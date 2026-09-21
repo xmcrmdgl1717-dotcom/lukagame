@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
@@ -8,15 +9,7 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
 
-// ================= 权限定义 =================
-const crypto = require('crypto');
-
-// 生成会话 Token
-function generateSessionToken() {
-  return crypto.randomBytes(32).toString('hex');
-}
-
-// 从请求头获取真实 IP
+// ================= 辅助函数 =================
 function getClientIp(req) {
   return (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
     || req.headers['x-real-ip']
@@ -24,69 +17,56 @@ function getClientIp(req) {
     || '';
 }
 
-// 从请求头获取 User-Agent
 function getClientUA(req) {
   return (req.headers['user-agent'] || '').slice(0, 200);
 }
 
+// ================= 权限定义 =================
 const ALL_PERMISSIONS = [
-  // 用户管理
   { key: 'users.view', label: '查看用户', group: '用户管理' },
   { key: 'users.edit', label: '编辑用户', group: '用户管理' },
   { key: 'users.delete', label: '删除用户', group: '用户管理' },
-  // 卡牌管理
   { key: 'cards.view', label: '查看卡牌', group: '卡牌管理' },
   { key: 'cards.create', label: '新增卡牌', group: '卡牌管理' },
   { key: 'cards.edit', label: '编辑卡牌', group: '卡牌管理' },
   { key: 'cards.delete', label: '删除卡牌', group: '卡牌管理' },
-  // 盲盒管理
   { key: 'boxes.view', label: '查看盲盒', group: '盲盒管理' },
   { key: 'boxes.create', label: '新增盲盒', group: '盲盒管理' },
   { key: 'boxes.edit', label: '编辑盲盒', group: '盲盒管理' },
   { key: 'boxes.delete', label: '删除盲盒', group: '盲盒管理' },
   { key: 'boxes.probability', label: '概率配置', group: '盲盒管理' },
-  // 充值套餐
   { key: 'recharge.view', label: '查看套餐', group: '充值套餐' },
   { key: 'recharge.create', label: '新增套餐', group: '充值套餐' },
   { key: 'recharge.edit', label: '编辑套餐', group: '充值套餐' },
   { key: 'recharge.delete', label: '删除套餐', group: '充值套餐' },
-  // 订单
   { key: 'orders.view', label: '查看订单', group: '订单管理' },
   { key: 'orders.refund', label: '手动补单', group: '订单管理' },
-  // 轮播图
   { key: 'banners.view', label: '查看轮播图', group: '轮播图' },
   { key: 'banners.create', label: '新增轮播图', group: '轮播图' },
   { key: 'banners.edit', label: '编辑轮播图', group: '轮播图' },
   { key: 'banners.delete', label: '删除轮播图', group: '轮播图' },
-  // 任务
   { key: 'tasks.view', label: '查看任务', group: '任务管理' },
   { key: 'tasks.create', label: '新增任务', group: '任务管理' },
   { key: 'tasks.edit', label: '编辑任务', group: '任务管理' },
   { key: 'tasks.delete', label: '删除任务', group: '任务管理' },
-  // 兑换码
   { key: 'redeem.view', label: '查看兑换码', group: '兑换码' },
   { key: 'redeem.create', label: '新增兑换码', group: '兑换码' },
   { key: 'redeem.delete', label: '删除兑换码', group: '兑换码' },
-  // 通知
   { key: 'notifications.view', label: '查看通知', group: '通知管理' },
   { key: 'notifications.create', label: '发布通知', group: '通知管理' },
   { key: 'notifications.delete', label: '删除通知', group: '通知管理' },
-  // 工单
   { key: 'tickets.view', label: '查看工单', group: '客服工单' },
   { key: 'tickets.reply', label: '回复工单', group: '客服工单' },
   { key: 'tickets.close', label: '关闭工单', group: '客服工单' },
   { key: 'tickets.delete', label: '删除工单', group: '客服工单' },
-  // 管理员
   { key: 'admins.view', label: '查看管理员', group: '管理员' },
   { key: 'admins.create', label: '新增管理员', group: '管理员' },
   { key: 'admins.edit', label: '编辑管理员', group: '管理员' },
   { key: 'admins.delete', label: '删除管理员', group: '管理员' },
-  // 角色
   { key: 'roles.view', label: '查看角色', group: '角色管理' },
   { key: 'roles.create', label: '新增角色', group: '角色管理' },
   { key: 'roles.edit', label: '编辑角色', group: '角色管理' },
   { key: 'roles.delete', label: '删除角色', group: '角色管理' },
-  // 审计
   { key: 'audit.view', label: '查看操作日志', group: '审计日志' },
 ];
 
@@ -372,7 +352,7 @@ app.put('/api/notifications/:id/read', async (req, res) => {
 
 // ================= 管理后台 API =================
 
-// 角色迁移：启动时自动执行一次
+// 启动时自动执行角色迁移
 async function migrateRoles() {
   try {
     for (const r of SYSTEM_ROLES) {
@@ -394,7 +374,7 @@ async function migrateRoles() {
 }
 migrateRoles();
 
-// 管理员登录（不需要鉴权）
+// 管理员登录
 app.post('/api/admin/login', async (req, res) => {
   const { username, password } = req.body;
   const admin = await prisma.admin.findUnique({
@@ -405,6 +385,17 @@ app.post('/api/admin/login', async (req, res) => {
     return res.status(401).json({ error: '账号或密码错误' });
   }
   await prisma.admin.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } });
+
+  try {
+    await prisma.adminSession.create({
+      data: {
+        adminId: admin.id,
+        adminName: admin.username,
+        ip: getClientIp(req),
+        userAgent: getClientUA(req),
+      },
+    });
+  } catch (e) { console.error('会话记录失败:', e); }
 
   const permissions = admin.roleRef?.name === 'super'
     ? ALL_PERMISSION_KEYS
@@ -439,6 +430,12 @@ app.use('/api/admin', async (req, res, next) => {
   req.permissions = admin.roleRef?.name === 'super'
     ? ALL_PERMISSION_KEYS
     : (admin.roleRef?.permissions || '').split(',').filter(Boolean);
+
+  prisma.adminSession.updateMany({
+    where: { adminId: admin.id, ip: getClientIp(req) },
+    data: { lastActiveAt: new Date() },
+  }).catch(() => {});
+
   next();
 });
 
@@ -449,7 +446,6 @@ function requirePermission(perm) {
   };
 }
 
-// 审计日志工具
 async function writeAuditLog(admin, action, targetType, targetId, detail) {
   try {
     await prisma.auditLog.create({
@@ -465,7 +461,6 @@ async function writeAuditLog(admin, action, targetType, targetId, detail) {
   } catch (e) { console.error('审计日志写入失败:', e); }
 }
 
-// 当前登录管理员信息
 app.get('/api/admin/me', async (req, res) => {
   res.json({
     id: req.admin.id,
@@ -477,7 +472,6 @@ app.get('/api/admin/me', async (req, res) => {
   });
 });
 
-// 数据概览
 app.get('/api/admin/stats', async (req, res) => {
   res.json({
     userCount: await prisma.user.count(),
@@ -487,6 +481,67 @@ app.get('/api/admin/stats', async (req, res) => {
     openTicketCount: await prisma.ticket.count({ where: { status: { not: 'CLOSED' } } }),
     totalRevenue: (await prisma.order.aggregate({ where: { status: 'PAID' }, _sum: { amount: true } }))._sum.amount || 0
   });
+});
+
+// ============ 密码二次确认 ============
+app.post('/api/admin/verify-password', async (req, res) => {
+  const { password } = req.body;
+  if (!password) return res.status(400).json({ error: '请输入密码' });
+  if (req.admin.password !== password) {
+    return res.status(401).json({ error: '密码错误' });
+  }
+  res.json({ success: true });
+});
+
+// ============ 会话管理 ============
+app.get('/api/admin/sessions', requirePermission('audit.view'), async (req, res) => {
+  const since = new Date();
+  since.setDate(since.getDate() - 7);
+  const sessions = await prisma.adminSession.findMany({
+    where: { createdAt: { gte: since } },
+    orderBy: { lastActiveAt: 'desc' },
+    take: 200,
+  });
+  res.json(sessions);
+});
+
+app.delete('/api/admin/sessions/cleanup', requirePermission('audit.view'), async (req, res) => {
+  const before = new Date();
+  before.setDate(before.getDate() - 30);
+  const result = await prisma.adminSession.deleteMany({ where: { createdAt: { lt: before } } });
+  await writeAuditLog(req.admin, 'session.cleanup', 'session', '', { deleted: result.count });
+  res.json({ success: true, deleted: result.count });
+});
+
+// ============ 数据导出 CSV ============
+app.get('/api/admin/export/users', requirePermission('users.view'), async (req, res) => {
+  const users = await prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
+  const header = '用户ID,用户名,金币余额,充值次数,提现次数,提现金额,注册时间,最近登录\n';
+  const rows = users.map(u => [
+    u.id, u.username, u.coins, u.rechargeCount, u.withdrawalCount, u.withdrawalAmount,
+    u.createdAt.toISOString(), u.lastLoginAt.toISOString(),
+  ].join(',')).join('\n');
+  const csv = '\uFEFF' + header + rows;
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="users_${Date.now()}.csv"`);
+  res.send(csv);
+});
+
+app.get('/api/admin/export/orders', requirePermission('orders.view'), async (req, res) => {
+  const orders = await prisma.order.findMany({
+    include: { user: { select: { username: true } }, option: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  const header = '订单ID,用户名,套餐基础金币,套餐赠送,支付金额(元),到账金币,状态,创建时间,支付时间\n';
+  const rows = orders.map(o => [
+    o.id, o.user.username, o.option.coins, o.option.bonus,
+    (o.amount / 100).toFixed(2), o.coins, o.status,
+    o.createdAt.toISOString(), o.paidAt ? o.paidAt.toISOString() : '',
+  ].join(',')).join('\n');
+  const csv = '\uFEFF' + header + rows;
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="orders_${Date.now()}.csv"`);
+  res.send(csv);
 });
 
 // ============ 用户管理 ============
@@ -584,8 +639,6 @@ app.delete('/api/admin/boxes/:id', requirePermission('boxes.delete'), async (req
     res.json({ success: true });
   } catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
-
-// 概率配置单独用 boxes.probability 权限
 app.post('/api/admin/boxes/:id/items', requirePermission('boxes.probability'), async (req, res) => {
   const { cardId, weight } = req.body;
   try {
