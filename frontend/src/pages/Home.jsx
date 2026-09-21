@@ -5,17 +5,19 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function Home({ onShowLogin, onGoGame }) {
-  const { user, boxes, updateCoins, setUser } = useStore();
+  const { user, updateCoins, setUser } = useStore();
   const [drawing, setDrawing] = useState(false);
   const [drawnResult, setDrawnResult] = useState([]);
   const [banners, setBanners] = useState([]);
   const [currentBanner, setCurrentBanner] = useState(0);
   const [games, setGames] = useState([]);
+  const [featuredBoxes, setFeaturedBoxes] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
 
   useEffect(() => {
     axios.get(`${API_URL}/api/banners`).then(res => setBanners(res.data)).catch(() => {});
     axios.get(`${API_URL}/api/games`).then(res => setGames(res.data)).catch(() => {});
+    axios.get(`${API_URL}/api/boxes?featured=true`).then(res => setFeaturedBoxes(res.data)).catch(() => {});
     axios.get(`${API_URL}/api/leaderboard/weekly`).then(res => setLeaderboard(res.data)).catch(() => {});
   }, []);
 
@@ -42,11 +44,9 @@ export default function Home({ onShowLogin, onGoGame }) {
     } catch (e) { alert(e.response?.data?.error || '抽卡失败'); }
   };
 
-  const getBox = (name, defaultPrice) => boxes.find(b => b.name.toLowerCase().includes(name.toLowerCase())) || { id: name, name, price: defaultPrice };
-
   return (
     <div className="p-4 space-y-6">
-      {/* 1. 轮播图 */}
+      {/* 轮播图 */}
       <div className="relative overflow-hidden rounded-2xl border border-[#3a1a1a] shadow-2xl">
         {banners.length === 0 ? (
           <div className="w-full h-48 bg-gradient-to-br from-[#2d1410] to-[#4a1c12] flex items-center justify-center text-gray-500 text-sm">暂无轮播图</div>
@@ -69,7 +69,7 @@ export default function Home({ onShowLogin, onGoGame }) {
         )}
       </div>
 
-      {/* 2. 周榜卡片 */}
+      {/* 排行榜 */}
       <div className="bg-gradient-to-br from-[#2d1410] to-[#4a1c12] border border-[#6b2a1e] rounded-2xl p-5 shadow-lg">
         <div className="text-center mb-3">
           <div className="text-orange-400 font-bold text-sm tracking-widest mb-1">1 Week Spending Leaderboard</div>
@@ -93,12 +93,10 @@ export default function Home({ onShowLogin, onGoGame }) {
         )}
       </div>
 
-      {/* 3. ====== 游戏列表（新） ====== */}
-      <div>
-        <div className="text-center text-xs font-bold text-gray-400 tracking-widest mb-3">游戏专区</div>
-        {games.length === 0 ? (
-          <div className="text-center text-gray-500 text-sm py-6">暂无游戏</div>
-        ) : (
+      {/* 游戏专区 */}
+      {games.length > 0 && (
+        <div>
+          <div className="text-center text-xs font-bold text-gray-400 tracking-widest mb-3">游戏专区</div>
           <div className="grid grid-cols-2 gap-3">
             {games.map((g) => (
               <div
@@ -123,28 +121,45 @@ export default function Home({ onShowLogin, onGoGame }) {
               </div>
             ))}
           </div>
-        )}
-      </div>
-
-      {/* 4. 推荐盲盒（原来的 HEAVEN & HELL） */}
-      <div className="text-center text-xs font-bold text-gray-400 tracking-widest my-3">推荐盲盒</div>
-
-      <div className="bg-[#1a0f0c] border border-[#3d1a1a] rounded-2xl p-4 relative overflow-hidden shadow-lg">
-        <div className="flex justify-between items-center mb-3">
-          <div className="text-orange-400 font-bold text-sm tracking-wide">HEAVEN & HELL</div>
-          <div className="bg-orange-600 text-white text-[10px] px-2 py-0.5 rounded shadow">Leaderboard</div>
         </div>
-        <div className="flex justify-between items-center">
-          <div className="flex-1">
-            <img src="https://via.placeholder.com/80x100/333/fff?text=H%26H" className="rounded shadow-md border border-orange-500/30" />
-          </div>
-          <div className="flex-1 text-right">
-            <div className="text-white text-sm font-bold mb-1">450 🪙</div>
-            <button onClick={() => handleDraw(getBox('Heaven', 450), 1)}
-              className="bg-orange-600 text-white text-xs px-5 py-2 rounded-lg font-bold hover:bg-orange-700 transition">开箱</button>
+      )}
+
+      {/* 推荐盲盒（从后台读取） */}
+      {featuredBoxes.length > 0 && (
+        <div>
+          <div className="text-center text-xs font-bold text-gray-400 tracking-widest my-3">推荐盲盒</div>
+          <div className="space-y-3">
+            {featuredBoxes.map((box) => (
+              <div key={box.id} className="bg-[#1a0f0c] border border-[#3d1a1a] rounded-2xl p-4 relative overflow-hidden shadow-lg">
+                <div className="flex justify-between items-center mb-3">
+                  <div className="text-orange-400 font-bold text-sm tracking-wide">{box.name}</div>
+                  {box.game?.displayName && (
+                    <div className="bg-orange-600 text-white text-[10px] px-2 py-0.5 rounded shadow">{box.game.displayName}</div>
+                  )}
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex-1">
+                    {box.coverUrl ? (
+                      <img src={box.coverUrl} className="w-20 h-24 object-cover rounded shadow-md border border-orange-500/30" />
+                    ) : (
+                      <div className="w-20 h-24 bg-[#0d0d0d] rounded flex items-center justify-center text-4xl">📦</div>
+                    )}
+                  </div>
+                  <div className="flex-1 text-right">
+                    <div className="text-white text-sm font-bold mb-2">{box.price.toLocaleString()} 🪙</div>
+                    <button
+                      onClick={() => handleDraw(box, 1)}
+                      className="bg-orange-600 text-white text-xs px-5 py-2 rounded-lg font-bold hover:bg-orange-700 transition"
+                    >
+                      开箱
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      )}
 
       <div className="text-center text-[10px] text-gray-600 pt-6 pb-2 leading-relaxed">
         POKEMON TRADING CARD GAME ONLINE<br/>
