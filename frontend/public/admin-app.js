@@ -20,6 +20,7 @@ createApp({
     const redeemCodes = ref([]);
     const tickets = ref([]);
     const admins = ref([]);
+    const notifications = ref([]);
 
     const newCard = ref({ name: '', rarity: 'R', imageUrl: '' });
     const newBox = ref({ name: '', price: 300, coverUrl: '' });
@@ -29,6 +30,7 @@ createApp({
     const newCode = ref({ code: '', coins: 100, maxUses: 1 });
     const batchCode = ref({ count: 10, prefix: 'LUKA' });
     const newAdmin = ref({ username: '', password: '', role: 'operator' });
+    const newNotification = ref({ userId: '', title: '', content: '' });
     const ticketReplies = ref({});
 
     const showEditUserModal = ref(false);
@@ -61,7 +63,7 @@ createApp({
 
     const fetchData = async () => {
       const h = headers();
-      const [s, u, c, b, r, o, bn, tk, rc, tp] = await Promise.all([
+      const [s, u, c, b, r, o, bn, tk, rc, tp, nt] = await Promise.all([
         axios.get(`${API_URL}/api/admin/stats`, { headers: h }),
         axios.get(`${API_URL}/api/admin/users`, { headers: h }),
         axios.get(`${API_URL}/api/admin/cards`, { headers: h }),
@@ -71,7 +73,8 @@ createApp({
         axios.get(`${API_URL}/api/admin/banners`, { headers: h }),
         axios.get(`${API_URL}/api/admin/tasks`, { headers: h }),
         axios.get(`${API_URL}/api/admin/redeem-codes`, { headers: h }),
-        axios.get(`${API_URL}/api/admin/tickets`, { headers: h })
+        axios.get(`${API_URL}/api/admin/tickets`, { headers: h }),
+        axios.get(`${API_URL}/api/admin/notifications`, { headers: h })
       ]);
       stats.value = s.data;
       users.value = u.data;
@@ -83,6 +86,7 @@ createApp({
       tasks.value = tk.data;
       redeemCodes.value = rc.data;
       tickets.value = tp.data;
+      notifications.value = nt.data;
       if (adminInfo.value?.role === 'super') {
         const a = await axios.get(`${API_URL}/api/admin/admins`, { headers: h });
         admins.value = a.data;
@@ -98,7 +102,7 @@ createApp({
     const tabClass = (tab) => ['px-4 py-2 rounded-lg text-sm font-bold transition',
       activeTab.value === tab ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'];
 
-    // 用户管理
+    // 用户
     const openEditUser = (u) => {
       editUserForm.value = { id: u.id, username: u.username, password: '', coins: u.coins, tags: u.tags || '', remark: u.remark || '' };
       showEditUserModal.value = true;
@@ -221,7 +225,7 @@ createApp({
       newItemWeight.value = 10;
     };
 
-    // 充值套餐
+    // 充值
     const addRecharge = async () => {
       if (!newRecharge.value.coins || !newRecharge.value.price) return alert('请填写基础金币和价格');
       try {
@@ -355,10 +359,26 @@ createApp({
       }
     };
 
+    // 通知（新增）
+    const addNotification = async () => {
+      if (!newNotification.value.title || !newNotification.value.content) return alert('请填写标题和内容');
+      try {
+        await axios.post(`${API_URL}/api/admin/notifications`, newNotification.value, { headers: headers() });
+        newNotification.value = { userId: '', title: '', content: '' };
+        fetchData();
+      } catch (e) { alert(e.response?.data?.error || '发布失败'); }
+    };
+    const deleteNotification = async (id) => {
+      if (confirm('确定要删除该通知吗？')) {
+        await axios.delete(`${API_URL}/api/admin/notifications/${id}`, { headers: headers() });
+        fetchData();
+      }
+    };
+
     return {
       isLoggedIn, adminUsername, password, adminInfo, activeTab, stats,
-      users, cards, boxes, rechargeOptions, orders, banners, tasks, redeemCodes, tickets, admins,
-      newCard, newBox, newRecharge, newBanner, newTask, newCode, batchCode, newAdmin, ticketReplies,
+      users, cards, boxes, rechargeOptions, orders, banners, tasks, redeemCodes, tickets, admins, notifications,
+      newCard, newBox, newRecharge, newBanner, newTask, newCode, batchCode, newAdmin, newNotification, ticketReplies,
       showEditUserModal, editUserForm, showEditCardModal, editCardForm,
       showProbabilityModal, currentBox, newItemCardId, newItemWeight,
       availableCards, totalWeight,
@@ -373,7 +393,8 @@ createApp({
       addTask, toggleTask, deleteTask,
       addCode, batchAddCodes, deleteCode,
       replyTicket, closeTicket, deleteTicket,
-      addAdmin, deleteAdmin
+      addAdmin, deleteAdmin,
+      addNotification, deleteNotification
     };
   }
 }).mount('#app');
