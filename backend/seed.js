@@ -41,7 +41,7 @@ async function main() {
     create: { username: 'admin', password: 'admin123', roleId: superRole.id, role: 'super' },
   });
 
-  // ================= VIP 等级 =================
+  // VIP 等级
   const vipLevels = [
     { level: 0, name: 'VIP0', sortOrder: 1, rechargeAmount: 0, consumeAmount: 0 },
     { level: 1, name: 'VIP1', sortOrder: 2, rechargeAmount: 30000, consumeAmount: 100000 },
@@ -54,44 +54,38 @@ async function main() {
     { level: 8, name: 'VIP8', sortOrder: 9, rechargeAmount: 100000000, consumeAmount: 300000000 },
     { level: 9, name: 'VIP9', sortOrder: 10, rechargeAmount: 300000000, consumeAmount: 900000000 },
   ];
-  for (const v of vipLevels) {
-    await prisma.vipLevel.upsert({ where: { level: v.level }, update: {}, create: v });
-  }
+  for (const v of vipLevels) await prisma.vipLevel.upsert({ where: { level: v.level }, update: {}, create: v });
 
-  // ================= 用户分组 =================
+  // 用户分组
   const groups = [
     { name: 'normal', displayName: '普通用户', color: '#6b7280', sortOrder: 1 },
     { name: 'bigr', displayName: '大R用户', color: '#ef4444', sortOrder: 2 },
     { name: 'potential', displayName: '潜力用户', color: '#f59e0b', sortOrder: 3 },
     { name: 'lost', displayName: '流失用户', color: '#9ca3af', sortOrder: 4 },
   ];
-  for (const g of groups) {
-    await prisma.userGroup.upsert({ where: { name: g.name }, update: {}, create: g });
-  }
+  for (const g of groups) await prisma.userGroup.upsert({ where: { name: g.name }, update: {}, create: g });
 
-  // ================= 支付渠道 =================
+  // 支付渠道
   const channels = [
     { name: 'alipay', displayName: '支付宝', sortOrder: 1 },
     { name: 'wechat', displayName: '微信支付', sortOrder: 2 },
     { name: 'stripe', displayName: 'Stripe', sortOrder: 3 },
   ];
-  for (const c of channels) {
-    await prisma.paymentChannel.upsert({ where: { name: c.name }, update: {}, create: c });
-  }
+  for (const c of channels) await prisma.paymentChannel.upsert({ where: { name: c.name }, update: {}, create: c });
 
-  // ================= 测试用户 =================
+  // 测试用户
   await prisma.user.upsert({
     where: { username: 'test' },
     update: {},
     create: { username: 'test', password: '123', coins: 100000, vipLevel: 2, totalRecharge: 100000, totalConsume: 300000 },
   });
 
-  // ================= 卡牌 =================
+  // 卡牌
   const c1 = await prisma.card.upsert({ where: { id: 'card-1' }, update: {}, create: { id: 'card-1', name: '喷火龙', rarity: 'SSR', value: 50000 } });
   const c2 = await prisma.card.upsert({ where: { id: 'card-2' }, update: {}, create: { id: 'card-2', name: '皮卡丘', rarity: 'SR', value: 5000 } });
   const c3 = await prisma.card.upsert({ where: { id: 'card-3' }, update: {}, create: { id: 'card-3', name: '杰尼龟', rarity: 'R', value: 500 } });
 
-  // ================= 游戏 =================
+  // 游戏
   const game = await prisma.game.upsert({
     where: { name: 'heaven_hell' },
     update: {},
@@ -101,7 +95,7 @@ async function main() {
     },
   });
 
-  // ================= 盲盒 =================
+  // 盲盒
   await prisma.box.upsert({
     where: { id: 'box-1' },
     update: { gameId: game.id },
@@ -111,7 +105,7 @@ async function main() {
     },
   });
 
-  // ================= 充值套餐 =================
+  // 充值套餐
   const opts = [
     { id: 'rc-1', coins: 300, bonus: 0, price: 3000, sortOrder: 1 },
     { id: 'rc-2', coins: 1500, bonus: 100, price: 15000, sortOrder: 2 },
@@ -122,37 +116,44 @@ async function main() {
   ];
   for (const o of opts) await prisma.rechargeOption.upsert({ where: { id: o.id }, update: {}, create: o });
 
-  // ================= 轮播图 =================
+  // 轮播图
   const banners = [
     { id: 'bn-1', imageUrl: 'https://via.placeholder.com/800x400/2d1410/ff6600?text=Welcome', link: 'https://luka.game', title: 'Welcome', sortOrder: 1 },
   ];
   for (const b of banners) await prisma.banner.upsert({ where: { id: b.id }, update: {}, create: b });
 
-  // ================= 任务 =================
+  // 任务
   const tasks = [
     { id: 'task-1', title: '每日抽卡 1 次', action: 'DRAW', targetCount: 1, rewardCoins: 100, sortOrder: 1 },
     { id: 'task-2', title: '每日抽卡 10 次', action: 'DRAW', targetCount: 10, rewardCoins: 500, sortOrder: 2 },
   ];
   for (const t of tasks) await prisma.task.upsert({ where: { id: t.id }, update: {}, create: t });
 
-  // ================= 菜单（B 方案：默认菜单树） =================
+  // ================= 菜单（B 方案） =================
   const menus = [
-    // 一级菜单
     { id: 'menu-dashboard', parentId: null, title: '仪表盘', type: 'MENU', icon: '📊', path: '/', component: 'DashboardPage', permission: '', sortOrder: 1 },
 
     { id: 'menu-user-group', parentId: null, title: '用户管理', type: 'DIRECTORY', icon: '👥', path: '', component: '', permission: '', sortOrder: 2 },
     { id: 'menu-users', parentId: 'menu-user-group', title: '用户列表', type: 'MENU', icon: '👥', path: '/users', component: 'UserList', permission: 'users.view', sortOrder: 1 },
-    { id: 'menu-vip-levels', parentId: 'menu-user-group', title: 'VIP等级设置', type: 'MENU', icon: '👑', path: '/vip-levels', component: 'VipLevels', permission: 'users.vip', sortOrder: 2 },
+    { id: 'menu-user-groups', parentId: 'menu-user-group', title: '用户分组', type: 'MENU', icon: '📁', path: '/user-groups', component: 'UserGroupList', permission: 'groups.view', sortOrder: 2 },
+    { id: 'menu-bankcards', parentId: 'menu-user-group', title: '绑卡管理', type: 'MENU', icon: '💳', path: '/bankcards', component: 'BankCardList', permission: 'bankcards.view', sortOrder: 3 },
+    { id: 'menu-vip-levels', parentId: 'menu-user-group', title: 'VIP等级设置', type: 'MENU', icon: '👑', path: '/vip-levels', component: 'VipLevels', permission: 'users.vip', sortOrder: 4 },
 
-    { id: 'menu-cards', parentId: null, title: '卡牌管理', type: 'MENU', icon: '🃏', path: '/cards', component: 'CardList', permission: 'cards.view', sortOrder: 3 },
-    { id: 'menu-boxes', parentId: null, title: '盲盒管理', type: 'MENU', icon: '📦', path: '/boxes', component: 'BoxList', permission: 'boxes.view', sortOrder: 4 },
-    { id: 'menu-recharge', parentId: null, title: '充值套餐', type: 'MENU', icon: '💰', path: '/recharge-options', component: 'RechargeList', permission: 'recharge.view', sortOrder: 5 },
-    { id: 'menu-orders', parentId: null, title: '订单管理', type: 'MENU', icon: '📄', path: '/orders', component: 'OrderList', permission: 'orders.view', sortOrder: 6 },
-    { id: 'menu-banners', parentId: null, title: '轮播图', type: 'MENU', icon: '🖼️', path: '/banners', component: 'BannerList', permission: 'banners.view', sortOrder: 7 },
-    { id: 'menu-tasks', parentId: null, title: '任务管理', type: 'MENU', icon: '🎯', path: '/tasks', component: 'TaskList', permission: 'tasks.view', sortOrder: 8 },
-    { id: 'menu-redeem', parentId: null, title: '兑换码', type: 'MENU', icon: '🎁', path: '/redeem-codes', component: 'RedeemCodeList', permission: 'redeem.view', sortOrder: 9 },
-    { id: 'menu-notifications', parentId: null, title: '通知管理', type: 'MENU', icon: '🔔', path: '/notifications', component: 'NotificationList', permission: 'notifications.view', sortOrder: 10 },
-    { id: 'menu-tickets', parentId: null, title: '客服工单', type: 'MENU', icon: '🎧', path: '/tickets', component: 'TicketList', permission: 'tickets.view', sortOrder: 11 },
+    { id: 'menu-games', parentId: null, title: '游戏管理', type: 'MENU', icon: '🎮', path: '/games', component: 'GameList', permission: 'games.view', sortOrder: 3 },
+
+    { id: 'menu-cards', parentId: null, title: '卡牌管理', type: 'MENU', icon: '🃏', path: '/cards', component: 'CardList', permission: 'cards.view', sortOrder: 4 },
+    { id: 'menu-boxes', parentId: null, title: '盲盒管理', type: 'MENU', icon: '📦', path: '/boxes', component: 'BoxList', permission: 'boxes.view', sortOrder: 5 },
+    { id: 'menu-recharge', parentId: null, title: '充值套餐', type: 'MENU', icon: '💰', path: '/recharge-options', component: 'RechargeList', permission: 'recharge.view', sortOrder: 6 },
+    { id: 'menu-orders', parentId: null, title: '订单管理', type: 'MENU', icon: '📄', path: '/orders', component: 'OrderList', permission: 'orders.view', sortOrder: 7 },
+
+    { id: 'menu-ad-group', parentId: null, title: '广告管理', type: 'DIRECTORY', icon: '📣', path: '', component: '', permission: '', sortOrder: 8 },
+    { id: 'menu-ads', parentId: 'menu-ad-group', title: '广告列表', type: 'MENU', icon: '📺', path: '/ads', component: 'AdList', permission: 'ads.view', sortOrder: 1 },
+    { id: 'menu-banners', parentId: 'menu-ad-group', title: '轮播图', type: 'MENU', icon: '🖼️', path: '/banners', component: 'BannerList', permission: 'banners.view', sortOrder: 2 },
+
+    { id: 'menu-tasks', parentId: null, title: '任务管理', type: 'MENU', icon: '🎯', path: '/tasks', component: 'TaskList', permission: 'tasks.view', sortOrder: 9 },
+    { id: 'menu-redeem', parentId: null, title: '兑换码', type: 'MENU', icon: '🎁', path: '/redeem-codes', component: 'RedeemCodeList', permission: 'redeem.view', sortOrder: 10 },
+    { id: 'menu-notifications', parentId: null, title: '通知管理', type: 'MENU', icon: '🔔', path: '/notifications', component: 'NotificationList', permission: 'notifications.view', sortOrder: 11 },
+    { id: 'menu-tickets', parentId: null, title: '客服工单', type: 'MENU', icon: '🎧', path: '/tickets', component: 'TicketList', permission: 'tickets.view', sortOrder: 12 },
 
     { id: 'menu-system-group', parentId: null, title: '系统管理', type: 'DIRECTORY', icon: '⚙️', path: '', component: '', permission: '', sortOrder: 99 },
     { id: 'menu-admins', parentId: 'menu-system-group', title: '管理员列表', type: 'MENU', icon: '👤', path: '/admins', component: 'AdminList', permission: 'admins.view', sortOrder: 1 },
@@ -162,8 +163,13 @@ async function main() {
     { id: 'menu-audit-logs', parentId: 'menu-system-group', title: '操作日志', type: 'MENU', icon: '📝', path: '/admins/audit-logs', component: 'AuditLogList', permission: 'audit.view', sortOrder: 5 },
     { id: 'menu-sessions', parentId: 'menu-system-group', title: '会话管理', type: 'MENU', icon: '💻', path: '/admins/sessions', component: 'SessionList', permission: 'audit.view', sortOrder: 6 },
   ];
+
   for (const m of menus) {
-    await prisma.adminMenu.upsert({ where: { id: m.id }, update: {}, create: m });
+    await prisma.adminMenu.upsert({
+      where: { id: m.id },
+      update: { title: m.title, icon: m.icon, path: m.path, component: m.component, permission: m.permission, sortOrder: m.sortOrder, parentId: m.parentId },
+      create: m,
+    });
   }
 
   console.log('✅ 数据初始化完成');
