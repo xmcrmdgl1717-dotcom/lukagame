@@ -20,10 +20,8 @@
         <div v-if="!isLoggedIn" class="flex items-center justify-center h-screen">
             <div class="bg-gray-800 p-8 rounded-xl shadow-lg w-full max-w-sm border border-gray-700">
                 <h1 class="text-2xl font-bold text-center text-red-500 mb-6">LUKA 管理后台</h1>
-                <input v-model="adminUsername" placeholder="管理员用户名"
-                       class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 mb-3 text-white focus:outline-none focus:border-red-500">
-                <input v-model="password" type="password" placeholder="请输入管理密码"
-                       class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 mb-4 text-white focus:outline-none focus:border-red-500">
+                <input v-model="adminUsername" placeholder="管理员用户名" class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 mb-3 text-white focus:outline-none focus:border-red-500">
+                <input v-model="password" type="password" placeholder="请输入管理密码" class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 mb-4 text-white focus:outline-none focus:border-red-500">
                 <button @click="login" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded transition">登录系统</button>
                 <p class="text-xs text-gray-500 mt-4 text-center">默认: admin / admin123</p>
             </div>
@@ -34,9 +32,7 @@
             <div class="flex justify-between items-center bg-gray-800 p-4 rounded-xl border border-gray-700 mb-6">
                 <div>
                     <h1 class="text-xl font-bold text-red-500">LUKA 管理后台</h1>
-                    <div class="text-xs text-gray-500 mt-1">
-                        当前: {{ adminInfo?.username }} ({{ adminInfo?.role }})
-                    </div>
+                    <div class="text-xs text-gray-500 mt-1">当前: {{ adminInfo?.username }} ({{ adminInfo?.role }})</div>
                 </div>
                 <button @click="logout" class="text-sm text-gray-400 hover:text-white">退出登录</button>
             </div>
@@ -79,6 +75,7 @@
                 <button @click="activeTab='banners'" :class="tabClass('banners')">轮播图</button>
                 <button @click="activeTab='tasks'" :class="tabClass('tasks')">任务管理</button>
                 <button @click="activeTab='redeemCodes'" :class="tabClass('redeemCodes')">兑换码</button>
+                <button @click="activeTab='notifications'" :class="tabClass('notifications')">通知管理</button>
                 <button @click="activeTab='tickets'" :class="tabClass('tickets')">
                     客服工单
                     <span v-if="stats.openTicketCount > 0" class="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5">{{ stats.openTicketCount }}</span>
@@ -86,7 +83,7 @@
                 <button v-if="adminInfo?.role === 'super'" @click="activeTab='admins'" :class="tabClass('admins')">管理员</button>
             </div>
 
-            <!-- ========== 用户管理 ========== -->
+            <!-- 用户管理 -->
             <div v-if="activeTab === 'users'" class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm whitespace-nowrap">
@@ -121,7 +118,7 @@
                 </div>
             </div>
 
-            <!-- ========== 卡牌管理 ========== -->
+            <!-- 卡牌管理 -->
             <div v-if="activeTab === 'cards'">
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
                     <input v-model="newCard.name" placeholder="卡牌名称" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-40 text-white">
@@ -156,7 +153,7 @@
                 </div>
             </div>
 
-            <!-- ========== 盲盒管理 ========== -->
+            <!-- 盲盒管理 -->
             <div v-if="activeTab === 'boxes'">
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
                     <input v-model="newBox.name" placeholder="盲盒名称" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-40 text-white">
@@ -185,7 +182,7 @@
                 </div>
             </div>
 
-            <!-- ========== 充值套餐 ========== -->
+            <!-- 充值套餐 -->
             <div v-if="activeTab === 'recharge'">
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
                     <input v-model.number="newRecharge.coins" type="number" placeholder="基础金币" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-28 text-white">
@@ -218,7 +215,7 @@
                 </div>
             </div>
 
-            <!-- ========== 订单管理 ========== -->
+            <!-- 订单管理 -->
             <div v-if="activeTab === 'orders'" class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm whitespace-nowrap">
@@ -245,7 +242,7 @@
                 </div>
             </div>
 
-            <!-- ========== 轮播图管理 ========== -->
+            <!-- 轮播图管理 -->
             <div v-if="activeTab === 'banners'">
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
                     <input v-model="newBanner.imageUrl" placeholder="图片 URL" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm flex-1 min-w-[200px] text-white">
@@ -269,7 +266,7 @@
                 </div>
             </div>
 
-            <!-- ========== 任务管理 ========== -->
+            <!-- 任务管理 -->
             <div v-if="activeTab === 'tasks'">
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
                     <input v-model="newTask.title" placeholder="任务标题" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-40 text-white">
@@ -309,7 +306,7 @@
                 </div>
             </div>
 
-            <!-- ========== 兑换码 ========== -->
+            <!-- 兑换码 -->
             <div v-if="activeTab === 'redeemCodes'">
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
                     <input v-model="newCode.code" placeholder="兑换码（大写）" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-40 text-white">
@@ -344,7 +341,37 @@
                 </div>
             </div>
 
-            <!-- ========== 客服工单 ========== -->
+            <!-- 通知管理（新增） -->
+            <div v-if="activeTab === 'notifications'">
+                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4">
+                    <div class="text-sm font-bold text-white mb-3">发布新通知</div>
+                    <div class="space-y-2">
+                        <input v-model="newNotification.userId" placeholder="指定用户 ID（留空表示全员通知）" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-white">
+                        <input v-model="newNotification.title" placeholder="通知标题" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-white">
+                        <textarea v-model="newNotification.content" rows="3" placeholder="通知内容" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-white"></textarea>
+                        <button @click="addNotification" class="bg-green-600 hover:bg-green-700 text-white text-sm px-6 py-2 rounded font-bold">发布通知</button>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <div v-for="n in notifications" :key="n.id" class="bg-gray-800 rounded-xl border border-gray-700 p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <div class="text-white font-bold">{{ n.title }}</div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    {{ n.userId ? '指定用户: ' + n.userId.slice(0, 8) : '全员通知' }} · {{ formatDate(n.createdAt) }}
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                <span class="text-xs bg-blue-900 text-blue-200 px-2 py-0.5 rounded">已读 {{ n.reads.length }}</span>
+                                <button @click="deleteNotification(n.id)" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded">删除</button>
+                            </div>
+                        </div>
+                        <div class="text-sm text-gray-300 bg-gray-900 rounded p-3">{{ n.content }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 客服工单 -->
             <div v-if="activeTab === 'tickets'">
                 <div class="space-y-3">
                     <div v-for="t in tickets" :key="t.id" class="bg-gray-800 rounded-xl border border-gray-700 p-4">
@@ -371,7 +398,7 @@
                 </div>
             </div>
 
-            <!-- ========== 管理员账号 ========== -->
+            <!-- 管理员账号 -->
             <div v-if="activeTab === 'admins' && adminInfo?.role === 'super'">
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
                     <input v-model="newAdmin.username" placeholder="用户名" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-40 text-white">
@@ -405,7 +432,7 @@
             </div>
         </div>
 
-        <!-- ========== 编辑用户弹窗 ========== -->
+        <!-- 编辑用户弹窗 -->
         <div v-if="showEditUserModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div class="bg-gray-800 rounded-xl border border-gray-600 p-6 w-full max-w-md shadow-2xl">
                 <h3 class="text-lg font-bold text-white mb-4">编辑用户: {{ editUserForm.username }}</h3>
@@ -428,7 +455,7 @@
             </div>
         </div>
 
-        <!-- ========== 编辑卡牌弹窗 ========== -->
+        <!-- 编辑卡牌弹窗 -->
         <div v-if="showEditCardModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div class="bg-gray-800 rounded-xl border border-gray-600 p-6 w-full max-w-md shadow-2xl">
                 <h3 class="text-lg font-bold text-white mb-4">编辑卡牌</h3>
@@ -449,7 +476,7 @@
             </div>
         </div>
 
-        <!-- ========== 概率配置弹窗 ========== -->
+        <!-- 概率配置弹窗 -->
         <div v-if="showProbabilityModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div class="bg-gray-800 rounded-xl border border-gray-600 p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
                 <h3 class="text-lg font-bold text-white mb-4">概率配置 - {{ currentBox?.name }}</h3>
