@@ -34,6 +34,7 @@ model User {
   userTasks        UserTask[]
   redeemUses       RedeemCodeUse[]
   tickets          Ticket[]
+  drawLogs         DrawLog[]
 }
 
 model Card {
@@ -54,6 +55,7 @@ model Box {
   isActive  Boolean    @default(true)
   createdAt DateTime   @default(now())
   items     BoxItem[]
+  drawLogs  DrawLog[]
 }
 
 model BoxItem {
@@ -174,4 +176,32 @@ model TicketReply {
   content   String
   createdAt DateTime @default(now())
   ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+}
+
+model DrawLog {
+  id        String   @id @default(uuid())
+  userId    String
+  boxId     String
+  cost      Int
+  count     Int      @default(1)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  box       Box      @relation(fields: [boxId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String?  // null 表示全员通知
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  reads     NotificationRead[]
+}
+
+model NotificationRead {
+  id             String   @id @default(uuid())
+  notificationId String
+  userId         String
+  readAt         DateTime @default(now())
+  @@unique([notificationId, userId])
 }
