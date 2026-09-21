@@ -36,7 +36,6 @@ app.get('/api/boxes', async (req, res) => {
   res.json(await prisma.box.findMany({ where: { isActive: true } }));
 });
 
-// 抽卡（新增 DrawLog 写入）
 app.post('/api/draw', async (req, res) => {
   const { userId, boxId, count } = req.body;
   try {
@@ -46,7 +45,6 @@ app.post('/api/draw', async (req, res) => {
       const totalCost = box.price * count;
       if (user.coins < totalCost) throw new Error('金币不足');
       await tx.user.update({ where: { id: userId }, data: { coins: { decrement: totalCost } } });
-
       const drawnCards = [];
       const totalWeight = box.items.reduce((sum, item) => sum + item.weight, 0);
       for (let i = 0; i < count; i++) {
@@ -63,9 +61,7 @@ app.post('/api/draw', async (req, res) => {
           create: { userId, cardId: card.id, quantity: 1 }
         });
       }
-      // 记录抽卡日志（用于排行榜）
       await tx.drawLog.create({ data: { userId, boxId, cost: totalCost, count } });
-
       await updateTaskProgress(tx, userId, 'DRAW', count);
       await updateTaskProgress(tx, userId, 'SPEND', totalCost);
       return { success: true, drawnCards };
@@ -149,21 +145,17 @@ app.get('/api/banners', async (req, res) => {
   res.json(await prisma.banner.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
 });
 
-// === 用户端：我的订单 ===
 app.get('/api/orders/:userId', async (req, res) => {
   try {
-    const orders = await prisma.order.findMany({
+    res.json(await prisma.order.findMany({
       where: { userId: req.params.userId },
       include: { option: true },
       orderBy: { createdAt: 'desc' },
       take: 100
-    });
-    res.json(orders);
+    }));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// === 用户端：排行榜 ===
-// 周榜：最近 7 天，按消耗金币排名
 app.get('/api/leaderboard/weekly', async (req, res) => {
   try {
     const since = new Date();
@@ -175,7 +167,6 @@ app.get('/api/leaderboard/weekly', async (req, res) => {
       orderBy: { _sum: { cost: 'desc' } },
       take: 10
     });
-    // 关联用户名
     const data = [];
     for (const row of result) {
       const user = await prisma.user.findUnique({ where: { id: row.userId }, select: { username: true } });
@@ -185,7 +176,6 @@ app.get('/api/leaderboard/weekly', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 月榜：最近 30 天
 app.get('/api/leaderboard/monthly', async (req, res) => {
   try {
     const since = new Date();
@@ -235,15 +225,14 @@ app.post('/api/tickets', async (req, res) => {
 });
 
 app.get('/api/tickets/:userId', async (req, res) => {
-  const tickets = await prisma.ticket.findMany({
+  res.json(await prisma.ticket.findMany({
     where: { userId: req.params.userId },
     include: { replies: { orderBy: { createdAt: 'asc' } } },
     orderBy: { createdAt: 'desc' }
-  });
-  res.json(tickets);
+  }));
 });
 
-// === 用户端：通知系统 ===
+// === 通知系统（用户端） ===
 app.get('/api/notifications/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -251,7 +240,7 @@ app.get('/api/notifications/:userId', async (req, res) => {
       where: {
         OR: [
           { userId: userId },
-          { userId: null } // 全员通知
+          { userId: null }
         ]
       },
       orderBy: { createdAt: 'desc' },
@@ -260,6 +249,18 @@ app.get('/api/notifications/:userId', async (req, res) => {
     const reads = await prisma.notificationRead.findMany({ where: { userId } });
     const readIds = reads.map(r => r.notificationId);
     res.json(notifications.map(n => ({ ...n, isRead: readIds.includes(n.id) })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 未读数（用于红点）
+app.get('/api/notifications/:userId/unread-count', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const total = await prisma.notification.count({
+      where: { OR: [{ userId: userId }, { userId: null }] }
+    });
+    const reads = await prisma.notificationRead.count({ where: { userId } });
+    res.json({ unread: Math.max(total - reads, 0) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -319,7 +320,6 @@ app.get('/api/admin/stats', async (req, res) => {
   });
 });
 
-// --- 用户管理 ---
 app.get('/api/admin/users', async (req, res) => {
   res.json(await prisma.user.findMany({
     select: { id: true, username: true, coins: true, createdAt: true, lastLoginAt: true,
@@ -343,7 +343,6 @@ app.delete('/api/admin/users/:id', async (req, res) => {
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// --- 卡牌 ---
 app.get('/api/admin/cards', async (req, res) => res.json(await prisma.card.findMany({ orderBy: { createdAt: 'desc' } })));
 app.post('/api/admin/cards', async (req, res) => {
   const { name, rarity, imageUrl } = req.body;
@@ -360,7 +359,6 @@ app.delete('/api/admin/cards/:id', async (req, res) => {
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// --- 盲盒 ---
 app.get('/api/admin/boxes', async (req, res) => {
   res.json(await prisma.box.findMany({ include: { items: { include: { card: true } } }, orderBy: { createdAt: 'desc' } }));
 });
@@ -396,7 +394,6 @@ app.delete('/api/admin/boxes/:boxId/items/:itemId', async (req, res) => {
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// --- 充值套餐 ---
 app.get('/api/admin/recharge-options', async (req, res) => res.json(await prisma.rechargeOption.findMany({ orderBy: { sortOrder: 'asc' } })));
 app.post('/api/admin/recharge-options', async (req, res) => {
   const { coins, bonus, price, sortOrder } = req.body;
@@ -422,7 +419,6 @@ app.delete('/api/admin/recharge-options/:id', async (req, res) => {
   catch (e) { res.status(400).json({ error: '删除失败，可能有订单引用' }); }
 });
 
-// --- 订单 ---
 app.get('/api/admin/orders', async (req, res) => {
   res.json(await prisma.order.findMany({
     include: { user: { select: { username: true } }, option: true },
@@ -442,7 +438,6 @@ app.put('/api/admin/orders/:id/paid', async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// --- 轮播图 ---
 app.get('/api/admin/banners', async (req, res) => res.json(await prisma.banner.findMany({ orderBy: { sortOrder: 'asc' } })));
 app.post('/api/admin/banners', async (req, res) => {
   const { imageUrl, link, title, sortOrder } = req.body;
@@ -468,7 +463,6 @@ app.delete('/api/admin/banners/:id', async (req, res) => {
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// --- 任务 ---
 app.get('/api/admin/tasks', async (req, res) => res.json(await prisma.task.findMany({ orderBy: { sortOrder: 'asc' } })));
 app.post('/api/admin/tasks', async (req, res) => {
   const { title, description, action, targetCount, rewardCoins, sortOrder } = req.body;
@@ -496,7 +490,6 @@ app.delete('/api/admin/tasks/:id', async (req, res) => {
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// --- 兑换码 ---
 app.get('/api/admin/redeem-codes', async (req, res) => res.json(await prisma.redeemCode.findMany({ orderBy: { createdAt: 'desc' }, take: 200 })));
 app.post('/api/admin/redeem-codes', async (req, res) => {
   const { code, coins, maxUses } = req.body;
@@ -526,7 +519,6 @@ app.delete('/api/admin/redeem-codes/:id', async (req, res) => {
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// --- 工单 ---
 app.get('/api/admin/tickets', async (req, res) => {
   res.json(await prisma.ticket.findMany({
     include: { user: { select: { username: true } }, replies: { orderBy: { createdAt: 'asc' } } },
@@ -555,7 +547,6 @@ app.delete('/api/admin/tickets/:id', async (req, res) => {
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// --- 管理员账号 ---
 app.get('/api/admin/admins', requireRole('super'), async (req, res) => {
   res.json(await prisma.admin.findMany({
     select: { id: true, username: true, role: true, isActive: true, createdAt: true, lastLoginAt: true },
@@ -587,10 +578,15 @@ app.delete('/api/admin/admins/:id', requireRole('super'), async (req, res) => {
   } catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// --- 通知管理 ---
+// --- 通知管理（新增） ---
 app.get('/api/admin/notifications', async (req, res) => {
-  res.json(await prisma.notification.findMany({ orderBy: { createdAt: 'desc' }, take: 100 }));
+  res.json(await prisma.notification.findMany({
+    include: { reads: true },
+    orderBy: { createdAt: 'desc' },
+    take: 100
+  }));
 });
+
 app.post('/api/admin/notifications', async (req, res) => {
   const { userId, title, content } = req.body;
   if (!title || !content) return res.status(400).json({ error: '请填写标题和内容' });
@@ -601,6 +597,7 @@ app.post('/api/admin/notifications', async (req, res) => {
     res.json({ success: true, notification });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
+
 app.delete('/api/admin/notifications/:id', async (req, res) => {
   try { await prisma.notification.delete({ where: { id: req.params.id } }); res.json({ success: true }); }
   catch (e) { res.status(400).json({ error: '删除失败' }); }
