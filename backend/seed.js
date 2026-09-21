@@ -2,7 +2,6 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  // 默认管理员账号
   await prisma.admin.upsert({
     where: { username: 'admin' },
     update: {},
@@ -14,7 +13,6 @@ async function main() {
     create: { username: 'operator', password: 'op123', role: 'operator' }
   });
 
-  // 测试用户
   await prisma.user.upsert({
     where: { username: 'test' },
     update: {},
@@ -26,7 +24,8 @@ async function main() {
   const c3 = await prisma.card.upsert({ where: { id: 'card-3' }, update: {}, create: { id: 'card-3', name: '杰尼龟', rarity: 'R', imageUrl: '' } });
 
   await prisma.box.upsert({
-    where: { id: 'box-1' }, update: {},
+    where: { id: 'box-1' },
+    update: {},
     create: {
       id: 'box-1', name: 'Heaven & Hell', price: 450, coverUrl: '',
       items: { create: [{ cardId: c1.id, weight: 1 }, { cardId: c2.id, weight: 9 }, { cardId: c3.id, weight: 90 }] }
@@ -58,7 +57,9 @@ async function main() {
   ];
   for (const t of tasks) await prisma.task.upsert({ where: { id: t.id }, update: {}, create: t });
 
-  console.log('✅ 数据初始化完成！管理员: admin/admin123 (super) 或 operator/op123');
+  console.log('✅ 数据初始化完成！');
+  console.log('管理员: admin / admin123 (super) 或 operator / op123');
+  console.log('测试用户: test / 123');
 }
 
 main().catch(e => console.error(e)).finally(() => prisma.$disconnect());
