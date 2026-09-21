@@ -7,8 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ================= 用户体系 =================
-
 model User {
   id               String   @id @default(uuid())
   username         String   @unique
@@ -25,8 +23,7 @@ model User {
   withdrawalCount  Int      @default(0)
   withdrawalAmount Int      @default(0)
   createdAt        DateTime @default(now())
-
-  group            UserGroup?     @relation(fields: [groupId], references: [id])
+  group            UserGroup?      @relation(fields: [groupId], references: [id])
   inventory        Inventory[]
   orders           Order[]
   userTasks        UserTask[]
@@ -71,8 +68,6 @@ model VipLevel {
   createdAt      DateTime @default(now())
 }
 
-// ================= 抽奖体系 =================
-
 model Game {
   id                String   @id @default(uuid())
   name              String   @unique
@@ -104,16 +99,17 @@ model Card {
 }
 
 model Box {
-  id        String     @id @default(uuid())
-  name      String
-  price     Int
-  coverUrl  String     @default("")
-  isActive  Boolean    @default(true)
-  gameId    String?
-  game      Game?      @relation(fields: [gameId], references: [id])
-  createdAt DateTime   @default(now())
-  items     BoxItem[]
-  drawLogs  DrawLog[]
+  id         String   @id @default(uuid())
+  name       String
+  price      Int
+  coverUrl   String   @default("")
+  isActive   Boolean  @default(true)
+  isFeatured Boolean  @default(false)   // 新增：是否在首页推荐
+  gameId     String?
+  game       Game?    @relation(fields: [gameId], references: [id])
+  createdAt  DateTime @default(now())
+  items      BoxItem[]
+  drawLogs   DrawLog[]
 }
 
 model BoxItem {
@@ -134,8 +130,6 @@ model Inventory {
   card     Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
   @@unique([userId, cardId])
 }
-
-// ================= 资金体系 =================
 
 model RechargeOption {
   id        String   @id @default(uuid())
@@ -194,8 +188,6 @@ model PaymentChannel {
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
 }
-
-// ================= 运营体系 =================
 
 model Banner {
   id        String   @id @default(uuid())
@@ -319,8 +311,6 @@ model NotificationRead {
   notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
   @@unique([notificationId, userId])
 }
-
-// ================= 后台体系 =================
 
 model Role {
   id          String   @id @default(uuid())
