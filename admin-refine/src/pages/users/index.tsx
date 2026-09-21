@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTable, useUpdate, useDelete } from '@refinedev/core';
+import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 
 interface UserItem {
   id: string;
@@ -11,6 +12,8 @@ interface UserItem {
   remark: string;
   rechargeCount: number;
 }
+
+const API_URL = import.meta.env.VITE_API_URL || 'https://luka-1i4g.onrender.com';
 
 const formatDate = (d: string) => {
   if (!d) return '-';
@@ -26,6 +29,7 @@ export default function UserList() {
 
   const { mutate: updateUser } = useUpdate();
   const { mutate: deleteUser } = useDelete();
+  const { confirm } = useSensitiveConfirm();
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
@@ -67,8 +71,9 @@ export default function UserList() {
     );
   };
 
-  const handleDelete = (user: UserItem) => {
-    if (!confirm(`确定要删除用户「${user.username}」吗？此操作不可恢复！`)) return;
+  const handleDelete = async (user: UserItem) => {
+    const ok = await confirm(`确定要删除用户「${user.username}」吗？此操作不可恢复！`);
+    if (!ok) return;
     deleteUser(
       { resource: 'users', id: user.id },
       {
@@ -78,11 +83,41 @@ export default function UserList() {
     );
   };
 
+  const handleExport = async () => {
+    try {
+      const adminInfo = JSON.parse(localStorage.getItem('adminInfo') || 'null');
+      const password = localStorage.getItem('adminPassword') || '';
+      const res = await fetch(`${API_URL}/api/admin/export/users`, {
+        headers: {
+          'x-admin-username': adminInfo?.username || '',
+          'x-admin-password': password,
+        },
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `users_${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('导出失败');
+    }
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">用户管理</h1>
-        <div className="text-sm text-gray-500">共 {total} 位用户</div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExport}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded font-bold"
+          >
+            📥 导出 CSV
+          </button>
+          <div className="text-sm text-gray-500">共 {total} 位用户</div>
+        </div>
       </div>
 
       {tableQueryResult.isLoading ? (
@@ -154,7 +189,6 @@ export default function UserList() {
             </div>
           </div>
 
-          {/* 分页 */}
           {totalPages > 1 && (
             <div className="flex justify-center items-center gap-2 mt-4">
               <button
@@ -179,7 +213,6 @@ export default function UserList() {
         </>
       )}
 
-      {/* 编辑弹窗 */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-md">
