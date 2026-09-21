@@ -9,6 +9,9 @@ import { LoginPage } from './pages/login';
 import { DashboardPage } from './pages/dashboard';
 import UserList from './pages/users';
 import CardList from './pages/cards';
+import BoxList from './pages/boxes';
+import RechargeList from './pages/recharge';
+import OrderList from './pages/orders';
 
 const ProtectedLayout = () => (
   <AppLayout>
@@ -53,9 +56,9 @@ export default function App() {
             <Route index element={<DashboardPage />} />
             <Route path="/users" element={<UserList />} />
             <Route path="/cards" element={<CardList />} />
-            <Route path="/boxes" element={<Placeholder title="盲盒管理" />} />
-            <Route path="/recharge-options" element={<Placeholder title="充值套餐" />} />
-            <Route path="/orders" element={<Placeholder title="订单管理" />} />
+            <Route path="/boxes" element={<BoxList />} />
+            <Route path="/recharge-options" element={<RechargeList />} />
+            <Route path="/orders" element={<OrderList />} />
             <Route path="/banners" element={<Placeholder title="轮播图" />} />
             <Route path="/tasks" element={<Placeholder title="任务管理" />} />
             <Route path="/redeem-codes" element={<Placeholder title="兑换码" />} />
