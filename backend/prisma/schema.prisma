@@ -21,6 +21,8 @@ model User {
   createdAt        DateTime @default(now())
   inventory        Inventory[]
   orders           Order[]
+  userTasks        UserTask[]
+  redeemUses       RedeemCodeUse[]
 }
 
 model Card {
@@ -67,7 +69,7 @@ model RechargeOption {
   id        String   @id @default(uuid())
   coins     Int
   bonus     Int      @default(0)
-  price     Int      // 价格，单位：分
+  price     Int
   isActive  Boolean  @default(true)
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
@@ -78,9 +80,9 @@ model Order {
   id        String          @id @default(uuid())
   userId    String
   optionId  String
-  amount    Int             // 支付金额，单位：分
-  coins     Int             // 实际到账金币
-  status    String          @default("PENDING") // PENDING / PAID / CANCELLED
+  amount    Int
+  coins     Int
+  status    String          @default("PENDING")
   createdAt DateTime        @default(now())
   paidAt    DateTime?
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -95,4 +97,52 @@ model Banner {
   sortOrder Int      @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  description String   @default("")
+  action      String   // DRAW, SPEND, RECHARGE
+  targetCount Int
+  rewardCoins Int      @default(0)
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  userTasks   UserTask[]
+}
+
+model UserTask {
+  id        String   @id @default(uuid())
+  userId    String
+  taskId    String
+  progress  Int      @default(0)
+  isClaimed Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, taskId])
+}
+
+model RedeemCode {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  coins     Int      @default(0)
+  maxUses   Int      @default(1)
+  usedCount Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  uses      RedeemCodeUse[]
+}
+
+model RedeemCodeUse {
+  id        String   @id @default(uuid())
+  codeId    String
+  userId    String
+  createdAt DateTime @default(now())
+  code      RedeemCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([codeId, userId])
 }
