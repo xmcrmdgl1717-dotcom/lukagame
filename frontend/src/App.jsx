@@ -7,16 +7,17 @@ import Activity from './pages/Activity';
 import Inventory from './pages/Inventory';
 import Profile from './pages/Profile';
 import LoginModal from './components/LoginModal';
+import RechargeModal from './components/RechargeModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('home');
   const [showLogin, setShowLogin] = useState(false);
+  const [showRecharge, setShowRecharge] = useState(false);
   const { setUser, setBoxes, user } = useStore();
 
   useEffect(() => {
-    // 获取盲盒数据
     axios.get(`${API_URL}/api/boxes`).then(res => setBoxes(res.data));
   }, [setBoxes]);
 
@@ -27,7 +28,6 @@ export default function App() {
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-[#0a0a0a] text-white pb-20 relative shadow-2xl overflow-hidden">
-      {/* 顶部栏：未登录显示 Sign In */}
       <div className="flex justify-between items-center p-4 bg-[#140a0a] border-b border-[#332222]">
         <div className="text-2xl font-black italic text-red-500 tracking-wider">LUKA!</div>
         {!user ? (
@@ -41,7 +41,6 @@ export default function App() {
         )}
       </div>
 
-      {/* 页面内容 */}
       <div className="p-4">
         {currentTab === 'home' && <Home onShowLogin={() => setShowLogin(true)} />}
         {currentTab === 'activity' && <Activity />}
@@ -49,11 +48,17 @@ export default function App() {
         {currentTab === 'profile' && <Profile />}
       </div>
 
-      {/* 登录弹窗 */}
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} onLoginSuccess={handleLoginSuccess} />}
+      {showRecharge && <RechargeModal onClose={() => setShowRecharge(false)} />}
 
-      {/* 底部导航 */}
-      <BottomNav currentTab={currentTab} setCurrentTab={setCurrentTab} />
+      <BottomNav 
+        currentTab={currentTab} 
+        setCurrentTab={setCurrentTab} 
+        onShowRecharge={() => {
+          if (!user) return setShowLogin(true);
+          setShowRecharge(true);
+        }} 
+      />
     </div>
   );
 }
