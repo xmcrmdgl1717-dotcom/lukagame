@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Refine } from '@refinedev/core';
+import React from 'react';
+import { Refine, useIsAuthenticated } from '@refinedev/core';
 import routerProvider from '@refinedev/react-router-v6';
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { dataProvider } from './providers/dataProvider';
@@ -8,7 +8,6 @@ import { SensitiveConfirmProvider } from './components/SensitiveConfirm';
 import AppLayout from './components/AppLayout';
 import { useMenuTree, AdminMenu } from './hooks/useMenuTree';
 
-// ========== 组件注册表（硬编码） ==========
 import { LoginPage } from './pages/login';
 import { DashboardPage } from './pages/dashboard';
 import UserList from './pages/users';
@@ -50,7 +49,6 @@ const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   MenuManage,
 };
 
-// 递归展平菜单树 → 生成路由
 function buildRoutes(menus: AdminMenu[]): React.ReactElement[] {
   const routes: React.ReactElement[] = [];
   const walk = (list: AdminMenu[]) => {
@@ -74,25 +72,32 @@ const ProtectedLayout = ({ menus }: { menus: AdminMenu[] }) => (
   </AppLayout>
 );
 
-export default function App() {
-  const { menus, loading } = useMenuTree();
-  const isLoggedIn = !!localStorage.getItem('adminInfo');
+// 所有页面都必须在 Refine 内部
+function AppContent() {
+  const { data: auth, isLoading: authLoading } = useIsAuthenticated();
+  const { menus, loading: menuLoading } = useMenuTree();
 
-  const dynamicRoutes = useMemo(() => (menus ? buildRoutes(menus) : []), [menus]);
-
-  // 未登录：只渲染登录页
-  if (!isLoggedIn) {
+  // 认证状态还没加载完
+  if (authLoading) {
     return (
-      <BrowserRouter>
-        <Routes>
-          <Route path="*" element={<LoginPage />} />
-        </Routes>
-      </BrowserRouter>
+      <div className="flex items-center justify-center h-screen bg-[#0d0d0d] text-gray-400">
+        验证登录状态...
+      </div>
     );
   }
 
-  // 已登录但菜单未加载完
-  if (loading || !menus) {
+  // 未登录 → 只渲染登录页
+  if (!auth?.authenticated) {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
+  // 已登录但菜单加载中
+  if (menuLoading || !menus) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#0d0d0d] text-gray-400">
         加载菜单中...
@@ -100,6 +105,21 @@ export default function App() {
     );
   }
 
+  const dynamicRoutes = buildRoutes(menus);
+
+  return (
+    <Routes>
+      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route element={<ProtectedLayout menus={menus} />}>
+        {dynamicRoutes}
+        <Route index element={<DashboardPage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+export default function App() {
   return (
     <SensitiveConfirmProvider>
       <BrowserRouter>
@@ -109,15 +129,7 @@ export default function App() {
           routerProvider={routerProvider}
           options={{ disableTelemetry: true }}
         >
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route element={<ProtectedLayout menus={menus} />}>
-              {dynamicRoutes}
-              {/* 默认跳转 */}
-              <Route index element={<DashboardPage />} />
-            </Route>
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
+          <AppContent />
         </Refine>
       </BrowserRouter>
     </SensitiveConfirmProvider>
