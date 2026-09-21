@@ -608,7 +608,7 @@ const PORT = process.env.PORT || 3001;
 
 
 // ================= 临时：初始化默认管理员 =================
-app.get('/api/admin/init-default', async (req, res) => {
+app.get('/api/setup-admin', async (req, res) => {
   try {
     const existing = await prisma.admin.findUnique({ where: { username: 'admin' } });
     if (existing) {
