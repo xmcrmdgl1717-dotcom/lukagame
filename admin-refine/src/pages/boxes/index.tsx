@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useTable, useCreate, useUpdate, useDelete, useCustom } from '@refinedev/core';
+import { useTable, useCreate, useUpdate, useDelete } from '@refinedev/core';
+import axios from 'axios';
 import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 
 interface BoxItem {
@@ -22,6 +23,15 @@ interface CardItem { id: string; name: string; rarity: string; imageUrl: string;
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://luka-1i4g.onrender.com';
 
+const hdr = () => {
+  const a = JSON.parse(localStorage.getItem('adminInfo') || 'null');
+  return {
+    'x-admin-username': a?.username || '',
+    'x-admin-password': localStorage.getItem('adminPassword') || '',
+    'Content-Type': 'application/json',
+  };
+};
+
 const readAsBase64 = (f: File): Promise<string> =>
   new Promise((res, rej) => {
     const r = new FileReader();
@@ -36,13 +46,12 @@ export default function BoxList() {
   const { mutate: createBox } = useCreate();
   const { mutate: updateBox } = useUpdate();
   const { mutate: deleteBox } = useDelete();
-  const { mutate: custom } = useCustom();
   const { confirm } = useSensitiveConfirm();
 
   const all = tableQueryResult.data?.data || [];
   const allCards = cardsQ.data?.data || [];
 
-  const [newBox, setNewBox] = useState({ name: '', price: 300, coverUrl: '', gameId: '', isFeatured: false });
+  const [newBox, setNewBox] = useState({ name: '', price: 300, coverUrl: '', isFeatured: false });
   const [creating, setCreating] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
@@ -69,11 +78,9 @@ export default function BoxList() {
   const handleCreate = () => {
     if (!newBox.name) return alert('请输入名称');
     setCreating(true);
-    const payload: any = { ...newBox };
-    if (!payload.gameId) delete payload.gameId;
-    createBox({ resource: 'boxes', values: payload }, {
+    createBox({ resource: 'boxes', values: newBox }, {
       onSuccess: () => {
-        setNewBox({ name: '', price: 300, coverUrl: '', gameId: '', isFeatured: false });
+        setNewBox({ name: '', price: 300, coverUrl: '', isFeatured: false });
         setCreating(false);
         tableQueryResult.refetch();
       },
@@ -93,7 +100,6 @@ export default function BoxList() {
         name: editForm.name,
         price: editForm.price,
         coverUrl: editForm.coverUrl,
-        gameId: editForm.gameId || null,
         isFeatured: !!editForm.isFeatured,
       },
     }, {
@@ -155,53 +161,56 @@ export default function BoxList() {
     return p >= 50 ? 'text-green-400' : p >= 10 ? 'text-yellow-400' : 'text-red-400';
   };
 
+  // 改用 axios 直接调用，不再用 useCustom
   const updateWeight = async (it: any) => {
     if (!curBox) return;
     if (it.weight < 1) it.weight = 1;
     const ok = await confirm(`将「${it.card.name}」权重改为 ${it.weight}？`);
     if (!ok) return;
-    custom({
-      url: `/api/admin/boxes/${curBox.id}/items`,
-      method: 'post',
-      payload: { cardId: it.card.id, weight: it.weight },
-    }, {
-      onError: (e: any) => alert('权重更新失败: ' + (e?.message || '未知错误')),
-    });
+    try {
+      await axios.post(
+        `${API_URL}/api/admin/boxes/${curBox.id}/items`,
+        { cardId: it.card.id, weight: it.weight },
+        { headers: hdr() }
+      );
+    } catch (e: any) {
+      alert('权重更新失败: ' + (e.response?.data?.error || e.message));
+    }
   };
 
   const removeItem = async (id: string) => {
     if (!curBox) return;
     const ok = await confirm('从盲盒移除该卡牌？');
     if (!ok) return;
-    custom({
-      url: `/api/admin/boxes/${curBox.id}/items/${id}`,
-      method: 'delete',
-    }, {
-      onSuccess: () => setCurBox((p: any) => ({ ...p, items: p.items.filter((i: any) => i.id !== id) })),
-    });
+    try {
+      await axios.delete(
+        `${API_URL}/api/admin/boxes/${curBox.id}/items/${id}`,
+        { headers: hdr() }
+      );
+      setCurBox((p: any) => ({ ...p, items: p.items.filter((i: any) => i.id !== id) }));
+    } catch (e: any) {
+      alert('移除失败: ' + (e.response?.data?.error || e.message));
+    }
   };
 
-  const addItem = () => {
+  const addItem = async () => {
     if (!curBox) return;
     if (!itemCard) return alert('请选择卡牌');
-    custom({
-      url: `/api/admin/boxes/${curBox.id}/items`,
-      method: 'post',
-      payload: { cardId: itemCard, weight: itemWeight },
-    }, {
-      onSuccess: async () => {
-        const adminInfo = JSON.parse(localStorage.getItem('adminInfo') || 'null');
-        const pwd = localStorage.getItem('adminPassword') || '';
-        const res = await fetch(`${API_URL}/api/admin/boxes`, {
-          headers: { 'x-admin-username': adminInfo?.username || '', 'x-admin-password': pwd },
-        });
-        const data = await res.json();
-        const found = data.find((b: any) => b.id === curBox.id);
-        if (found) setCurBox(JSON.parse(JSON.stringify(found)));
-        setItemCard('');
-        setItemWeight(10);
-      },
-    });
+    try {
+      await axios.post(
+        `${API_URL}/api/admin/boxes/${curBox.id}/items`,
+        { cardId: itemCard, weight: itemWeight },
+        { headers: hdr() }
+      );
+      // 重新拉取盲盒数据
+      const res = await axios.get(`${API_URL}/api/admin/boxes`, { headers: hdr() });
+      const found = res.data.find((b: any) => b.id === curBox.id);
+      if (found) setCurBox(JSON.parse(JSON.stringify(found)));
+      setItemCard('');
+      setItemWeight(10);
+    } catch (e: any) {
+      alert('添加失败: ' + (e.response?.data?.error || e.message));
+    }
   };
 
   const avail = curBox ? allCards.filter((c) => !curBox.items.some((i) => i.card.id === c.id)) : [];
