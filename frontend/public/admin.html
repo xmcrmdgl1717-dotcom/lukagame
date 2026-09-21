@@ -20,41 +20,52 @@
         <div v-if="!isLoggedIn" class="flex items-center justify-center h-screen">
             <div class="bg-gray-800 p-8 rounded-xl shadow-lg w-full max-w-sm border border-gray-700">
                 <h1 class="text-2xl font-bold text-center text-red-500 mb-6">LUKA 管理后台</h1>
+                <input v-model="adminUsername" placeholder="管理员用户名"
+                       class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 mb-3 text-white focus:outline-none focus:border-red-500">
                 <input v-model="password" type="password" placeholder="请输入管理密码"
                        class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 mb-4 text-white focus:outline-none focus:border-red-500">
                 <button @click="login" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded transition">登录系统</button>
-                <p class="text-xs text-gray-500 mt-4 text-center">默认密码: admin123</p>
+                <p class="text-xs text-gray-500 mt-4 text-center">默认: admin / admin123</p>
             </div>
         </div>
 
         <!-- 主界面 -->
         <div v-else>
             <div class="flex justify-between items-center bg-gray-800 p-4 rounded-xl border border-gray-700 mb-6">
-                <h1 class="text-xl font-bold text-red-500">LUKA 管理后台</h1>
+                <div>
+                    <h1 class="text-xl font-bold text-red-500">LUKA 管理后台</h1>
+                    <div class="text-xs text-gray-500 mt-1">
+                        当前: {{ adminInfo?.username }} ({{ adminInfo?.role }})
+                    </div>
+                </div>
                 <button @click="logout" class="text-sm text-gray-400 hover:text-white">退出登录</button>
             </div>
 
             <!-- 数据概览 -->
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 text-center">
-                    <div class="text-gray-400 text-xs mb-1">总用户数</div>
-                    <div class="text-2xl font-bold text-blue-400">{{ stats.userCount }}</div>
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
+                <div class="bg-gray-800 p-3 rounded-xl border border-gray-700 text-center">
+                    <div class="text-gray-400 text-xs">用户</div>
+                    <div class="text-xl font-bold text-blue-400">{{ stats.userCount }}</div>
                 </div>
-                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 text-center">
-                    <div class="text-gray-400 text-xs mb-1">卡牌总数</div>
-                    <div class="text-2xl font-bold text-yellow-400">{{ stats.cardCount }}</div>
+                <div class="bg-gray-800 p-3 rounded-xl border border-gray-700 text-center">
+                    <div class="text-gray-400 text-xs">卡牌</div>
+                    <div class="text-xl font-bold text-yellow-400">{{ stats.cardCount }}</div>
                 </div>
-                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 text-center">
-                    <div class="text-gray-400 text-xs mb-1">盲盒总数</div>
-                    <div class="text-2xl font-bold text-green-400">{{ stats.boxCount }}</div>
+                <div class="bg-gray-800 p-3 rounded-xl border border-gray-700 text-center">
+                    <div class="text-gray-400 text-xs">盲盒</div>
+                    <div class="text-xl font-bold text-green-400">{{ stats.boxCount }}</div>
                 </div>
-                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 text-center">
-                    <div class="text-gray-400 text-xs mb-1">订单总数</div>
-                    <div class="text-2xl font-bold text-purple-400">{{ stats.orderCount }}</div>
+                <div class="bg-gray-800 p-3 rounded-xl border border-gray-700 text-center">
+                    <div class="text-gray-400 text-xs">订单</div>
+                    <div class="text-xl font-bold text-purple-400">{{ stats.orderCount }}</div>
                 </div>
-                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 text-center">
-                    <div class="text-gray-400 text-xs mb-1">总收入</div>
-                    <div class="text-2xl font-bold text-red-400">¥{{ (stats.totalRevenue / 100).toFixed(2) }}</div>
+                <div class="bg-gray-800 p-3 rounded-xl border border-gray-700 text-center">
+                    <div class="text-gray-400 text-xs">待处理工单</div>
+                    <div class="text-xl font-bold text-orange-400">{{ stats.openTicketCount }}</div>
+                </div>
+                <div class="bg-gray-800 p-3 rounded-xl border border-gray-700 text-center">
+                    <div class="text-gray-400 text-xs">总收入</div>
+                    <div class="text-xl font-bold text-red-400">¥{{ (stats.totalRevenue / 100).toFixed(2) }}</div>
                 </div>
             </div>
 
@@ -66,9 +77,16 @@
                 <button @click="activeTab='recharge'" :class="tabClass('recharge')">充值套餐</button>
                 <button @click="activeTab='orders'" :class="tabClass('orders')">订单管理</button>
                 <button @click="activeTab='banners'" :class="tabClass('banners')">轮播图</button>
+                <button @click="activeTab='tasks'" :class="tabClass('tasks')">任务管理</button>
+                <button @click="activeTab='redeemCodes'" :class="tabClass('redeemCodes')">兑换码</button>
+                <button @click="activeTab='tickets'" :class="tabClass('tickets')">
+                    客服工单
+                    <span v-if="stats.openTicketCount > 0" class="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5">{{ stats.openTicketCount }}</span>
+                </button>
+                <button v-if="adminInfo?.role === 'super'" @click="activeTab='admins'" :class="tabClass('admins')">管理员</button>
             </div>
 
-            <!-- ============ 用户管理 ============ -->
+            <!-- ========== 用户管理 ========== -->
             <div v-if="activeTab === 'users'" class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm whitespace-nowrap">
@@ -87,8 +105,8 @@
                         <tbody>
                             <tr v-for="u in users" :key="u.id" class="border-b border-gray-700 hover:bg-gray-750">
                                 <td class="p-3 font-bold text-white">{{ u.username }}</td>
-                                <td class="p-3 text-gray-400">{{ formatDate(u.createdAt) }}</td>
-                                <td class="p-3 text-gray-400">{{ formatDate(u.lastLoginAt) }}</td>
+                                <td class="p-3 text-gray-400 text-xs">{{ formatDate(u.createdAt) }}</td>
+                                <td class="p-3 text-gray-400 text-xs">{{ formatDate(u.lastLoginAt) }}</td>
                                 <td class="p-3 font-bold text-yellow-500">{{ u.coins }}</td>
                                 <td class="p-3 text-blue-400 text-center">{{ u.rechargeCount }}</td>
                                 <td class="p-3"><span v-if="u.tags" class="bg-blue-900 text-blue-200 text-xs px-2 py-0.5 rounded">{{ u.tags }}</span></td>
@@ -103,7 +121,7 @@
                 </div>
             </div>
 
-            <!-- ============ 卡牌管理 ============ -->
+            <!-- ========== 卡牌管理 ========== -->
             <div v-if="activeTab === 'cards'">
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
                     <input v-model="newCard.name" placeholder="卡牌名称" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-40 text-white">
@@ -138,7 +156,7 @@
                 </div>
             </div>
 
-            <!-- ============ 盲盒管理 ============ -->
+            <!-- ========== 盲盒管理 ========== -->
             <div v-if="activeTab === 'boxes'">
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
                     <input v-model="newBox.name" placeholder="盲盒名称" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-40 text-white">
@@ -167,7 +185,7 @@
                 </div>
             </div>
 
-            <!-- ============ 充值套餐 ============ -->
+            <!-- ========== 充值套餐 ========== -->
             <div v-if="activeTab === 'recharge'">
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
                     <input v-model.number="newRecharge.coins" type="number" placeholder="基础金币" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-28 text-white">
@@ -179,14 +197,7 @@
                 <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
                     <table class="w-full text-left text-sm">
                         <thead class="bg-gray-700 text-gray-300 text-xs uppercase">
-                            <tr>
-                                <th class="p-3">基础金币</th>
-                                <th class="p-3">赠送</th>
-                                <th class="p-3">价格</th>
-                                <th class="p-3">状态</th>
-                                <th class="p-3">排序</th>
-                                <th class="p-3 text-center">操作</th>
-                            </tr>
+                            <tr><th class="p-3">基础金币</th><th class="p-3">赠送</th><th class="p-3">价格</th><th class="p-3">状态</th><th class="p-3">排序</th><th class="p-3 text-center">操作</th></tr>
                         </thead>
                         <tbody>
                             <tr v-for="opt in rechargeOptions" :key="opt.id" class="border-b border-gray-700">
@@ -207,21 +218,12 @@
                 </div>
             </div>
 
-            <!-- ============ 订单管理 ============ -->
+            <!-- ========== 订单管理 ========== -->
             <div v-if="activeTab === 'orders'" class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm whitespace-nowrap">
                         <thead class="bg-gray-700 text-gray-300 text-xs uppercase">
-                            <tr>
-                                <th class="p-3">订单号</th>
-                                <th class="p-3">用户</th>
-                                <th class="p-3">套餐</th>
-                                <th class="p-3">金额</th>
-                                <th class="p-3">金币</th>
-                                <th class="p-3">状态</th>
-                                <th class="p-3">创建时间</th>
-                                <th class="p-3 text-center">操作</th>
-                            </tr>
+                            <tr><th class="p-3">订单号</th><th class="p-3">用户</th><th class="p-3">套餐</th><th class="p-3">金额</th><th class="p-3">金币</th><th class="p-3">状态</th><th class="p-3">创建时间</th><th class="p-3 text-center">操作</th></tr>
                         </thead>
                         <tbody>
                             <tr v-for="o in orders" :key="o.id" class="border-b border-gray-700">
@@ -243,7 +245,7 @@
                 </div>
             </div>
 
-            <!-- ============ 轮播图管理 ============ -->
+            <!-- ========== 轮播图管理 ========== -->
             <div v-if="activeTab === 'banners'">
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
                     <input v-model="newBanner.imageUrl" placeholder="图片 URL" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm flex-1 min-w-[200px] text-white">
@@ -266,9 +268,144 @@
                     </div>
                 </div>
             </div>
+
+            <!-- ========== 任务管理 ========== -->
+            <div v-if="activeTab === 'tasks'">
+                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
+                    <input v-model="newTask.title" placeholder="任务标题" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-40 text-white">
+                    <input v-model="newTask.description" placeholder="描述" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm flex-1 min-w-[150px] text-white">
+                    <select v-model="newTask.action" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white">
+                        <option value="DRAW">抽卡</option>
+                        <option value="SPEND">消费</option>
+                        <option value="RECHARGE">充值</option>
+                    </select>
+                    <input v-model.number="newTask.targetCount" type="number" placeholder="目标" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-20 text-white">
+                    <input v-model.number="newTask.rewardCoins" type="number" placeholder="奖励金币" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-24 text-white">
+                    <input v-model.number="newTask.sortOrder" type="number" placeholder="排序" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-16 text-white">
+                    <button @click="addTask" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded font-bold">+ 添加</button>
+                </div>
+                <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-700 text-gray-300 text-xs uppercase">
+                            <tr><th class="p-3">标题</th><th class="p-3">类型</th><th class="p-3">目标</th><th class="p-3">奖励</th><th class="p-3">状态</th><th class="p-3">排序</th><th class="p-3 text-center">操作</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="t in tasks" :key="t.id" class="border-b border-gray-700">
+                                <td class="p-3 text-white">{{ t.title }}</td>
+                                <td class="p-3 text-gray-400">{{ t.action }}</td>
+                                <td class="p-3 text-gray-400">{{ t.targetCount }}</td>
+                                <td class="p-3 text-yellow-500 font-bold">+{{ t.rewardCoins }}</td>
+                                <td class="p-3">
+                                    <span :class="t.isActive ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'" class="text-xs px-2 py-0.5 rounded">{{ t.isActive ? '启用' : '停用' }}</span>
+                                </td>
+                                <td class="p-3 text-gray-400">{{ t.sortOrder }}</td>
+                                <td class="p-3 text-center">
+                                    <button @click="toggleTask(t)" class="bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1 rounded mr-1">{{ t.isActive ? '停用' : '启用' }}</button>
+                                    <button @click="deleteTask(t.id)" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded">删除</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ========== 兑换码 ========== -->
+            <div v-if="activeTab === 'redeemCodes'">
+                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
+                    <input v-model="newCode.code" placeholder="兑换码（大写）" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-40 text-white">
+                    <input v-model.number="newCode.coins" type="number" placeholder="金币" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-24 text-white">
+                    <input v-model.number="newCode.maxUses" type="number" placeholder="最多使用次数" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-28 text-white">
+                    <button @click="addCode" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded font-bold">+ 单个添加</button>
+                    <div class="w-px h-6 bg-gray-600 mx-2"></div>
+                    <input v-model.number="batchCode.count" type="number" placeholder="数量" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-20 text-white">
+                    <input v-model="batchCode.prefix" placeholder="前缀" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-24 text-white">
+                    <button @click="batchAddCodes" class="bg-purple-600 hover:bg-purple-700 text-white text-sm px-4 py-1.5 rounded font-bold">批量生成</button>
+                </div>
+                <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-700 text-gray-300 text-xs uppercase">
+                            <tr><th class="p-3">兑换码</th><th class="p-3">金币</th><th class="p-3">已用/上限</th><th class="p-3">状态</th><th class="p-3">创建时间</th><th class="p-3 text-center">操作</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="c in redeemCodes" :key="c.id" class="border-b border-gray-700">
+                                <td class="p-3 font-mono text-orange-400">{{ c.code }}</td>
+                                <td class="p-3 text-yellow-500 font-bold">+{{ c.coins }}</td>
+                                <td class="p-3 text-gray-400">{{ c.usedCount }} / {{ c.maxUses }}</td>
+                                <td class="p-3">
+                                    <span :class="c.isActive ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'" class="text-xs px-2 py-0.5 rounded">{{ c.isActive ? '启用' : '停用' }}</span>
+                                </td>
+                                <td class="p-3 text-gray-500 text-xs">{{ formatDate(c.createdAt) }}</td>
+                                <td class="p-3 text-center">
+                                    <button @click="deleteCode(c.id)" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded">删除</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ========== 客服工单 ========== -->
+            <div v-if="activeTab === 'tickets'">
+                <div class="space-y-3">
+                    <div v-for="t in tickets" :key="t.id" class="bg-gray-800 rounded-xl border border-gray-700 p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <div class="text-white font-bold">{{ t.title }}</div>
+                                <div class="text-xs text-gray-500 mt-1">来自：{{ t.user.username }} · {{ formatDate(t.createdAt) }}</div>
+                            </div>
+                            <span :class="{'bg-yellow-900 text-yellow-200': t.status==='OPEN', 'bg-blue-900 text-blue-200': t.status==='PROCESSING', 'bg-gray-700 text-gray-300': t.status==='CLOSED'}" class="text-xs px-2 py-0.5 rounded">{{ t.status }}</span>
+                        </div>
+                        <div class="text-sm text-gray-300 bg-gray-900 rounded p-3 mb-3">{{ t.content }}</div>
+                        <div v-if="t.replies.length" class="space-y-2 mb-3 border-l-2 border-gray-700 pl-3">
+                            <div v-for="r in t.replies" :key="r.id" :class="r.fromAdmin ? 'text-orange-300' : 'text-gray-400'" class="text-xs">
+                                <span class="font-bold">{{ r.fromAdmin ? '客服' : '用户' }}：</span>{{ r.content }}
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <input v-model="ticketReplies[t.id]" placeholder="输入回复..." class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white">
+                            <button @click="replyTicket(t.id)" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 py-1.5 rounded font-bold">回复</button>
+                            <button v-if="t.status !== 'CLOSED'" @click="closeTicket(t.id)" class="bg-gray-600 hover:bg-gray-700 text-white text-xs px-4 py-1.5 rounded">关闭</button>
+                            <button @click="deleteTicket(t.id)" class="bg-red-600 hover:bg-red-700 text-white text-xs px-4 py-1.5 rounded">删除</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== 管理员账号 ========== -->
+            <div v-if="activeTab === 'admins' && adminInfo?.role === 'super'">
+                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
+                    <input v-model="newAdmin.username" placeholder="用户名" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-40 text-white">
+                    <input v-model="newAdmin.password" type="password" placeholder="密码" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-40 text-white">
+                    <select v-model="newAdmin.role" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white">
+                        <option value="super">超级管理员</option>
+                        <option value="admin">管理员</option>
+                        <option value="operator">运营</option>
+                        <option value="viewer">只读</option>
+                    </select>
+                    <button @click="addAdmin" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded font-bold">+ 添加管理员</button>
+                </div>
+                <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-700 text-gray-300 text-xs uppercase">
+                            <tr><th class="p-3">用户名</th><th class="p-3">角色</th><th class="p-3">状态</th><th class="p-3">最近登录</th><th class="p-3 text-center">操作</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="a in admins" :key="a.id" class="border-b border-gray-700">
+                                <td class="p-3 text-white">{{ a.username }}</td>
+                                <td class="p-3 text-orange-400">{{ a.role }}</td>
+                                <td class="p-3"><span :class="a.isActive ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'" class="text-xs px-2 py-0.5 rounded">{{ a.isActive ? '启用' : '停用' }}</span></td>
+                                <td class="p-3 text-gray-400 text-xs">{{ formatDate(a.lastLoginAt) }}</td>
+                                <td class="p-3 text-center">
+                                    <button @click="deleteAdmin(a.id)" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded">删除</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
-        <!-- ============ 编辑用户弹窗 ============ -->
+        <!-- ========== 编辑用户弹窗 ========== -->
         <div v-if="showEditUserModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div class="bg-gray-800 rounded-xl border border-gray-600 p-6 w-full max-w-md shadow-2xl">
                 <h3 class="text-lg font-bold text-white mb-4">编辑用户: {{ editUserForm.username }}</h3>
@@ -291,7 +428,7 @@
             </div>
         </div>
 
-        <!-- ============ 编辑卡牌弹窗 ============ -->
+        <!-- ========== 编辑卡牌弹窗 ========== -->
         <div v-if="showEditCardModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div class="bg-gray-800 rounded-xl border border-gray-600 p-6 w-full max-w-md shadow-2xl">
                 <h3 class="text-lg font-bold text-white mb-4">编辑卡牌</h3>
@@ -312,7 +449,7 @@
             </div>
         </div>
 
-        <!-- ============ 概率配置弹窗 ============ -->
+        <!-- ========== 概率配置弹窗 ========== -->
         <div v-if="showProbabilityModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div class="bg-gray-800 rounded-xl border border-gray-600 p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
                 <h3 class="text-lg font-bold text-white mb-4">概率配置 - {{ currentBox?.name }}</h3>
@@ -352,278 +489,6 @@
         </div>
     </div>
 
-    <script>
-        const { createApp, ref, computed } = Vue;
-        const API_URL = 'https://luka-1i4g.onrender.com';
-
-        createApp({
-            setup() {
-                const isLoggedIn = ref(false);
-                const password = ref('');
-                const activeTab = ref('users');
-                const stats = ref({ userCount: 0, cardCount: 0, boxCount: 0, orderCount: 0, totalRevenue: 0 });
-                const users = ref([]);
-                const cards = ref([]);
-                const boxes = ref([]);
-                const rechargeOptions = ref([]);
-                const orders = ref([]);
-                const banners = ref([]);
-
-                const newCard = ref({ name: '', rarity: 'R', imageUrl: '' });
-                const newBox = ref({ name: '', price: 300, coverUrl: '' });
-                const newRecharge = ref({ coins: 300, bonus: 0, price: 3000, sortOrder: 0 });
-                const newBanner = ref({ imageUrl: '', link: '', title: '', sortOrder: 0 });
-
-                const showEditUserModal = ref(false);
-                const editUserForm = ref({ id: '', username: '', password: '', coins: 0, tags: '', remark: '' });
-                const showEditCardModal = ref(false);
-                const editCardForm = ref({ id: '', name: '', rarity: 'R', imageUrl: '' });
-
-                const showProbabilityModal = ref(false);
-                const currentBox = ref(null);
-                const newItemCardId = ref('');
-                const newItemWeight = ref(10);
-
-                const headers = () => ({ 'x-admin-password': password.value });
-
-                const login = async () => {
-                    try {
-                        await axios.get(`${API_URL}/api/admin/stats`, { headers: headers() });
-                        isLoggedIn.value = true;
-                        fetchData();
-                    } catch (e) { alert('密码错误！'); }
-                };
-                const logout = () => { isLoggedIn.value = false; password.value = ''; };
-
-                const fetchData = async () => {
-                    const h = headers();
-                    const [s, u, c, b, r, o, bn] = await Promise.all([
-                        axios.get(`${API_URL}/api/admin/stats`, { headers: h }),
-                        axios.get(`${API_URL}/api/admin/users`, { headers: h }),
-                        axios.get(`${API_URL}/api/admin/cards`, { headers: h }),
-                        axios.get(`${API_URL}/api/admin/boxes`, { headers: h }),
-                        axios.get(`${API_URL}/api/admin/recharge-options`, { headers: h }),
-                        axios.get(`${API_URL}/api/admin/orders`, { headers: h }),
-                        axios.get(`${API_URL}/api/admin/banners`, { headers: h })
-                    ]);
-                    stats.value = s.data;
-                    users.value = u.data;
-                    cards.value = c.data;
-                    boxes.value = b.data;
-                    rechargeOptions.value = r.data;
-                    orders.value = o.data;
-                    banners.value = bn.data;
-                };
-
-                const formatDate = (dateStr) => {
-                    if (!dateStr) return '-';
-                    const d = new Date(dateStr);
-                    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-                };
-
-                const tabClass = (tab) => {
-                    return ['px-4 py-2 rounded-lg text-sm font-bold transition',
-                        activeTab.value === tab ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'];
-                };
-
-                // ===== 用户 =====
-                const openEditUser = (u) => {
-                    editUserForm.value = { id: u.id, username: u.username, password: '', coins: u.coins, tags: u.tags || '', remark: u.remark || '' };
-                    showEditUserModal.value = true;
-                };
-                const saveUser = async () => {
-                    try {
-                        await axios.put(`${API_URL}/api/admin/users/${editUserForm.value.id}`, editUserForm.value, { headers: headers() });
-                        showEditUserModal.value = false;
-                        fetchData();
-                    } catch (e) { alert('保存失败: ' + (e.response?.data?.error || e.message)); }
-                };
-                const deleteUser = async (id) => {
-                    if (confirm('确定要彻底删除该用户吗？此操作不可恢复！')) {
-                        try {
-                            await axios.delete(`${API_URL}/api/admin/users/${id}`, { headers: headers() });
-                            fetchData();
-                        } catch (e) { alert('删除失败: ' + (e.response?.data?.error || e.message)); }
-                    }
-                };
-
-                // ===== 卡牌 =====
-                const addCard = async () => {
-                    if (!newCard.value.name) return alert('请输入卡牌名称');
-                    try {
-                        await axios.post(`${API_URL}/api/admin/cards`, newCard.value, { headers: headers() });
-                        newCard.value = { name: '', rarity: 'R', imageUrl: '' };
-                        fetchData();
-                    } catch (e) { alert('添加失败: ' + (e.response?.data?.error || e.message)); }
-                };
-                const openEditCard = (c) => {
-                    editCardForm.value = { id: c.id, name: c.name, rarity: c.rarity, imageUrl: c.imageUrl || '' };
-                    showEditCardModal.value = true;
-                };
-                const saveCard = async () => {
-                    try {
-                        await axios.put(`${API_URL}/api/admin/cards/${editCardForm.value.id}`, editCardForm.value, { headers: headers() });
-                        showEditCardModal.value = false;
-                        fetchData();
-                    } catch (e) { alert('保存失败: ' + (e.response?.data?.error || e.message)); }
-                };
-                const deleteCard = async (id) => {
-                    if (confirm('确定要删除这张卡牌吗？')) {
-                        try {
-                            await axios.delete(`${API_URL}/api/admin/cards/${id}`, { headers: headers() });
-                            fetchData();
-                        } catch (e) { alert('删除失败: ' + (e.response?.data?.error || e.message)); }
-                    }
-                };
-
-                // ===== 盲盒 =====
-                const addBox = async () => {
-                    if (!newBox.value.name || !newBox.value.price) return alert('请填写名称和价格');
-                    try {
-                        await axios.post(`${API_URL}/api/admin/boxes`, newBox.value, { headers: headers() });
-                        newBox.value = { name: '', price: 300, coverUrl: '' };
-                        fetchData();
-                    } catch (e) { alert('添加失败: ' + (e.response?.data?.error || e.message)); }
-                };
-                const toggleBoxStatus = async (box) => {
-                    await axios.put(`${API_URL}/api/admin/boxes/${box.id}`, { isActive: !box.isActive }, { headers: headers() });
-                    fetchData();
-                };
-                const deleteBox = async (id) => {
-                    if (confirm('确定要删除这个盲盒吗？所有概率配置会一并删除！')) {
-                        try {
-                            await axios.delete(`${API_URL}/api/admin/boxes/${id}`, { headers: headers() });
-                            fetchData();
-                        } catch (e) { alert('删除失败: ' + (e.response?.data?.error || e.message)); }
-                    }
-                };
-
-                // ===== 概率配置 =====
-                const openProbabilityModal = (box) => {
-                    currentBox.value = JSON.parse(JSON.stringify(box));
-                    newItemCardId.value = '';
-                    newItemWeight.value = 10;
-                    showProbabilityModal.value = true;
-                };
-                const closeProbabilityModal = () => {
-                    showProbabilityModal.value = false;
-                    currentBox.value = null;
-                    fetchData();
-                };
-                const availableCards = computed(() => {
-                    if (!currentBox.value) return [];
-                    const existingIds = currentBox.value.items.map(i => i.card.id);
-                    return cards.value.filter(c => !existingIds.includes(c.id));
-                });
-                const totalWeight = computed(() => {
-                    if (!currentBox.value) return 0;
-                    return currentBox.value.items.reduce((sum, i) => sum + (i.weight || 0), 0);
-                });
-                const calculateProbability = (item) => {
-                    if (!totalWeight.value || !item.weight) return '0.00';
-                    return ((item.weight / totalWeight.value) * 100).toFixed(2);
-                };
-                const getProbabilityColor = (item) => {
-                    const p = parseFloat(calculateProbability(item));
-                    if (p >= 50) return 'text-green-400';
-                    if (p >= 10) return 'text-yellow-400';
-                    return 'text-red-400';
-                };
-                const updateItemWeight = async (item) => {
-                    if (item.weight < 1) item.weight = 1;
-                    await axios.post(`${API_URL}/api/admin/boxes/${currentBox.value.id}/items`,
-                        { cardId: item.card.id, weight: item.weight }, { headers: headers() });
-                };
-                const removeItem = async (itemId) => {
-                    if (confirm('确定要移除该卡牌吗？')) {
-                        await axios.delete(`${API_URL}/api/admin/boxes/${currentBox.value.id}/items/${itemId}`, { headers: headers() });
-                        currentBox.value.items = currentBox.value.items.filter(i => i.id !== itemId);
-                    }
-                };
-                const addItemToBox = async () => {
-                    if (!newItemCardId.value) return alert('请选择卡牌');
-                    if (newItemWeight.value < 1) return alert('权重至少为 1');
-                    await axios.post(`${API_URL}/api/admin/boxes/${currentBox.value.id}/items`,
-                        { cardId: newItemCardId.value, weight: newItemWeight.value }, { headers: headers() });
-                    const res = await axios.get(`${API_URL}/api/admin/boxes`, { headers: headers() });
-                    const updated = res.data.find(b => b.id === currentBox.value.id);
-                    currentBox.value = JSON.parse(JSON.stringify(updated));
-                    newItemCardId.value = '';
-                    newItemWeight.value = 10;
-                };
-
-                // ===== 充值套餐 =====
-                const addRecharge = async () => {
-                    if (!newRecharge.value.coins || !newRecharge.value.price) return alert('请填写基础金币和价格');
-                    try {
-                        await axios.post(`${API_URL}/api/admin/recharge-options`, newRecharge.value, { headers: headers() });
-                        newRecharge.value = { coins: 300, bonus: 0, price: 3000, sortOrder: 0 };
-                        fetchData();
-                    } catch (e) { alert('添加失败: ' + (e.response?.data?.error || e.message)); }
-                };
-                const toggleRecharge = async (opt) => {
-                    await axios.put(`${API_URL}/api/admin/recharge-options/${opt.id}`, { isActive: !opt.isActive }, { headers: headers() });
-                    fetchData();
-                };
-                const deleteRecharge = async (id) => {
-                    if (confirm('确定要删除该充值套餐吗？')) {
-                        try {
-                            await axios.delete(`${API_URL}/api/admin/recharge-options/${id}`, { headers: headers() });
-                            fetchData();
-                        } catch (e) { alert('删除失败: ' + (e.response?.data?.error || e.message)); }
-                    }
-                };
-
-                // ===== 订单 =====
-                const markOrderPaid = async (id) => {
-                    if (confirm('确认将该订单标记为已支付，并为用户增加金币？')) {
-                        try {
-                            await axios.put(`${API_URL}/api/admin/orders/${id}/paid`, {}, { headers: headers() });
-                            fetchData();
-                        } catch (e) { alert('操作失败: ' + (e.response?.data?.error || e.message)); }
-                    }
-                };
-
-                // ===== 轮播图 =====
-                const addBanner = async () => {
-                    if (!newBanner.value.imageUrl) return alert('请填写图片 URL');
-                    try {
-                        await axios.post(`${API_URL}/api/admin/banners`, newBanner.value, { headers: headers() });
-                        newBanner.value = { imageUrl: '', link: '', title: '', sortOrder: 0 };
-                        fetchData();
-                    } catch (e) { alert('添加失败: ' + (e.response?.data?.error || e.message)); }
-                };
-                const toggleBanner = async (b) => {
-                    await axios.put(`${API_URL}/api/admin/banners/${b.id}`, { isActive: !b.isActive }, { headers: headers() });
-                    fetchData();
-                };
-                const deleteBanner = async (id) => {
-                    if (confirm('确定要删除这张轮播图吗？')) {
-                        try {
-                            await axios.delete(`${API_URL}/api/admin/banners/${id}`, { headers: headers() });
-                            fetchData();
-                        } catch (e) { alert('删除失败: ' + (e.response?.data?.error || e.message)); }
-                    }
-                };
-
-                return {
-                    isLoggedIn, password, activeTab, stats, users, cards, boxes, rechargeOptions, orders, banners,
-                    newCard, newBox, newRecharge, newBanner,
-                    showEditUserModal, editUserForm, showEditCardModal, editCardForm,
-                    showProbabilityModal, currentBox, newItemCardId, newItemWeight,
-                    availableCards, totalWeight,
-                    login, logout, formatDate, tabClass,
-                    openEditUser, saveUser, deleteUser,
-                    addCard, openEditCard, saveCard, deleteCard,
-                    addBox, toggleBoxStatus, deleteBox,
-                    openProbabilityModal, closeProbabilityModal,
-                    calculateProbability, getProbabilityColor, updateItemWeight, removeItem, addItemToBox,
-                    addRecharge, toggleRecharge, deleteRecharge,
-                    markOrderPaid,
-                    addBanner, toggleBanner, deleteBanner
-                };
-            }
-        }).mount('#app');
-    </script>
+    <script src="/admin-app.js"></script>
 </body>
 </html>
