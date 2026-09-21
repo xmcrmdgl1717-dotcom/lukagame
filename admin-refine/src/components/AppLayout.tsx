@@ -31,6 +31,7 @@ const MENU_TREE: MenuItem[] = [
       { name: 'roles', label: '角色管理', icon: '🎭', path: '/admins/roles' },
       { name: 'permissions', label: '权限说明', icon: '📖', path: '/admins/permissions' },
       { name: 'audit-logs', label: '操作日志', icon: '📋', path: '/admins/audit-logs' },
+      { name: 'sessions', label: '会话管理', icon: '💻', path: '/admins/sessions' },
     ],
   },
 ];
@@ -62,18 +63,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const toggleGroup = (name: string) =>
     setExpandedGroups((g) => ({ ...g, [name]: !g[name] }));
 
-  // 根据权限过滤菜单
   const hasPermission = (menuName: string) => {
     if (!permissions) return false;
-    // 仪表盘总是可见
     if (menuName === 'dashboard') return true;
-    // 匹配权限 key
     return permissions.some((p) => p.startsWith(menuName + '.'));
   };
 
   const visibleMenus = MENU_TREE.filter((item) => {
     if (item.children) {
-      // 二级菜单至少有一个子菜单可见
       return item.children.some((c) => hasPermission(c.name));
     }
     return hasPermission(item.name);
