@@ -27,8 +27,22 @@ model Admin {
   role        String   @default("admin")
   permissions String   @default("")
   isActive    Boolean  @default(true)
+  totpSecret  String?  @default("")
+  totpEnabled Boolean  @default(false)
   createdAt   DateTime @default(now())
   lastLoginAt DateTime @default(now())
+  sessions    AdminSession[]
+}
+
+model AdminSession {
+  id           String   @id @default(uuid())
+  adminId      String
+  adminName    String
+  ip           String   @default("")
+  userAgent    String   @default("")
+  createdAt    DateTime @default(now())
+  lastActiveAt DateTime @default(now())
+  admin        Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
