@@ -4,28 +4,26 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export default function Notifications() {
+export default function Notifications({ onRead }) {
   const { user } = useStore();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchNotifications = async () => {
-    if (!user) return;
-    try {
-      const res = await axios.get(`${API_URL}/api/notifications/${user.id}`);
-      setList(res.data);
-    } catch (e) { console.error(e); }
-    setLoading(false);
-  };
-
-  useEffect(() => { fetchNotifications(); }, [user]);
-
-  const markRead = async (id) => {
-    try {
-      await axios.put(`${API_URL}/api/notifications/${id}/read`, { userId: user.id });
-      setList(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-    } catch (e) { console.error(e); }
-  };
+  useEffect(() => {
+    if (!user) { setLoading(false); return; }
+    axios.get(`${API_URL}/api/notifications/${user.id}`)
+      .then(res => {
+        setList(res.data);
+        // 进入页面时把所有未读标记为已读
+        res.data.filter(n => !n.isRead).forEach(n => {
+          axios.put(`${API_URL}/api/notifications/${n.id}/read`, { userId: user.id }).catch(() => {});
+        });
+        // 通知父组件清空红点
+        if (onRead) setTimeout(() => onRead(), 500);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [user]);
 
   if (!user) return <div className="text-center text-gray-500 py-20">请先登录</div>;
 
@@ -42,11 +40,7 @@ export default function Notifications() {
       ) : (
         <div className="space-y-3">
           {list.map(n => (
-            <div
-              key={n.id}
-              onClick={() => !n.isRead && markRead(n.id)}
-              className={`border rounded-xl p-4 shadow-lg cursor-pointer transition ${n.isRead ? 'bg-[#1c0e0e] border-[#3d1a1a]' : 'bg-[#2a1414] border-orange-700'}`}
-            >
+            <div key={n.id} className={`border rounded-xl p-4 shadow-lg ${n.isRead ? 'bg-[#1c0e0e] border-[#3d1a1a]' : 'bg-[#2a1414] border-orange-700'}`}>
               <div className="flex justify-between items-center mb-1">
                 <div className="text-white font-bold text-sm">{n.title}</div>
                 {!n.isRead && <span className="w-2 h-2 bg-red-500 rounded-full"></span>}
