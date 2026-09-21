@@ -3,11 +3,6 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://luka-1i4g.onrender.com';
 
-const ALL_PERMISSIONS = [
-  'users', 'cards', 'boxes', 'recharge', 'orders',
-  'banners', 'tasks', 'redeem', 'notifications', 'tickets', 'admins'
-];
-
 export const authProvider: AuthProvider = {
   login: async ({ username, password }) => {
     try {
@@ -38,13 +33,19 @@ export const authProvider: AuthProvider = {
   getIdentity: async () => {
     const adminInfo = JSON.parse(localStorage.getItem('adminInfo') || 'null');
     if (!adminInfo) return null;
-    return { id: adminInfo.id, name: adminInfo.username, role: adminInfo.role };
+    return {
+      id: adminInfo.id,
+      name: adminInfo.username,
+      role: adminInfo.roleDisplayName || adminInfo.role,
+    };
   },
 
+  // ✅ 修复：直接返回登录时后端下发的细粒度权限列表
   getPermissions: async () => {
     const adminInfo = JSON.parse(localStorage.getItem('adminInfo') || 'null');
     if (!adminInfo) return [];
-    if (adminInfo.role === 'super') return ALL_PERMISSIONS;
+    // 后端登录接口返回的 permissions 已经是细粒度权限 key 数组（如 users.view）
+    // super 会返回全部 40+ 个权限点
     return adminInfo.permissions || [];
   },
 
