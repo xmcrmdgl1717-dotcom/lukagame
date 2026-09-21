@@ -56,13 +56,20 @@ export default function GameList() {
   });
   const [creating, setCreating] = useState(false);
 
+  // 新建时上传封面
   const onCoverCreate = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f) return;
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 2 * 1024 * 1024) return alert('图片不能超过 2MB');
     const img = await readAsBase64(f);
     setN((x) => ({ ...x, coverUrl: img }));
   };
+
+  // 编辑时上传封面
   const onCoverEdit = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f) return;
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 2 * 1024 * 1024) return alert('图片不能超过 2MB');
     const img = await readAsBase64(f);
     setEd((x: any) => ({ ...x, coverUrl: img }));
   };
@@ -86,10 +93,17 @@ export default function GameList() {
     update_({
       resource: 'games', id: ed.id,
       values: {
-        displayName: ed.displayName, description: ed.description, icon: ed.icon, coverUrl: ed.coverUrl,
-        minVipLevel: ed.minVipLevel, minCoins: ed.minCoins, sortOrder: ed.sortOrder,
-        enableLeaderboard: ed.enableLeaderboard, leaderboardMetric: ed.leaderboardMetric,
-        leaderboardType: ed.leaderboardType, isActive: ed.isActive,
+        displayName: ed.displayName,
+        description: ed.description,
+        icon: ed.icon,
+        coverUrl: ed.coverUrl,
+        minVipLevel: ed.minVipLevel,
+        minCoins: ed.minCoins,
+        sortOrder: ed.sortOrder,
+        enableLeaderboard: ed.enableLeaderboard,
+        leaderboardMetric: ed.leaderboardMetric,
+        leaderboardType: ed.leaderboardType,
+        isActive: ed.isActive,
       },
     }, {
       onSuccess: () => { setShowEdit(false); setSaving(false); tableQueryResult.refetch(); },
@@ -98,7 +112,7 @@ export default function GameList() {
   };
 
   const handleDelete = (g: GameItem) => {
-    if (!confirm(`确定要删除游戏「${g.displayName}」吗？`)) return;
+    if (!confirm(`确定要删除游戏「${g.displayName}」吗？该游戏下的盲盒将变成无归属。`)) return;
     delete_({ resource: 'games', id: g.id }, {
       onSuccess: () => tableQueryResult.refetch(),
       onError: (e: any) => alert('删除失败: ' + (e?.message || '')),
@@ -119,41 +133,52 @@ export default function GameList() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filtered.map((g) => (
-            <div key={g.id} className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4">
-              <div className="flex items-start gap-3 mb-3">
-                <div className="text-4xl">{g.icon || '🎮'}</div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-lg">{g.displayName}</span>
-                    {!g.isActive && <span className="text-xs bg-red-900/60 text-red-200 px-2 py-0.5 rounded">已停用</span>}
-                  </div>
-                  <div className="text-xs text-gray-500 font-mono">{g.name}</div>
-                  <div className="text-sm text-gray-400 mt-1">{g.description || '暂无描述'}</div>
-                </div>
+            <div key={g.id} className="bg-[#161616] border border-[#2a2a2a] rounded-xl overflow-hidden">
+              {/* 封面图 */}
+              <div className="h-32 bg-[#0d0d0d] flex items-center justify-center relative">
+                {g.coverUrl ? (
+                  <img src={g.coverUrl} className="w-full h-full object-cover" alt={g.displayName} />
+                ) : (
+                  <div className="text-5xl">{g.icon || '🎮'}</div>
+                )}
+                {!g.isActive && (
+                  <span className="absolute top-2 right-2 text-xs bg-red-600 text-white px-2 py-0.5 rounded">已停用</span>
+                )}
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-                <div className="bg-[#0d0d0d] rounded p-2">
-                  <div className="text-gray-500">入场 VIP 门槛</div>
-                  <div className="text-orange-400 font-bold">VIP{g.minVipLevel}</div>
+
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xl">{g.icon}</span>
+                  <span className="font-bold text-lg">{g.displayName}</span>
                 </div>
-                <div className="bg-[#0d0d0d] rounded p-2">
-                  <div className="text-gray-500">入场余额门槛</div>
-                  <div className="text-yellow-400 font-bold">{g.minCoins.toLocaleString()} 🪙</div>
-                </div>
-                <div className="bg-[#0d0d0d] rounded p-2">
-                  <div className="text-gray-500">盲盒数</div>
-                  <div className="text-blue-400 font-bold">{g.boxCount ?? 0}</div>
-                </div>
-                <div className="bg-[#0d0d0d] rounded p-2">
-                  <div className="text-gray-500">排行榜</div>
-                  <div className={`font-bold ${g.enableLeaderboard ? 'text-green-400' : 'text-gray-500'}`}>
-                    {g.enableLeaderboard ? '已开启' : '未开启'}
+                <div className="text-xs text-gray-500 font-mono mb-2">{g.name}</div>
+                <div className="text-sm text-gray-400 mb-3 line-clamp-1">{g.description || '暂无描述'}</div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                  <div className="bg-[#0d0d0d] rounded p-2">
+                    <div className="text-gray-500">入场 VIP 门槛</div>
+                    <div className="text-orange-400 font-bold">VIP{g.minVipLevel}</div>
+                  </div>
+                  <div className="bg-[#0d0d0d] rounded p-2">
+                    <div className="text-gray-500">入场余额门槛</div>
+                    <div className="text-yellow-400 font-bold">{g.minCoins.toLocaleString()} 🪙</div>
+                  </div>
+                  <div className="bg-[#0d0d0d] rounded p-2">
+                    <div className="text-gray-500">盲盒数</div>
+                    <div className="text-blue-400 font-bold">{g.boxCount ?? 0}</div>
+                  </div>
+                  <div className="bg-[#0d0d0d] rounded p-2">
+                    <div className="text-gray-500">排行榜</div>
+                    <div className={`font-bold ${g.enableLeaderboard ? 'text-green-400' : 'text-gray-500'}`}>
+                      {g.enableLeaderboard ? '已开启' : '未开启'}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => { setEd({ ...g }); setShowEdit(true); }} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs py-1.5 rounded">编辑</button>
-                <button onClick={() => handleDelete(g)} className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-1.5 rounded">删除</button>
+
+                <div className="flex gap-2">
+                  <button onClick={() => { setEd({ ...g }); setShowEdit(true); }} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs py-1.5 rounded">编辑</button>
+                  <button onClick={() => handleDelete(g)} className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-1.5 rounded">删除</button>
+                </div>
               </div>
             </div>
           ))}
@@ -161,6 +186,7 @@ export default function GameList() {
         </div>
       )}
 
+      {/* 新建弹窗 */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -184,6 +210,25 @@ export default function GameList() {
                 <label className="block text-gray-400 mb-1 text-xs">描述</label>
                 <input value={n.description} onChange={(e) => setN({ ...n, description: e.target.value })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" />
               </div>
+
+              {/* ====== 封面上传 ====== */}
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">封面图</label>
+                <label className="cursor-pointer inline-block bg-[#2a2a2a] hover:bg-[#3a3a3a] text-xs px-3 py-1.5 rounded text-white">
+                  选择图片
+                  <input type="file" accept="image/*" onChange={onCoverCreate} className="hidden" />
+                </label>
+                {n.coverUrl && (
+                  <div className="mt-2 relative inline-block">
+                    <img src={n.coverUrl} className="h-24 rounded border border-[#2a2a2a]" />
+                    <button
+                      onClick={() => setN({ ...n, coverUrl: '' })}
+                      className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-6 h-6 text-xs"
+                    >×</button>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-gray-400 mb-1 text-xs">最低 VIP 等级</label>
@@ -215,6 +260,7 @@ export default function GameList() {
         </div>
       )}
 
+      {/* 编辑弹窗 */}
       {showEdit && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -238,6 +284,25 @@ export default function GameList() {
                 <label className="block text-gray-400 mb-1 text-xs">描述</label>
                 <input value={ed.description || ''} onChange={(e) => setEd({ ...ed, description: e.target.value })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" />
               </div>
+
+              {/* ====== 封面上传（编辑） ====== */}
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">封面图</label>
+                <label className="cursor-pointer inline-block bg-[#2a2a2a] hover:bg-[#3a3a3a] text-xs px-3 py-1.5 rounded text-white">
+                  {ed.coverUrl ? '更换图片' : '选择图片'}
+                  <input type="file" accept="image/*" onChange={onCoverEdit} className="hidden" />
+                </label>
+                {ed.coverUrl && (
+                  <div className="mt-2 relative inline-block">
+                    <img src={ed.coverUrl} className="h-24 rounded border border-[#2a2a2a]" />
+                    <button
+                      onClick={() => setEd({ ...ed, coverUrl: '' })}
+                      className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-6 h-6 text-xs"
+                    >×</button>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-gray-400 mb-1 text-xs">最低 VIP 等级</label>
