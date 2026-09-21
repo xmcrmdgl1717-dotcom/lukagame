@@ -16,11 +16,12 @@ model User {
 }
 
 model Card {
-  id       String   @id @default(uuid())
-  name     String
-  rarity   String
-  imageUrl String
-  boxItems BoxItem[]
+  id        String   @id @default(uuid())
+  name      String
+  rarity    String
+  imageUrl  String
+  boxItems  BoxItem[]
+  inventory Inventory[]   // ← 这一行是必须补上的
 }
 
 model Box {
@@ -41,12 +42,12 @@ model BoxItem {
 }
 
 model Inventory {
-  id        String @id @default(uuid())
-  userId    String
-  cardId    String
-  quantity  Int    @default(1)
-  user      User   @relation(fields: [userId], references: [id])
-  card      Card   @relation(fields: [cardId], references: [id])
+  id       String @id @default(uuid())
+  userId   String
+  cardId   String
+  quantity Int    @default(1)
+  user     User   @relation(fields: [userId], references: [id])
+  card     Card   @relation(fields: [cardId], references: [id])
 
   @@unique([userId, cardId])
 }
