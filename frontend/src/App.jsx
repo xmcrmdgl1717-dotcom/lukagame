@@ -6,37 +6,63 @@ import Home from './pages/Home';
 import Activity from './pages/Activity';
 import Inventory from './pages/Inventory';
 import Profile from './pages/Profile';
+import LoginModal from './components/LoginModal';
 
-// 自动读取 Render 的环境变量，本地开发则回退到 localhost
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('home');
+  const [showLogin, setShowLogin] = useState(false);
   const { setUser, setBoxes, user } = useStore();
 
   useEffect(() => {
-    // 使用环境变量中的 API 地址进行请求
-    axios.post(`${API_URL}/api/login`, { username: 'test' })
-      .then(res => setUser(res.data))
-      .catch(err => console.error("登录失败:", err));
+    // 获取盲盒数据
+    axios.get(`${API_URL}/api/boxes`).then(res => setBoxes(res.data));
+  }, [setBoxes]);
 
-    axios.get(`${API_URL}/api/boxes`)
-      .then(res => setBoxes(res.data))
-      .catch(err => console.error("获取盲盒失败:", err));
-  }, [setUser, setBoxes]);
-
-  if (!user) {
-    return <div className="flex items-center justify-center h-screen text-red-500 font-bold">加载中...</div>;
-  }
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
+    setShowLogin(false);
+  };
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-[#0a0a0a] text-white pb-20 relative shadow-2xl">
+    <div className="max-w-md mx-auto min-h-screen bg-[#0a0a0a] text-white pb-20 relative shadow-2xl overflow-hidden">
+      {/* 顶部栏 */}
+      <div className="flex justify-between items-center p-4 bg-[#140a0a] border-b border-[#332222]">
+        <div className="text-2xl font-black italic text-red-500 tracking-wider">LUKA!</div>
+        {!user ? (
+          <button onClick={() => setShowLogin(true)} className="text-xs text-gray-400 border border-gray-600 px-4 py-1.5 rounded-full hover:text-white hover:border-white transition">
+            Sign In
+          </button>
+        ) : (
+          <div className="text-xs text-yellow-500 font-bold bg-[#2a1414] px-3 py-1.5 rounded-full border border-yellow-900/50">
+            💰 {user.coins.toLocaleString()}
+          </div>
+        )}
+      </div>
+
+      {/* 页面内容 */}
       <div className="p-4">
+        {/* 未登录提示 */}
+        {!user && currentTab === 'home' && (
+          <div className="bg-[#2a1414] border border-red-900/50 rounded-xl p-6 text-center mb-6">
+            <p className="text-gray-400 text-sm mb-4">请先登录以查看您的 LUKA 分数并进行抽卡</p>
+            <button onClick={() => setShowLogin(true)} className="bg-red-600 hover:bg-red-700 text-white px-8 py-2.5 rounded-full font-bold text-sm transition">
+              登录 / 注册
+            </button>
+          </div>
+        )}
+
         {currentTab === 'home' && <Home />}
         {currentTab === 'activity' && <Activity />}
         {currentTab === 'inventory' && <Inventory />}
         {currentTab === 'profile' && <Profile />}
       </div>
+
+      {/* 登录弹窗 */}
+      {showLogin && <LoginModal onClose={() => setShowLogin(false)} onLoginSuccess={handleLoginSuccess} />}
+
+      {/* 底部导航 */}
       <BottomNav currentTab={currentTab} setCurrentTab={setCurrentTab} />
     </div>
   );
