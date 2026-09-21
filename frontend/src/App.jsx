@@ -27,7 +27,7 @@ export default function App() {
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-[#0a0a0a] text-white pb-20 relative shadow-2xl overflow-hidden">
-      {/* 顶部栏 */}
+      {/* 顶部栏：未登录显示 Sign In */}
       <div className="flex justify-between items-center p-4 bg-[#140a0a] border-b border-[#332222]">
         <div className="text-2xl font-black italic text-red-500 tracking-wider">LUKA!</div>
         {!user ? (
@@ -43,17 +43,7 @@ export default function App() {
 
       {/* 页面内容 */}
       <div className="p-4">
-        {/* 未登录提示 */}
-        {!user && currentTab === 'home' && (
-          <div className="bg-[#2a1414] border border-red-900/50 rounded-xl p-6 text-center mb-6">
-            <p className="text-gray-400 text-sm mb-4">请先登录以查看您的 LUKA 分数并进行抽卡</p>
-            <button onClick={() => setShowLogin(true)} className="bg-red-600 hover:bg-red-700 text-white px-8 py-2.5 rounded-full font-bold text-sm transition">
-              登录 / 注册
-            </button>
-          </div>
-        )}
-
-        {currentTab === 'home' && <Home />}
+        {currentTab === 'home' && <Home onShowLogin={() => setShowLogin(true)} />}
         {currentTab === 'activity' && <Activity />}
         {currentTab === 'inventory' && <Inventory />}
         {currentTab === 'profile' && <Profile />}
