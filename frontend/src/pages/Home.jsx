@@ -4,16 +4,18 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export default function Home({ onShowLogin }) {
+export default function Home({ onShowLogin, onGoGame }) {
   const { user, boxes, updateCoins, setUser } = useStore();
   const [drawing, setDrawing] = useState(false);
   const [drawnResult, setDrawnResult] = useState([]);
   const [banners, setBanners] = useState([]);
   const [currentBanner, setCurrentBanner] = useState(0);
+  const [games, setGames] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
 
   useEffect(() => {
     axios.get(`${API_URL}/api/banners`).then(res => setBanners(res.data)).catch(() => {});
+    axios.get(`${API_URL}/api/games`).then(res => setGames(res.data)).catch(() => {});
     axios.get(`${API_URL}/api/leaderboard/weekly`).then(res => setLeaderboard(res.data)).catch(() => {});
   }, []);
 
@@ -44,7 +46,7 @@ export default function Home({ onShowLogin }) {
 
   return (
     <div className="p-4 space-y-6">
-      {/* 1. 顶部轮播图 */}
+      {/* 1. 轮播图 */}
       <div className="relative overflow-hidden rounded-2xl border border-[#3a1a1a] shadow-2xl">
         {banners.length === 0 ? (
           <div className="w-full h-48 bg-gradient-to-br from-[#2d1410] to-[#4a1c12] flex items-center justify-center text-gray-500 text-sm">暂无轮播图</div>
@@ -54,7 +56,6 @@ export default function Home({ onShowLogin }) {
               {banners.map(b => (
                 <div key={b.id} className="w-full flex-shrink-0 relative cursor-pointer" onClick={() => handleBannerClick(b.link)}>
                   <img src={b.imageUrl} alt={b.title} className="w-full h-48 object-cover" />
-                  <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-black/60 to-transparent"></div>
                 </div>
               ))}
             </div>
@@ -68,7 +69,7 @@ export default function Home({ onShowLogin }) {
         )}
       </div>
 
-      {/* 2. 周消耗榜 */}
+      {/* 2. 周榜卡片 */}
       <div className="bg-gradient-to-br from-[#2d1410] to-[#4a1c12] border border-[#6b2a1e] rounded-2xl p-5 shadow-lg">
         <div className="text-center mb-3">
           <div className="text-orange-400 font-bold text-sm tracking-widest mb-1">1 Week Spending Leaderboard</div>
@@ -83,6 +84,7 @@ export default function Home({ onShowLogin }) {
                 <div className="flex items-center gap-2">
                   <span className={`font-bold ${idx === 0 ? 'text-yellow-400' : idx === 1 ? 'text-gray-300' : 'text-orange-400'}`}>TOP {idx + 1}</span>
                   <span className="text-white">{row.username}</span>
+                  <span className="text-[10px] bg-orange-900/60 text-orange-200 px-1.5 py-0.5 rounded">VIP{row.vipLevel}</span>
                 </div>
                 <span className="text-orange-500 font-bold">{row.totalCost.toLocaleString()} 🪙</span>
               </div>
@@ -91,28 +93,42 @@ export default function Home({ onShowLogin }) {
         )}
       </div>
 
-      {/* 3. 功能模块 */}
-      <div className="grid grid-cols-3 gap-3 text-center">
-        {['Influencer Promos', 'Raffles', 'Leaderboard'].map((item, idx) => (
-          <div key={idx} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-3 flex flex-col items-center">
-            <div className="w-10 h-10 bg-gray-800 rounded-lg mb-2 flex items-center justify-center text-xl">🎖️</div>
-            <div className="text-[10px] text-gray-400">{item}</div>
+      {/* 3. ====== 游戏列表（新） ====== */}
+      <div>
+        <div className="text-center text-xs font-bold text-gray-400 tracking-widest mb-3">游戏专区</div>
+        {games.length === 0 ? (
+          <div className="text-center text-gray-500 text-sm py-6">暂无游戏</div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {games.map((g) => (
+              <div
+                key={g.id}
+                onClick={() => onGoGame(g)}
+                className="bg-[#161616] border border-[#2a2a2a] rounded-xl overflow-hidden cursor-pointer hover:border-orange-600 transition shadow-lg"
+              >
+                <div className="h-28 bg-[#0d0d0d] flex items-center justify-center relative">
+                  {g.coverUrl ? (
+                    <img src={g.coverUrl} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-5xl">{g.icon || '🎮'}</div>
+                  )}
+                  {g.minVipLevel > 0 && (
+                    <span className="absolute top-2 right-2 text-[10px] bg-orange-600 text-white px-1.5 py-0.5 rounded">VIP{g.minVipLevel}+</span>
+                  )}
+                </div>
+                <div className="p-2 text-center">
+                  <div className="text-sm font-bold text-white truncate">{g.displayName}</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5 truncate">{g.description || '进入抽奖'}</div>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
 
-      <div className="text-center text-xs font-bold text-gray-400 tracking-widest my-6">PACKS</div>
+      {/* 4. 推荐盲盒（原来的 HEAVEN & HELL） */}
+      <div className="text-center text-xs font-bold text-gray-400 tracking-widest my-3">推荐盲盒</div>
 
-      {/* 4. 神秘包 */}
-      <div className="bg-gradient-to-r from-red-900 to-red-700 rounded-2xl p-5 border border-red-500 relative overflow-hidden shadow-lg">
-        <div className="text-3xl text-red-400 font-black mb-2 opacity-80">???</div>
-        <div className="text-center mb-4">
-          <img src="https://via.placeholder.com/100x120/333/fff?text=LUKA" className="mx-auto rounded shadow-lg transform rotate-6 border border-white/20" alt="Luka Pack" />
-        </div>
-        <div className="text-white font-bold text-sm mb-1">666666 🪙</div>
-      </div>
-
-      {/* 5. HEAVEN & HELL */}
       <div className="bg-[#1a0f0c] border border-[#3d1a1a] rounded-2xl p-4 relative overflow-hidden shadow-lg">
         <div className="flex justify-between items-center mb-3">
           <div className="text-orange-400 font-bold text-sm tracking-wide">HEAVEN & HELL</div>
@@ -120,7 +136,7 @@ export default function Home({ onShowLogin }) {
         </div>
         <div className="flex justify-between items-center">
           <div className="flex-1">
-            <img src="https://via.placeholder.com/80x100/333/fff?text=H%26H" className="rounded shadow-md border border-orange-500/30" alt="H&H" />
+            <img src="https://via.placeholder.com/80x100/333/fff?text=H%26H" className="rounded shadow-md border border-orange-500/30" />
           </div>
           <div className="flex-1 text-right">
             <div className="text-white text-sm font-bold mb-1">450 🪙</div>
@@ -130,33 +146,12 @@ export default function Home({ onShowLogin }) {
         </div>
       </div>
 
-      {/* 6. Great / Ultra / Master */}
-      <div className="space-y-4">
-        {[
-          { name: 'GREAT', price: 75, color: 'from-blue-900 to-blue-700', img: 'https://via.placeholder.com/60x80/333/fff?text=G' },
-          { name: 'ULTRA', price: 300, color: 'from-purple-900 to-purple-700', img: 'https://via.placeholder.com/60x80/333/fff?text=U' },
-          { name: 'MASTER', price: 450, color: 'from-yellow-900 to-yellow-700', img: 'https://via.placeholder.com/60x80/333/fff?text=M' }
-        ].map((cat, idx) => (
-          <div key={idx} className={`bg-gradient-to-br ${cat.color} rounded-2xl p-4 border border-white/10 shadow-lg flex items-center justify-between`}>
-            <div className="flex gap-2">
-              <img src={cat.img} className="w-10 h-14 rounded shadow" alt={cat.name} />
-              <img src={cat.img} className="w-10 h-14 rounded shadow" alt={cat.name} />
-            </div>
-            <div className="text-right">
-              <div className="text-white text-sm font-bold">{cat.name}</div>
-              <div className="text-orange-300 text-xs font-bold mb-1">{cat.price} 🪙</div>
-              <button onClick={() => handleDraw(getBox(cat.name, cat.price), 1)}
-                className="bg-white/20 text-white text-[10px] px-4 py-1 rounded font-bold hover:bg-white/30 transition">开箱</button>
-            </div>
-          </div>
-        ))}
-      </div>
-
       <div className="text-center text-[10px] text-gray-600 pt-6 pb-2 leading-relaxed">
         POKEMON TRADING CARD GAME ONLINE<br/>
         Terms & Conditions · Privacy Policy · Blog
       </div>
 
+      {/* 抽卡结果 */}
       {drawing && drawnResult.length > 0 && (
         <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-4">
           <div className="text-2xl font-bold text-red-500 mb-8 animate-pulse">抽卡结果</div>
