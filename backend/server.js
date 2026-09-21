@@ -1650,6 +1650,23 @@ app.get('/api/admin/reports/vip-distribution', requirePermission('reports.view')
   res.json({ list: result });
 });
 
+// ============ 临时：初始化数据库 ============
+const { execSync } = require('child_process');
+app.get('/api/setup-db', async (req, res) => {
+  try {
+    console.log('开始同步数据库...');
+    execSync('npx prisma db push', { stdio: 'inherit' });
+    console.log('开始写入种子数据...');
+    execSync('node seed.js', { stdio: 'inherit' });
+    res.json({ success: true, message: '数据库已同步，种子数据已写入' });
+  } catch (e) {
+    console.error('初始化失败:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+// ============ 临时接口结束 ============
+
+
 // ================= 服务启动 =================
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 后端服务器运行在 http://localhost:${PORT}`));
