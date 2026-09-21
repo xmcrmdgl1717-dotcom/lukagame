@@ -4,20 +4,19 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export default function Home() {
+export default function Home({ onShowLogin }) {
   const { user, boxes, updateCoins, setUser } = useStore();
   const [drawing, setDrawing] = useState(false);
   const [drawnResult, setDrawnResult] = useState([]);
 
   const handleDraw = async (box, count) => {
-    if (!user) return alert('请先登录！');
+    if (!user) return onShowLogin(); // 未登录直接弹出登录框
     if (user.coins < box.price * count) return alert('金币不足，请先充值！');
     
     try {
       const res = await axios.post(`${API_URL}/api/draw`, { userId: user.id, boxId: box.id, count });
       updateCoins(-(box.price * count));
       
-      // 刷新用户数据（同步库存和金币）
       const updatedUser = await axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' });
       setUser(updatedUser.data);
       
@@ -28,21 +27,40 @@ export default function Home() {
     }
   };
 
-  // 辅助函数：按名字在已有盲盒里找，找不到就用默认假数据
   const getBox = (name, defaultPrice) => boxes.find(b => b.name.toLowerCase().includes(name.toLowerCase())) || { id: name, name, price: defaultPrice };
 
   return (
     <div className="p-4 space-y-6">
-      {/* 1. 顶部 Banner 区 */}
-      <div className="bg-gradient-to-br from-[#2d1410] to-[#4a1c12] border border-[#6b2a1e] rounded-2xl p-5 relative overflow-hidden">
+      {/* 1. 顶部 Banner 区（已升级为 Banner 图样式） */}
+      <div 
+        className="border border-[#6b2a1e] rounded-2xl p-5 relative overflow-hidden shadow-2xl bg-cover bg-center"
+        style={{ 
+          backgroundImage: "linear-gradient(to bottom, rgba(20,5,0,0.6), rgba(20,5,0,0.95)), url('https://via.placeholder.com/800x400/2d1410/4a1c12?text=1+Week+Spending+Leaderboard')" 
+        }}
+      >
+        {/* Banner 头部文字 */}
         <div className="text-center mb-4">
-          <div className="text-gray-400 text-[10px] mb-2 tracking-widest">LOG IN TO VIEW YOUR LUKA SCORE</div>
-          <div className="text-3xl font-black text-orange-400">81,500 🪙</div>
+          <div className="text-orange-400 font-bold text-sm tracking-widest mb-1">1 Week Spending Leaderboard</div>
+          <div className="text-gray-300 text-[10px] mb-3">The more you open, the higher your rank!</div>
+          
+          {/* 未登录时的 Banner 登录按钮 */}
+          {!user ? (
+            <button 
+              onClick={onShowLogin} 
+              className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-6 py-2 rounded-full shadow-lg transition transform hover:scale-105"
+            >
+              登录 / 注册查看分数
+            </button>
+          ) : (
+            <div className="text-3xl font-black text-orange-400">81,500 🪙</div>
+          )}
         </div>
+
+        {/* 排行榜前三名 */}
         <div className="flex justify-around text-center text-[10px] text-gray-300">
-          <div className="bg-black/30 p-2 rounded-lg w-1/4"><span className="block text-orange-500 font-bold">TOP 1</span>30,000 🪙</div>
-          <div className="bg-black/30 p-2 rounded-lg w-1/4"><span className="block text-orange-500 font-bold">TOP 2</span>10,000 🪙</div>
-          <div className="bg-black/30 p-2 rounded-lg w-1/4"><span className="block text-orange-500 font-bold">TOP 3</span>4,000 🪙</div>
+          <div className="bg-black/40 p-2 rounded-lg w-1/4 backdrop-blur-sm"><span className="block text-orange-500 font-bold">TOP 1</span>30,000 🪙</div>
+          <div className="bg-black/40 p-2 rounded-lg w-1/4 backdrop-blur-sm"><span className="block text-orange-500 font-bold">TOP 2</span>10,000 🪙</div>
+          <div className="bg-black/40 p-2 rounded-lg w-1/4 backdrop-blur-sm"><span className="block text-orange-500 font-bold">TOP 3</span>4,000 🪙</div>
         </div>
       </div>
 
