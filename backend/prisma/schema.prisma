@@ -7,14 +7,40 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  displayName String
+  description String   @default("")
+  permissions String   @default("")
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  admins      Admin[]
+}
+
 model Admin {
   id          String   @id @default(uuid())
   username    String   @unique
   password    String
+  roleId      String?
+  roleRef     Role?    @relation(fields: [roleId], references: [id])
   role        String   @default("admin")
+  permissions String   @default("")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   lastLoginAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  adminId    String
+  adminName  String
+  action     String
+  targetType String   @default("")
+  targetId   String   @default("")
+  detail     String   @default("")
+  ip         String   @default("")
+  createdAt  DateTime @default(now())
 }
 
 model User {
