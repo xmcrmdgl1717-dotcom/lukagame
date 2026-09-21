@@ -1,282 +1,104 @@
 import React, { useState } from 'react';
 import { useTable, useCreate, useUpdate, useDelete } from '@refinedev/core';
+import SearchBar from '../../components/SearchBar';
+import { useSearch } from '../../hooks/useSearch';
 
-interface BannerItem {
-  id: string;
-  imageUrl: string;
-  link: string;
-  title: string;
-  sortOrder: number;
-  isActive: boolean;
-  createdAt: string;
-}
+interface B { id: string; imageUrl: string; link: string; title: string; sortOrder: number; isActive: boolean; createdAt: string; }
 
-const readFileAsBase64 = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+const readAsBase64 = (f: File): Promise<string> =>
+  new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f); });
+
+const SEARCH_FIELDS = [
+  { key: 'title', label: '标题', type: 'text' as const },
+  { key: 'isActive', label: '状态', type: 'select' as const, options: [{ value: 'true', label: '上架' }, { value: 'false', label: '下架' }] },
+  { key: 'createdAt', label: '创建时间', type: 'date-range' as const },
+];
 
 export default function BannerList() {
-  const { tableQueryResult } = useTable<BannerItem>({
-    resource: 'banners',
-    pagination: { pageSize: 100 },
-  });
+  const { tableQueryResult } = useTable<B>({ resource: 'banners', pagination: { pageSize: 100 } });
+  const { mutate: create_ } = useCreate();
+  const { mutate: update_ } = useUpdate();
+  const { mutate: delete_ } = useDelete();
 
-  const { mutate: createBanner } = useCreate();
-  const { mutate: updateBanner } = useUpdate();
-  const { mutate: deleteBanner } = useDelete();
+  const all = tableQueryResult.data?.data || [];
+  const { filters, setFilters, filtered, reset } = useSearch(all, SEARCH_FIELDS);
 
-  const [newBanner, setNewBanner] = useState({ imageUrl: '', link: '', title: '', sortOrder: 0 });
+  const [n, setN] = useState({ imageUrl: '', link: '', title: '', sortOrder: 0 });
   const [creating, setCreating] = useState(false);
-
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState<any>({});
+  const [showEdit, setShowEdit] = useState(false);
+  const [ed, setEd] = useState<any>({});
   const [saving, setSaving] = useState(false);
 
-  const banners = tableQueryResult.data?.data || [];
+  const onNewImg = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (!f) return; setN((b) => ({ ...b, imageUrl: await readAsBase64(f) })); };
+  const onEdImg = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (!f) return; setEd((b: any) => ({ ...b, imageUrl: await readAsBase64(f) })); };
 
-  const handleNewImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const base64 = await readFileAsBase64(file);
-    setNewBanner((b) => ({ ...b, imageUrl: base64 }));
-  };
-
-  const handleEditImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const base64 = await readFileAsBase64(file);
-    setEditForm((f: any) => ({ ...f, imageUrl: base64 }));
-  };
-
-  const handleCreate = () => {
-    if (!newBanner.imageUrl) return alert('请上传或填写图片');
+  const createFn = () => {
+    if (!n.imageUrl) return alert('请上传图片');
     setCreating(true);
-    createBanner(
-      { resource: 'banners', values: newBanner },
-      {
-        onSuccess: () => {
-          setNewBanner({ imageUrl: '', link: '', title: '', sortOrder: 0 });
-          setCreating(false);
-          tableQueryResult.refetch();
-        },
-        onError: (err: any) => {
-          alert('添加失败: ' + (err?.message || '未知错误'));
-          setCreating(false);
-        },
-      }
-    );
+    create_({ resource: 'banners', values: n }, { onSuccess: () => { setN({ imageUrl: '', link: '', title: '', sortOrder: 0 }); setCreating(false); tableQueryResult.refetch(); }, onError: () => setCreating(false) });
   };
 
-  const openEdit = (b: BannerItem) => {
-    setEditForm({ ...b });
-    setShowEditModal(true);
-  };
-
-  const handleSaveEdit = () => {
+  const save = () => {
     setSaving(true);
-    updateBanner(
-      {
-        resource: 'banners',
-        id: editForm.id,
-        values: {
-          imageUrl: editForm.imageUrl,
-          link: editForm.link,
-          title: editForm.title,
-          sortOrder: editForm.sortOrder,
-        },
-      },
-      {
-        onSuccess: () => {
-          setShowEditModal(false);
-          setSaving(false);
-          tableQueryResult.refetch();
-        },
-        onError: (err: any) => {
-          alert('保存失败: ' + (err?.message || '未知错误'));
-          setSaving(false);
-        },
-      }
-    );
+    update_({ resource: 'banners', id: ed.id, values: { imageUrl: ed.imageUrl, link: ed.link, title: ed.title, sortOrder: ed.sortOrder } }, {
+      onSuccess: () => { setShowEdit(false); setSaving(false); tableQueryResult.refetch(); }, onError: () => setSaving(false),
+    });
   };
 
-  const toggleStatus = (b: BannerItem) => {
-    updateBanner(
-      { resource: 'banners', id: b.id, values: { isActive: !b.isActive } },
-      { onSuccess: () => tableQueryResult.refetch() }
-    );
-  };
-
-  const handleDelete = (b: BannerItem) => {
-    if (!confirm(`确定要删除轮播图「${b.title || b.id.slice(0, 8)}」吗？`)) return;
-    deleteBanner(
-      { resource: 'banners', id: b.id },
-      {
-        onSuccess: () => tableQueryResult.refetch(),
-        onError: (err: any) => alert('删除失败: ' + (err?.message || '未知错误')),
-      }
-    );
-  };
+  const toggle = (b: B) => update_({ resource: 'banners', id: b.id, values: { isActive: !b.isActive } }, { onSuccess: () => tableQueryResult.refetch() });
+  const del = (b: B) => { if (confirm('删除轮播图？')) delete_({ resource: 'banners', id: b.id }, { onSuccess: () => tableQueryResult.refetch() }); };
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">轮播图管理</h1>
-        <div className="text-sm text-gray-500">共 {banners.length} 张</div>
-      </div>
+      <div className="flex justify-between items-center mb-6"><h1 className="text-2xl font-bold">轮播图</h1></div>
 
-      {/* 新增 */}
-      <div className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4 mb-6">
+      <div className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4 mb-4">
         <div className="text-sm font-bold mb-3">新增轮播图</div>
         <div className="flex flex-wrap gap-2 items-center">
-          <label className="cursor-pointer bg-[#2a2a2a] hover:bg-[#3a3a3a] text-xs px-3 py-2 rounded">
-            选择图片
-            <input type="file" accept="image/*" onChange={handleNewImage} className="hidden" />
-          </label>
-          {newBanner.imageUrl && (
-            <img src={newBanner.imageUrl} className="h-12 rounded border border-[#2a2a2a]" />
-          )}
-          <input
-            value={newBanner.link}
-            onChange={(e) => setNewBanner({ ...newBanner, link: e.target.value })}
-            placeholder="跳转链接"
-            className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm w-48 focus:outline-none focus:border-red-500"
-          />
-          <input
-            value={newBanner.title}
-            onChange={(e) => setNewBanner({ ...newBanner, title: e.target.value })}
-            placeholder="标题"
-            className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm w-32 focus:outline-none focus:border-red-500"
-          />
-          <input
-            type="number"
-            value={newBanner.sortOrder}
-            onChange={(e) => setNewBanner({ ...newBanner, sortOrder: parseInt(e.target.value) || 0 })}
-            placeholder="排序"
-            className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm w-20 focus:outline-none focus:border-red-500"
-          />
-          <button
-            onClick={handleCreate}
-            disabled={creating}
-            className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm px-4 py-1.5 rounded font-bold"
-          >
-            {creating ? '添加中...' : '+ 添加'}
-          </button>
+          <label className="cursor-pointer bg-[#2a2a2a] text-xs px-3 py-2 rounded text-white">选择图片<input type="file" accept="image/*" onChange={onNewImg} className="hidden" /></label>
+          {n.imageUrl && <img src={n.imageUrl} className="h-12 rounded" />}
+          <input value={n.link} onChange={(e) => setN({ ...n, link: e.target.value })} placeholder="跳转链接" className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm w-48 text-white" />
+          <input value={n.title} onChange={(e) => setN({ ...n, title: e.target.value })} placeholder="标题" className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm w-40 text-white" />
+          <input type="number" value={n.sortOrder} onChange={(e) => setN({ ...n, sortOrder: parseInt(e.target.value) || 0 })} placeholder="排序" className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm w-20 text-white" />
+          <button onClick={createFn} disabled={creating} className="bg-green-600 text-white text-sm px-4 py-1.5 rounded font-bold disabled:opacity-50">{creating ? '添加中...' : '+ 添加'}</button>
         </div>
       </div>
 
-      {/* 列表 */}
-      {tableQueryResult.isLoading ? (
-        <div className="text-center text-gray-500 py-20">加载中...</div>
-      ) : banners.length === 0 ? (
-        <div className="text-center text-gray-500 py-20">暂无轮播图</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {banners.map((b) => (
-            <div key={b.id} className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4">
-              {b.imageUrl && (
-                <img
-                  src={b.imageUrl}
-                  className="w-full h-32 object-cover rounded mb-3"
-                  alt={b.title}
-                />
-              )}
-              <div className="text-sm font-bold mb-1">{b.title || '（无标题）'}</div>
-              <div className="text-xs text-gray-500 mb-1 truncate">链接: {b.link || '-'}</div>
-              <div className="text-xs text-gray-500 mb-3">排序: {b.sortOrder}</div>
-              <div className="flex gap-2 flex-wrap">
-                <span
-                  className={`text-xs px-2 py-0.5 rounded ${
-                    b.isActive
-                      ? 'bg-green-900/60 text-green-200'
-                      : 'bg-red-900/60 text-red-200'
-                  }`}
-                >
-                  {b.isActive ? '上架' : '下架'}
-                </span>
-                <button
-                  onClick={() => openEdit(b)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded"
-                >
-                  编辑
-                </button>
-                <button
-                  onClick={() => toggleStatus(b)}
-                  className="bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1 rounded"
-                >
-                  {b.isActive ? '下架' : '上架'}
-                </button>
-                <button
-                  onClick={() => handleDelete(b)}
-                  className="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded"
-                >
-                  删除
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <SearchBar fields={SEARCH_FIELDS} filters={filters} setFilters={setFilters} onReset={reset} total={all.length} filtered={filtered.length} />
 
-      {/* 编辑弹窗 */}
-      {showEditModal && (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {filtered.map((b) => (
+          <div key={b.id} className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4">
+            <img src={b.imageUrl} className="w-full h-32 object-cover rounded mb-3" />
+            <div className="text-sm font-bold mb-1">{b.title || '（无标题）'}</div>
+            <div className="text-xs text-gray-500 mb-3">链接: {b.link || '-'} · 排序: {b.sortOrder}</div>
+            <div className="flex gap-2">
+              <span className={`text-xs px-2 py-0.5 rounded ${b.isActive ? 'bg-green-900/60 text-green-200' : 'bg-red-900/60 text-red-200'}`}>{b.isActive ? '上架' : '下架'}</span>
+              <button onClick={() => { setEd({ ...b }); setShowEdit(true); }} className="bg-blue-600 text-white text-xs px-3 py-1 rounded">编辑</button>
+              <button onClick={() => toggle(b)} className="bg-orange-600 text-white text-xs px-3 py-1 rounded">{b.isActive ? '下架' : '上架'}</button>
+              <button onClick={() => del(b)} className="bg-red-600 text-white text-xs px-3 py-1 rounded">删除</button>
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && <div className="col-span-2 text-center text-gray-500 py-10">无匹配结果</div>}
+      </div>
+
+      {showEdit && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-md">
             <h3 className="text-lg font-bold mb-4">编辑轮播图</h3>
             <div className="space-y-3 text-sm">
-              <div>
-                <label className="block text-gray-400 mb-1 text-xs">图片</label>
-                <label className="cursor-pointer inline-block bg-[#2a2a2a] hover:bg-[#3a3a3a] text-xs px-3 py-1.5 rounded mb-2">
-                  选择新图片
-                  <input type="file" accept="image/*" onChange={handleEditImage} className="hidden" />
-                </label>
-                {editForm.imageUrl && (
-                  <img src={editForm.imageUrl} className="mt-2 h-24 rounded border border-[#2a2a2a]" />
-                )}
+              <div><label className="block text-gray-400 mb-1 text-xs">图片</label>
+                <label className="cursor-pointer inline-block bg-[#2a2a2a] text-xs px-3 py-1.5 rounded mb-2 text-white">选择新图片<input type="file" accept="image/*" onChange={onEdImg} className="hidden" /></label>
+                {ed.imageUrl && <img src={ed.imageUrl} className="mt-2 h-24 rounded" />}
               </div>
-              <div>
-                <label className="block text-gray-400 mb-1 text-xs">标题</label>
-                <input
-                  value={editForm.title || ''}
-                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                  className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-gray-400 mb-1 text-xs">跳转链接</label>
-                <input
-                  value={editForm.link || ''}
-                  onChange={(e) => setEditForm({ ...editForm, link: e.target.value })}
-                  className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-gray-400 mb-1 text-xs">排序</label>
-                <input
-                  type="number"
-                  value={editForm.sortOrder ?? 0}
-                  onChange={(e) => setEditForm({ ...editForm, sortOrder: parseInt(e.target.value) || 0 })}
-                  className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white"
-                />
-              </div>
+              <div><label className="block text-gray-400 mb-1 text-xs">标题</label><input value={ed.title || ''} onChange={(e) => setEd({ ...ed, title: e.target.value })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" /></div>
+              <div><label className="block text-gray-400 mb-1 text-xs">链接</label><input value={ed.link || ''} onChange={(e) => setEd({ ...ed, link: e.target.value })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" /></div>
+              <div><label className="block text-gray-400 mb-1 text-xs">排序</label><input type="number" value={ed.sortOrder ?? 0} onChange={(e) => setEd({ ...ed, sortOrder: parseInt(e.target.value) || 0 })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" /></div>
             </div>
             <div className="flex justify-end gap-3 mt-5">
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="px-4 py-2 bg-[#2a2a2a] rounded text-sm hover:bg-[#3a3a3a]"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                disabled={saving}
-                className="px-4 py-2 bg-blue-600 rounded text-sm font-bold hover:bg-blue-700 disabled:opacity-50"
-              >
-                {saving ? '保存中...' : '保存'}
-              </button>
+              <button onClick={() => setShowEdit(false)} className="px-4 py-2 bg-[#2a2a2a] rounded text-sm">取消</button>
+              <button onClick={save} disabled={saving} className="px-4 py-2 bg-blue-600 rounded text-sm font-bold disabled:opacity-50">{saving ? '保存中...' : '保存'}</button>
             </div>
           </div>
         </div>
