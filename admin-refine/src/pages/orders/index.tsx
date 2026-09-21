@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTable, useUpdate } from '@refinedev/core';
+import axios from 'axios';
 
 interface OrderItem {
   id: string;
@@ -11,6 +12,8 @@ interface OrderItem {
   user: { username: string };
   option: { coins: number; bonus: number };
 }
+
+const API_URL = import.meta.env.VITE_API_URL || 'https://luka-1i4g.onrender.com';
 
 const formatDate = (d: string) => {
   if (!d) return '-';
@@ -24,34 +27,64 @@ export default function OrderList() {
     pagination: { pageSize: 200 },
   });
 
-  const { mutate: customRequest } = useUpdate();
-
   const orders = tableQueryResult.data?.data || [];
 
-  const markPaid = (order: OrderItem) => {
+  const markPaid = async (order: OrderItem) => {
     if (!confirm(`确定将该订单标记为已支付，并为用户「${order.user.username}」增加 ${order.coins} 金币？`)) return;
-    customRequest(
-      {
-        resource: 'orders',
-        id: order.id,
-        values: {},
-        meta: {
-          // 因为后端接口是 PUT /api/admin/orders/:id/paid
-          // 我们需要自定义 meta 让 dataProvider 用正确路径
+    try {
+      const adminInfo = JSON.parse(localStorage.getItem('adminInfo') || 'null');
+      const password = localStorage.getItem('adminPassword') || '';
+      await axios.put(
+        `${API_URL}/api/admin/orders/${order.id}/paid`,
+        {},
+        {
+          headers: {
+            'x-admin-username': adminInfo?.username || '',
+            'x-admin-password': password,
+          },
+        }
+      );
+      tableQueryResult.refetch();
+    } catch (e: any) {
+      alert('操作失败: ' + (e.response?.data?.error || e.message));
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const adminInfo = JSON.parse(localStorage.getItem('adminInfo') || 'null');
+      const password = localStorage.getItem('adminPassword') || '';
+      const res = await fetch(`${API_URL}/api/admin/export/orders`, {
+        headers: {
+          'x-admin-username': adminInfo?.username || '',
+          'x-admin-password': password,
         },
-      },
-      {
-        onSuccess: () => tableQueryResult.refetch(),
-        onError: (err: any) => alert('操作失败: ' + (err?.message || '未知错误')),
-      }
-    );
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `orders_${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('导出失败');
+    }
   };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">订单管理</h1>
-        <div className="text-sm text-gray-500">共 {orders.length} 条订单</div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExport}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded font-bold"
+          >
+            📥 导出 CSV
+          </button>
+          <div className="text-sm text-gray-500">共 {orders.length} 条订单</div>
+        </div>
       </div>
 
       {tableQueryResult.isLoading ? (
