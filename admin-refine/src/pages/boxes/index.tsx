@@ -6,9 +6,13 @@ import { useSearch } from '../../hooks/useSearch';
 
 interface BoxItem {
   id: string; name: string; price: number; coverUrl: string; isActive: boolean;
+  isFeatured: boolean;
+  gameId: string | null;
+  game: { id: string; displayName: string } | null;
   items: Array<{ id: string; weight: number; card: { id: string; name: string; rarity: string; imageUrl: string } }>;
 }
 interface CardItem { id: string; name: string; rarity: string; imageUrl: string; }
+interface GameItem { id: string; displayName: string; }
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://luka-1i4g.onrender.com';
 
@@ -21,12 +25,16 @@ const SEARCH_FIELDS = [
   { key: 'isActive', label: '状态', type: 'select' as const, options: [
     { value: 'true', label: '上架' }, { value: 'false', label: '下架' },
   ]},
+  { key: 'isFeatured', label: '推荐', type: 'select' as const, options: [
+    { value: 'true', label: '已推荐' }, { value: 'false', label: '未推荐' },
+  ]},
   { key: 'createdAt', label: '创建时间', type: 'date-range' as const },
 ];
 
 export default function BoxList() {
   const { tableQueryResult } = useTable<BoxItem>({ resource: 'boxes', pagination: { pageSize: 100 } });
   const { tableQueryResult: cardsQ } = useTable<CardItem>({ resource: 'cards', pagination: { pageSize: 500 } });
+  const { tableQueryResult: gamesQ } = useTable<GameItem>({ resource: 'games', pagination: { pageSize: 100 } });
   const { mutate: createBox } = useCreate();
   const { mutate: updateBox } = useUpdate();
   const { mutate: deleteBox } = useDelete();
@@ -35,9 +43,10 @@ export default function BoxList() {
 
   const all = tableQueryResult.data?.data || [];
   const allCards = cardsQ.data?.data || [];
+  const allGames = gamesQ.data?.data || [];
   const { filters, setFilters, filtered, reset } = useSearch(all, SEARCH_FIELDS);
 
-  const [newBox, setNewBox] = useState({ name: '', price: 300, coverUrl: '' });
+  const [newBox, setNewBox] = useState({ name: '', price: 300, coverUrl: '', gameId: '', isFeatured: false });
   const [creating, setCreating] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
@@ -47,17 +56,14 @@ export default function BoxList() {
   const [itemCard, setItemCard] = useState('');
   const [itemWeight, setItemWeight] = useState(10);
 
-  // ✅ 修复：先 await，再 setState
   const onCoverNew = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
+    const f = e.target.files?.[0]; if (!f) return;
     const img = await readAsBase64(f);
     setNewBox((b) => ({ ...b, coverUrl: img }));
   };
 
   const onCoverEdit = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
+    const f = e.target.files?.[0]; if (!f) return;
     const img = await readAsBase64(f);
     setEditForm((b: any) => ({ ...b, coverUrl: img }));
   };
@@ -65,21 +71,45 @@ export default function BoxList() {
   const handleCreate = () => {
     if (!newBox.name) return alert('请输入名称');
     setCreating(true);
-    createBox({ resource: 'boxes', values: newBox }, {
-      onSuccess: () => { setNewBox({ name: '', price: 300, coverUrl: '' }); setCreating(false); tableQueryResult.refetch(); },
+    const payload: any = { ...newBox };
+    if (!payload.gameId) payload.gameId = null;
+    createBox({ resource: 'boxes', values: payload }, {
+      onSuccess: () => {
+        setNewBox({ name: '', price: 300, coverUrl: '', gameId: '', isFeatured: false });
+        setCreating(false);
+        tableQueryResult.refetch();
+      },
       onError: () => setCreating(false),
     });
   };
 
   const handleSave = () => {
     setSaving(true);
-    updateBox({ resource: 'boxes', id: editForm.id, values: { name: editForm.name, price: editForm.price, coverUrl: editForm.coverUrl } }, {
+    updateBox({
+      resource: 'boxes',
+      id: editForm.id,
+      values: {
+        name: editForm.name,
+        price: editForm.price,
+        coverUrl: editForm.coverUrl,
+        gameId: editForm.gameId || null,
+        isFeatured: editForm.isFeatured,
+      },
+    }, {
       onSuccess: () => { setShowEdit(false); setSaving(false); tableQueryResult.refetch(); },
       onError: () => setSaving(false),
     });
   };
 
-  const toggle = (b: BoxItem) => updateBox({ resource: 'boxes', id: b.id, values: { isActive: !b.isActive } }, { onSuccess: () => tableQueryResult.refetch() });
+  const toggle = (b: BoxItem) => updateBox(
+    { resource: 'boxes', id: b.id, values: { isActive: !b.isActive } },
+    { onSuccess: () => tableQueryResult.refetch() }
+  );
+
+  const toggleFeatured = (b: BoxItem) => updateBox(
+    { resource: 'boxes', id: b.id, values: { isFeatured: !b.isFeatured } },
+    { onSuccess: () => tableQueryResult.refetch() }
+  );
 
   const handleDelete = async (b: BoxItem) => {
     const ok = await confirm(`删除盲盒「${b.name}」？概率配置会一并删除！`);
@@ -125,16 +155,30 @@ export default function BoxList() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6"><h1 className="text-2xl font-bold">盲盒管理</h1></div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">盲盒管理</h1>
+        <div className="text-sm text-gray-500">共 {all.length} 个盲盒 · 其中 {all.filter(b => b.isFeatured).length} 个推荐到首页</div>
+      </div>
 
+      {/* 新建 */}
       <div className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4 mb-4">
         <div className="text-sm font-bold mb-3">新增盲盒</div>
         <div className="flex flex-wrap gap-2 items-center">
           <input value={newBox.name} onChange={(e) => setNewBox({ ...newBox, name: e.target.value })} placeholder="名称" className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm w-40 text-white" />
           <input type="number" value={newBox.price} onChange={(e) => setNewBox({ ...newBox, price: parseInt(e.target.value) || 0 })} placeholder="价格" className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm w-24 text-white" />
+          <select value={newBox.gameId} onChange={(e) => setNewBox({ ...newBox, gameId: e.target.value })} className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm text-white">
+            <option value="">-- 无归属游戏 --</option>
+            {allGames.map((g) => <option key={g.id} value={g.id}>{g.displayName}</option>)}
+          </select>
+          <label className="flex items-center gap-2 text-xs cursor-pointer text-white">
+            <input type="checkbox" checked={newBox.isFeatured} onChange={(e) => setNewBox({ ...newBox, isFeatured: e.target.checked })} />
+            推荐到首页
+          </label>
           <label className="cursor-pointer bg-[#2a2a2a] text-xs px-3 py-2 rounded text-white">选择封面<input type="file" accept="image/*" onChange={onCoverNew} className="hidden" /></label>
           {newBox.coverUrl && <img src={newBox.coverUrl} className="w-10 h-14 object-cover rounded" />}
-          <button onClick={handleCreate} disabled={creating} className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm px-4 py-1.5 rounded font-bold">{creating ? '添加中...' : '+ 添加'}</button>
+          <button onClick={handleCreate} disabled={creating} className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm px-4 py-1.5 rounded font-bold">
+            {creating ? '添加中...' : '+ 添加'}
+          </button>
         </div>
       </div>
 
@@ -144,17 +188,26 @@ export default function BoxList() {
         {filtered.map((b) => (
           <div key={b.id} className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4">
             <div className="flex justify-between items-center flex-wrap gap-2">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">{b.name}</span>
-                  {!b.isActive && <span className="text-xs bg-red-900/60 text-red-200 px-2 py-0.5 rounded">已下架</span>}
+              <div className="flex items-center gap-3">
+                {b.coverUrl && <img src={b.coverUrl} className="w-12 h-16 object-cover rounded" />}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold">{b.name}</span>
+                    {!b.isActive && <span className="text-xs bg-red-900/60 text-red-200 px-2 py-0.5 rounded">已下架</span>}
+                    {b.isFeatured && <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded">⭐推荐</span>}
+                  </div>
+                  <div className="text-yellow-500 text-sm mt-1">价格: {b.price} 🪙</div>
+                  <div className="text-gray-500 text-xs mt-1">
+                    归属游戏: {b.game?.displayName || '无'} · 包含 {b.items.length} 种卡牌
+                  </div>
                 </div>
-                <div className="text-yellow-500 text-sm mt-1">价格: {b.price} 🪙</div>
-                <div className="text-gray-500 text-xs mt-1">包含 {b.items.length} 种卡牌</div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <button onClick={() => { setEditForm({ ...b }); setShowEdit(true); }} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded">编辑</button>
                 <button onClick={() => openProb(b)} className="bg-purple-600 text-white text-xs px-3 py-1.5 rounded font-bold">概率配置</button>
+                <button onClick={() => toggleFeatured(b)} className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs px-3 py-1.5 rounded">
+                  {b.isFeatured ? '取消推荐' : '⭐ 推荐'}
+                </button>
                 <button onClick={() => toggle(b)} className="bg-orange-600 text-white text-xs px-3 py-1.5 rounded">{b.isActive ? '下架' : '上架'}</button>
                 <button onClick={() => handleDelete(b)} className="bg-red-600 text-white text-xs px-3 py-1.5 rounded">删除</button>
               </div>
@@ -164,16 +217,41 @@ export default function BoxList() {
         {filtered.length === 0 && <div className="text-center text-gray-500 py-10">无匹配结果</div>}
       </div>
 
+      {/* 编辑弹窗 */}
       {showEdit && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-md">
             <h3 className="text-lg font-bold mb-4">编辑盲盒</h3>
             <div className="space-y-3 text-sm">
-              <div><label className="block text-gray-400 mb-1 text-xs">名称</label><input value={editForm.name || ''} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" /></div>
-              <div><label className="block text-gray-400 mb-1 text-xs">价格</label><input type="number" value={editForm.price ?? 0} onChange={(e) => setEditForm({ ...editForm, price: parseInt(e.target.value) || 0 })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" /></div>
-              <div><label className="block text-gray-400 mb-1 text-xs">封面</label>
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">名称</label>
+                <input value={editForm.name || ''} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" />
+              </div>
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">价格</label>
+                <input type="number" value={editForm.price ?? 0} onChange={(e) => setEditForm({ ...editForm, price: parseInt(e.target.value) || 0 })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" />
+              </div>
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">归属游戏</label>
+                <select value={editForm.gameId || ''} onChange={(e) => setEditForm({ ...editForm, gameId: e.target.value })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white">
+                  <option value="">-- 无归属游戏 --</option>
+                  {allGames.map((g) => <option key={g.id} value={g.id}>{g.displayName}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">封面图</label>
                 <label className="cursor-pointer inline-block bg-[#2a2a2a] text-xs px-3 py-1.5 rounded mb-2 text-white">选择新封面<input type="file" accept="image/*" onChange={onCoverEdit} className="hidden" /></label>
                 {editForm.coverUrl && <img src={editForm.coverUrl} className="mt-2 h-24 rounded" />}
+              </div>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input type="checkbox" checked={editForm.isFeatured || false} onChange={(e) => setEditForm({ ...editForm, isFeatured: e.target.checked })} />
+                  ⭐ 推荐到首页
+                </label>
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input type="checkbox" checked={editForm.isActive || false} onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })} />
+                  上架
+                </label>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-5">
@@ -184,6 +262,7 @@ export default function BoxList() {
         </div>
       )}
 
+      {/* 概率配置弹窗 */}
       {showProb && curBox && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
