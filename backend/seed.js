@@ -141,19 +141,27 @@ async function main() {
 
     { id: 'menu-games', parentId: null, title: '游戏管理', type: 'MENU', icon: '🎮', path: '/games', component: 'GameList', permission: 'games.view', sortOrder: 3 },
 
-    { id: 'menu-cards', parentId: null, title: '卡牌管理', type: 'MENU', icon: '🃏', path: '/cards', component: 'CardList', permission: 'cards.view', sortOrder: 4 },
-    { id: 'menu-boxes', parentId: null, title: '盲盒管理', type: 'MENU', icon: '📦', path: '/boxes', component: 'BoxList', permission: 'boxes.view', sortOrder: 5 },
-    { id: 'menu-recharge', parentId: null, title: '充值套餐', type: 'MENU', icon: '💰', path: '/recharge-options', component: 'RechargeList', permission: 'recharge.view', sortOrder: 6 },
-    { id: 'menu-orders', parentId: null, title: '订单管理', type: 'MENU', icon: '📄', path: '/orders', component: 'OrderList', permission: 'orders.view', sortOrder: 7 },
+    { id: 'menu-fund-group', parentId: null, title: '资金管理', type: 'DIRECTORY', icon: '💰', path: '', component: '', permission: '', sortOrder: 4 },
+    { id: 'menu-payment-channels', parentId: 'menu-fund-group', title: '支付管理', type: 'MENU', icon: '💳', path: '/payment-channels', component: 'PaymentChannelList', permission: 'payments.view', sortOrder: 1 },
+    { id: 'menu-orders', parentId: 'menu-fund-group', title: '充值记录', type: 'MENU', icon: '📥', path: '/orders', component: 'OrderList', permission: 'orders.view', sortOrder: 2 },
+    { id: 'menu-withdrawals', parentId: 'menu-fund-group', title: '提现记录', type: 'MENU', icon: '📤', path: '/withdrawals', component: 'WithdrawalList', permission: 'withdrawals.view', sortOrder: 3 },
+    { id: 'menu-transactions', parentId: 'menu-fund-group', title: '交易明细', type: 'MENU', icon: '📊', path: '/transactions', component: 'TransactionList', permission: 'transactions.view', sortOrder: 4 },
 
-    { id: 'menu-ad-group', parentId: null, title: '广告管理', type: 'DIRECTORY', icon: '📣', path: '', component: '', permission: '', sortOrder: 8 },
+    { id: 'menu-drawlog-group', parentId: null, title: '抽奖管理', type: 'DIRECTORY', icon: '🎰', path: '', component: '', permission: '', sortOrder: 5 },
+    { id: 'menu-drawlogs', parentId: 'menu-drawlog-group', title: '抽奖记录', type: 'MENU', icon: '📝', path: '/drawlogs', component: 'DrawLogList', permission: 'drawlogs.view', sortOrder: 1 },
+
+    { id: 'menu-cards', parentId: null, title: '卡牌管理', type: 'MENU', icon: '🃏', path: '/cards', component: 'CardList', permission: 'cards.view', sortOrder: 6 },
+    { id: 'menu-boxes', parentId: null, title: '盲盒管理', type: 'MENU', icon: '📦', path: '/boxes', component: 'BoxList', permission: 'boxes.view', sortOrder: 7 },
+    { id: 'menu-recharge', parentId: null, title: '充值套餐', type: 'MENU', icon: '💰', path: '/recharge-options', component: 'RechargeList', permission: 'recharge.view', sortOrder: 8 },
+
+    { id: 'menu-ad-group', parentId: null, title: '广告管理', type: 'DIRECTORY', icon: '📣', path: '', component: '', permission: '', sortOrder: 9 },
     { id: 'menu-ads', parentId: 'menu-ad-group', title: '广告列表', type: 'MENU', icon: '📺', path: '/ads', component: 'AdList', permission: 'ads.view', sortOrder: 1 },
     { id: 'menu-banners', parentId: 'menu-ad-group', title: '轮播图', type: 'MENU', icon: '🖼️', path: '/banners', component: 'BannerList', permission: 'banners.view', sortOrder: 2 },
 
-    { id: 'menu-tasks', parentId: null, title: '任务管理', type: 'MENU', icon: '🎯', path: '/tasks', component: 'TaskList', permission: 'tasks.view', sortOrder: 9 },
-    { id: 'menu-redeem', parentId: null, title: '兑换码', type: 'MENU', icon: '🎁', path: '/redeem-codes', component: 'RedeemCodeList', permission: 'redeem.view', sortOrder: 10 },
-    { id: 'menu-notifications', parentId: null, title: '通知管理', type: 'MENU', icon: '🔔', path: '/notifications', component: 'NotificationList', permission: 'notifications.view', sortOrder: 11 },
-    { id: 'menu-tickets', parentId: null, title: '客服工单', type: 'MENU', icon: '🎧', path: '/tickets', component: 'TicketList', permission: 'tickets.view', sortOrder: 12 },
+    { id: 'menu-tasks', parentId: null, title: '任务管理', type: 'MENU', icon: '🎯', path: '/tasks', component: 'TaskList', permission: 'tasks.view', sortOrder: 10 },
+    { id: 'menu-redeem', parentId: null, title: '兑换码', type: 'MENU', icon: '🎁', path: '/redeem-codes', component: 'RedeemCodeList', permission: 'redeem.view', sortOrder: 11 },
+    { id: 'menu-notifications', parentId: null, title: '通知管理', type: 'MENU', icon: '🔔', path: '/notifications', component: 'NotificationList', permission: 'notifications.view', sortOrder: 12 },
+    { id: 'menu-tickets', parentId: null, title: '客服工单', type: 'MENU', icon: '🎧', path: '/tickets', component: 'TicketList', permission: 'tickets.view', sortOrder: 13 },
 
     { id: 'menu-system-group', parentId: null, title: '系统管理', type: 'DIRECTORY', icon: '⚙️', path: '', component: '', permission: '', sortOrder: 99 },
     { id: 'menu-admins', parentId: 'menu-system-group', title: '管理员列表', type: 'MENU', icon: '👤', path: '/admins', component: 'AdminList', permission: 'admins.view', sortOrder: 1 },
@@ -171,6 +179,11 @@ async function main() {
       create: m,
     });
   }
+
+  // 删除已废弃的旧菜单
+  await prisma.adminMenu.deleteMany({
+    where: { id: { in: ['menu-old-orders'] } },
+  });
 
   console.log('✅ 数据初始化完成');
   console.log('管理员: admin / admin123');
