@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUKA 管理后台 - 用户管理</title>
+    <title>LUKA 管理后台</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
         body { background-color: #0d0d0d; color: white; }
-        /* 美化滚动条 */
         ::-webkit-scrollbar { height: 8px; width: 8px; }
         ::-webkit-scrollbar-thumb { background: #4a1c12; border-radius: 4px; }
     </style>
@@ -22,10 +21,8 @@
             <div class="bg-gray-800 p-8 rounded-xl shadow-lg w-full max-w-sm border border-gray-700">
                 <h1 class="text-2xl font-bold text-center text-red-500 mb-6">LUKA 管理后台</h1>
                 <input v-model="password" type="password" placeholder="请输入管理密码" 
-                       class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 mb-4 focus:outline-none focus:border-red-500 text-white">
-                <button @click="login" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded transition">
-                    登录系统
-                </button>
+                       class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 mb-4 text-white focus:outline-none focus:border-red-500">
+                <button @click="login" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded transition">登录系统</button>
                 <p class="text-xs text-gray-500 mt-4 text-center">默认密码: admin123</p>
             </div>
         </div>
@@ -53,12 +50,15 @@
                 </div>
             </div>
 
-            <!-- 用户管理表格 -->
-            <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-lg">
-                <div class="p-4 bg-gray-900 border-b border-gray-700 flex justify-between items-center">
-                    <h2 class="text-lg font-bold text-white">用户管理</h2>
-                    <div class="text-xs text-gray-400">共 {{ users.length }} 位用户</div>
-                </div>
+            <!-- 选项卡 -->
+            <div class="flex gap-3 mb-4 flex-wrap">
+                <button @click="activeTab='users'" :class="tabClass('users')">用户管理</button>
+                <button @click="activeTab='cards'" :class="tabClass('cards')">卡牌管理</button>
+                <button @click="activeTab='boxes'" :class="tabClass('boxes')">盲盒管理</button>
+            </div>
+
+            <!-- ================== 用户管理 ================== -->
+            <div v-if="activeTab === 'users'" class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm whitespace-nowrap">
                         <thead class="bg-gray-700 text-gray-300 text-xs uppercase">
@@ -67,86 +67,219 @@
                                 <th class="p-3">注册时间</th>
                                 <th class="p-3">最近登录</th>
                                 <th class="p-3">余额</th>
-                                <th class="p-3">充值次数</th>
-                                <th class="p-3">提现次数</th>
-                                <th class="p-3">提现金额</th>
                                 <th class="p-3">标签</th>
                                 <th class="p-3">备注</th>
                                 <th class="p-3 text-center">操作</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="user in users" :key="user.id" class="border-b border-gray-700 hover:bg-gray-750 transition">
-                                <td class="p-3 font-bold text-white">{{ user.username }}</td>
-                                <td class="p-3 text-gray-400">{{ formatDate(user.createdAt) }}</td>
-                                <td class="p-3 text-gray-400">{{ formatDate(user.lastLoginAt) }}</td>
-                                <td class="p-3 font-bold text-yellow-500">{{ user.coins }}</td>
-                                <td class="p-3 text-blue-400 text-center">{{ user.rechargeCount }}</td>
-                                <td class="p-3 text-purple-400 text-center">{{ user.withdrawalCount }}</td>
-                                <td class="p-3 text-red-400 text-center">{{ user.withdrawalAmount }}</td>
-                                <td class="p-3">
-                                    <span v-if="user.tags" class="bg-blue-900 text-blue-200 text-xs px-2 py-0.5 rounded">{{ user.tags }}</span>
-                                </td>
-                                <td class="p-3 text-gray-400 text-xs max-w-xs truncate" :title="user.remark">{{ user.remark || '-' }}</td>
+                            <tr v-for="u in users" :key="u.id" class="border-b border-gray-700 hover:bg-gray-750">
+                                <td class="p-3 font-bold text-white">{{ u.username }}</td>
+                                <td class="p-3 text-gray-400">{{ formatDate(u.createdAt) }}</td>
+                                <td class="p-3 text-gray-400">{{ formatDate(u.lastLoginAt) }}</td>
+                                <td class="p-3 font-bold text-yellow-500">{{ u.coins }}</td>
+                                <td class="p-3"><span v-if="u.tags" class="bg-blue-900 text-blue-200 text-xs px-2 py-0.5 rounded">{{ u.tags }}</span></td>
+                                <td class="p-3 text-gray-400 text-xs max-w-xs truncate" :title="u.remark">{{ u.remark || '-' }}</td>
                                 <td class="p-3 text-center">
-                                    <button @click="openEditModal(user)" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded mr-1">编辑</button>
-                                    <button @click="deleteUser(user.id)" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded">删除</button>
+                                    <button @click="openEditUser(u)" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded mr-1">编辑</button>
+                                    <button @click="deleteUser(u.id)" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded">删除</button>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
-        </div>
 
-        <!-- 编辑用户弹窗 -->
-        <div v-if="showEditModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-            <div class="bg-gray-800 rounded-xl border border-gray-600 p-6 w-full max-w-md shadow-2xl">
-                <h3 class="text-lg font-bold text-white mb-4">编辑用户: {{ editForm.username }}</h3>
-                <div class="space-y-4 text-sm">
-                    <div>
-                        <label class="block text-gray-400 mb-1">用户名</label>
-                        <input v-model="editForm.username" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-gray-400 mb-1">重置密码（留空则不修改）</label>
-                        <input v-model="editForm.password" type="password" placeholder="输入新密码" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-gray-400 mb-1">金币余额</label>
-                        <input v-model.number="editForm.coins" type="number" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-gray-400 mb-1">用户标签（如：大R, 测试）</label>
-                        <input v-model="editForm.tags" placeholder="多个标签用逗号分隔" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-gray-400 mb-1">备注</label>
-                        <textarea v-model="editForm.remark" rows="2" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500"></textarea>
+            <!-- ================== 卡牌管理 ================== -->
+            <div v-if="activeTab === 'cards'">
+                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
+                    <input v-model="newCard.name" placeholder="卡牌名称" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-40 text-white">
+                    <select v-model="newCard.rarity" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white">
+                        <option value="SSR">SSR</option><option value="SR">SR</option><option value="R">R</option>
+                    </select>
+                    <input v-model="newCard.imageUrl" placeholder="卡图 URL（可选）" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm flex-1 text-white min-w-[200px]">
+                    <button @click="addCard" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded font-bold">+ 添加卡牌</button>
+                </div>
+                <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-700 text-gray-300 text-xs uppercase">
+                            <tr>
+                                <th class="p-3">预览</th>
+                                <th class="p-3">名称</th>
+                                <th class="p-3">稀有度</th>
+                                <th class="p-3 text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="c in cards" :key="c.id" class="border-b border-gray-700">
+                                <td class="p-3">
+                                    <img v-if="c.imageUrl" :src="c.imageUrl" class="w-10 h-14 object-cover rounded shadow" />
+                                    <div v-else class="w-10 h-14 bg-gray-700 rounded flex items-center justify-center text-xl">🃏</div>
+                                </td>
+                                <td class="p-3 text-white">{{ c.name }}</td>
+                                <td class="p-3">
+                                    <span :class="{'text-yellow-400': c.rarity==='SSR', 'text-purple-400': c.rarity==='SR', 'text-blue-400': c.rarity==='R'}">{{ c.rarity }}</span>
+                                </td>
+                                <td class="p-3 text-center">
+                                    <button @click="openEditCard(c)" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded mr-1">编辑</button>
+                                    <button @click="deleteCard(c.id)" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded">删除</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ================== 盲盒管理 ================== -->
+            <div v-if="activeTab === 'boxes'">
+                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 mb-4 flex flex-wrap gap-2 items-center">
+                    <input v-model="newBox.name" placeholder="盲盒名称" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-40 text-white">
+                    <input v-model.number="newBox.price" type="number" placeholder="价格" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm w-24 text-white">
+                    <input v-model="newBox.coverUrl" placeholder="封面图 URL（可选）" class="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm flex-1 text-white min-w-[200px]">
+                    <button @click="addBox" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded font-bold">+ 添加盲盒</button>
+                </div>
+                <div class="space-y-3">
+                    <div v-for="box in boxes" :key="box.id" class="bg-gray-800 rounded-xl border border-gray-700 p-4">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-white">{{ box.name }}</span>
+                                    <span v-if="!box.isActive" class="text-xs bg-red-900 text-red-200 px-2 py-0.5 rounded">已下架</span>
+                                </div>
+                                <div class="text-yellow-500 text-sm mt-1">价格: {{ box.price }} 🪙</div>
+                                <div class="text-gray-500 text-xs mt-1">包含 {{ box.items.length }} 种卡牌</div>
+                            </div>
+                            <div class="flex gap-2">
+                                <button @click="openProbabilityModal(box)" class="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1.5 rounded font-bold">概率配置</button>
+                                <button @click="toggleBoxStatus(box)" class="bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1.5 rounded">{{ box.isActive ? '下架' : '上架' }}</button>
+                                <button @click="deleteBox(box.id)" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded">删除</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- ================== 用户编辑弹窗 ================== -->
+        <div v-if="showEditUserModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-800 rounded-xl border border-gray-600 p-6 w-full max-w-md shadow-2xl">
+                <h3 class="text-lg font-bold text-white mb-4">编辑用户: {{ editUserForm.username }}</h3>
+                <div class="space-y-3 text-sm">
+                    <div><label class="block text-gray-400 mb-1">用户名</label>
+                        <input v-model="editUserForm.username" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"></div>
+                    <div><label class="block text-gray-400 mb-1">重置密码（留空不修改）</label>
+                        <input v-model="editUserForm.password" type="password" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"></div>
+                    <div><label class="block text-gray-400 mb-1">金币余额</label>
+                        <input v-model.number="editUserForm.coins" type="number" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"></div>
+                    <div><label class="block text-gray-400 mb-1">标签</label>
+                        <input v-model="editUserForm.tags" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"></div>
+                    <div><label class="block text-gray-400 mb-1">备注</label>
+                        <textarea v-model="editUserForm.remark" rows="2" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"></textarea></div>
+                </div>
+                <div class="flex justify-end gap-3 mt-5">
+                    <button @click="showEditUserModal = false" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm">取消</button>
+                    <button @click="saveUser" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-bold">保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================== 卡牌编辑弹窗 ================== -->
+        <div v-if="showEditCardModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-800 rounded-xl border border-gray-600 p-6 w-full max-w-md shadow-2xl">
+                <h3 class="text-lg font-bold text-white mb-4">编辑卡牌</h3>
+                <div class="space-y-3 text-sm">
+                    <div><label class="block text-gray-400 mb-1">名称</label>
+                        <input v-model="editCardForm.name" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"></div>
+                    <div><label class="block text-gray-400 mb-1">稀有度</label>
+                        <select v-model="editCardForm.rarity" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white">
+                            <option value="SSR">SSR</option><option value="SR">SR</option><option value="R">R</option>
+                        </select></div>
+                    <div><label class="block text-gray-400 mb-1">卡图 URL</label>
+                        <input v-model="editCardForm.imageUrl" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"></div>
+                </div>
+                <div class="flex justify-end gap-3 mt-5">
+                    <button @click="showEditCardModal = false" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm">取消</button>
+                    <button @click="saveCard" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-bold">保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================== 概率配置弹窗（核心） ================== -->
+        <div v-if="showProbabilityModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-800 rounded-xl border border-gray-600 p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+                <h3 class="text-lg font-bold text-white mb-4">概率配置 - {{ currentBox?.name }}</h3>
+
+                <!-- 当前已有的卡牌及权重 -->
+                <div class="mb-4">
+                    <div class="text-sm text-gray-400 mb-2">当前盲盒内卡牌（共 {{ currentBox?.items.length }} 种）</div>
+                    <div v-if="currentBox?.items.length === 0" class="text-gray-500 text-sm text-center py-4">尚未添加任何卡牌</div>
+                    <div v-else class="space-y-2">
+                        <div v-for="item in currentBox.items" :key="item.id" class="flex items-center gap-3 bg-gray-700 p-2 rounded">
+                            <div class="w-8 text-center">
+                                <img v-if="item.card.imageUrl" :src="item.card.imageUrl" class="w-6 h-8 object-cover rounded" />
+                                <span v-else class="text-xl">🃏</span>
+                            </div>
+                            <div class="flex-1 text-sm text-white">{{ item.card.name }}</div>
+                            <span :class="{'text-yellow-400': item.card.rarity==='SSR', 'text-purple-400': item.card.rarity==='SR', 'text-blue-400': item.card.rarity==='R'}" class="text-xs">{{ item.card.rarity }}</span>
+                            <div class="text-xs text-gray-300">权重</div>
+                            <input v-model.number="item.weight" @change="updateItemWeight(item)" type="number" class="w-20 bg-gray-600 border border-gray-500 rounded px-2 py-1 text-xs text-white">
+                            <div class="text-xs font-bold" :class="getProbabilityColor(item)">
+                                {{ calculateProbability(item) }}%
+                            </div>
+                            <button @click="removeItem(item.id)" class="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded">移除</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 添加新卡牌到盲盒 -->
+                <div class="border-t border-gray-600 pt-4">
+                    <div class="text-sm text-gray-400 mb-2">添加卡牌到该盲盒</div>
+                    <div class="flex gap-2">
+                        <select v-model="newItemCardId" class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-white">
+                            <option value="">-- 选择卡牌 --</option>
+                            <option v-for="c in availableCards" :key="c.id" :value="c.id">{{ c.name }} ({{ c.rarity }})</option>
+                        </select>
+                        <input v-model.number="newItemWeight" type="number" placeholder="权重" class="w-24 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-white">
+                        <button @click="addItemToBox" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded font-bold">添加</button>
+                    </div>
+                </div>
+
                 <div class="flex justify-end gap-3 mt-6">
-                    <button @click="showEditModal = false" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm">取消</button>
-                    <button @click="saveUser" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-bold">保存修改</button>
+                    <button @click="closeProbabilityModal" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-bold">完成</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        const { createApp, ref } = Vue;
-        const API_URL = 'https://luka-1i4g.onrender.com'; // 替换成你的后端地址
+        const { createApp, ref, computed } = Vue;
+        const API_URL = 'https://luka-1i4g.onrender.com';
 
         createApp({
             setup() {
                 const isLoggedIn = ref(false);
                 const password = ref('');
+                const activeTab = ref('users');
                 const stats = ref({ userCount: 0, cardCount: 0, boxCount: 0 });
                 const users = ref([]);
-                
-                // 编辑弹窗状态
-                const showEditModal = ref(false);
-                const editForm = ref({ id: '', username: '', password: '', coins: 0, tags: '', remark: '' });
+                const cards = ref([]);
+                const boxes = ref([]);
+
+                // 新增卡牌/盲盒表单
+                const newCard = ref({ name: '', rarity: 'R', imageUrl: '' });
+                const newBox = ref({ name: '', price: 300, coverUrl: '' });
+
+                // 编辑弹窗
+                const showEditUserModal = ref(false);
+                const editUserForm = ref({ id: '', username: '', password: '', coins: 0, tags: '', remark: '' });
+                const showEditCardModal = ref(false);
+                const editCardForm = ref({ id: '', name: '', rarity: 'R', imageUrl: '' });
+
+                // 概率配置弹窗
+                const showProbabilityModal = ref(false);
+                const currentBox = ref(null);
+                const newItemCardId = ref('');
+                const newItemWeight = ref(10);
 
                 const headers = () => ({ 'x-admin-password': password.value });
 
@@ -155,20 +288,19 @@
                         await axios.get(`${API_URL}/api/admin/stats`, { headers: headers() });
                         isLoggedIn.value = true;
                         fetchData();
-                    } catch (e) {
-                        alert('密码错误！');
-                    }
+                    } catch (e) { alert('密码错误！'); }
                 };
-
                 const logout = () => { isLoggedIn.value = false; password.value = ''; };
 
                 const fetchData = async () => {
                     const h = headers();
-                    const [s, u] = await Promise.all([
+                    const [s, u, c, b] = await Promise.all([
                         axios.get(`${API_URL}/api/admin/stats`, { headers: h }),
-                        axios.get(`${API_URL}/api/admin/users`, { headers: h })
+                        axios.get(`${API_URL}/api/admin/users`, { headers: h }),
+                        axios.get(`${API_URL}/api/admin/cards`, { headers: h }),
+                        axios.get(`${API_URL}/api/admin/boxes`, { headers: h })
                     ]);
-                    stats.value = s.data; users.value = u.data;
+                    stats.value = s.data; users.value = u.data; cards.value = c.data; boxes.value = b.data;
                 };
 
                 const formatDate = (dateStr) => {
@@ -177,43 +309,164 @@
                     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
                 };
 
-                const openEditModal = (user) => {
-                    editForm.value = { 
-                        id: user.id, 
-                        username: user.username, 
-                        password: '', // 留空
-                        coins: user.coins, 
-                        tags: user.tags || '', 
-                        remark: user.remark || '' 
-                    };
-                    showEditModal.value = true;
+                const tabClass = (tab) => {
+                    return ['px-4 py-2 rounded-lg text-sm font-bold transition',
+                        activeTab.value === tab ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'];
                 };
 
+                // ============ 用户管理 ============
+                const openEditUser = (u) => {
+                    editUserForm.value = { id: u.id, username: u.username, password: '', coins: u.coins, tags: u.tags || '', remark: u.remark || '' };
+                    showEditUserModal.value = true;
+                };
                 const saveUser = async () => {
                     try {
-                        await axios.put(`${API_URL}/api/admin/users/${editForm.value.id}`, editForm.value, { headers: headers() });
-                        showEditModal.value = false;
+                        await axios.put(`${API_URL}/api/admin/users/${editUserForm.value.id}`, editUserForm.value, { headers: headers() });
+                        showEditUserModal.value = false;
                         fetchData();
-                    } catch (e) {
-                        alert('保存失败: ' + (e.response?.data?.error || e.message));
-                    }
+                    } catch (e) { alert('保存失败: ' + (e.response?.data?.error || e.message)); }
                 };
-
                 const deleteUser = async (id) => {
                     if (confirm('确定要彻底删除该用户吗？此操作不可恢复！')) {
                         try {
                             await axios.delete(`${API_URL}/api/admin/users/${id}`, { headers: headers() });
                             fetchData();
-                        } catch (e) {
-                            alert('删除失败: ' + (e.response?.data?.error || e.message));
-                        }
+                        } catch (e) { alert('删除失败: ' + (e.response?.data?.error || e.message)); }
                     }
                 };
 
+                // ============ 卡牌管理 ============
+                const addCard = async () => {
+                    if (!newCard.value.name) return alert('请输入卡牌名称');
+                    try {
+                        await axios.post(`${API_URL}/api/admin/cards`, newCard.value, { headers: headers() });
+                        newCard.value = { name: '', rarity: 'R', imageUrl: '' };
+                        fetchData();
+                    } catch (e) { alert('添加失败: ' + (e.response?.data?.error || e.message)); }
+                };
+                const openEditCard = (c) => {
+                    editCardForm.value = { id: c.id, name: c.name, rarity: c.rarity, imageUrl: c.imageUrl || '' };
+                    showEditCardModal.value = true;
+                };
+                const saveCard = async () => {
+                    try {
+                        await axios.put(`${API_URL}/api/admin/cards/${editCardForm.value.id}`, editCardForm.value, { headers: headers() });
+                        showEditCardModal.value = false;
+                        fetchData();
+                    } catch (e) { alert('保存失败: ' + (e.response?.data?.error || e.message)); }
+                };
+                const deleteCard = async (id) => {
+                    if (confirm('确定要删除这张卡牌吗？')) {
+                        try {
+                            await axios.delete(`${API_URL}/api/admin/cards/${id}`, { headers: headers() });
+                            fetchData();
+                        } catch (e) { alert('删除失败: ' + (e.response?.data?.error || e.message)); }
+                    }
+                };
+
+                // ============ 盲盒管理 ============
+                const addBox = async () => {
+                    if (!newBox.value.name || !newBox.value.price) return alert('请填写名称和价格');
+                    try {
+                        await axios.post(`${API_URL}/api/admin/boxes`, newBox.value, { headers: headers() });
+                        newBox.value = { name: '', price: 300, coverUrl: '' };
+                        fetchData();
+                    } catch (e) { alert('添加失败: ' + (e.response?.data?.error || e.message)); }
+                };
+                const toggleBoxStatus = async (box) => {
+                    await axios.put(`${API_URL}/api/admin/boxes/${box.id}`, { isActive: !box.isActive }, { headers: headers() });
+                    fetchData();
+                };
+                const deleteBox = async (id) => {
+                    if (confirm('确定要删除这个盲盒吗？所有概率配置会一并删除！')) {
+                        try {
+                            await axios.delete(`${API_URL}/api/admin/boxes/${id}`, { headers: headers() });
+                            fetchData();
+                        } catch (e) { alert('删除失败: ' + (e.response?.data?.error || e.message)); }
+                    }
+                };
+
+                // ============ 概率配置（核心） ============
+                const openProbabilityModal = (box) => {
+                    currentBox.value = JSON.parse(JSON.stringify(box)); // 深拷贝一份，避免直接修改列表
+                    newItemCardId.value = '';
+                    newItemWeight.value = 10;
+                    showProbabilityModal.value = true;
+                };
+
+                const closeProbabilityModal = () => {
+                    showProbabilityModal.value = false;
+                    currentBox.value = null;
+                    fetchData(); // 关闭时刷新数据
+                };
+
+                // 当前盲盒里没有的卡牌（可供添加）
+                const availableCards = computed(() => {
+                    if (!currentBox.value) return [];
+                    const existingIds = currentBox.value.items.map(i => i.card.id);
+                    return cards.value.filter(c => !existingIds.includes(c.id));
+                });
+
+                // 计算总权重
+                const totalWeight = computed(() => {
+                    if (!currentBox.value) return 0;
+                    return currentBox.value.items.reduce((sum, i) => sum + (i.weight || 0), 0);
+                });
+
+                const calculateProbability = (item) => {
+                    if (!totalWeight.value || !item.weight) return '0.00';
+                    return ((item.weight / totalWeight.value) * 100).toFixed(2);
+                };
+
+                const getProbabilityColor = (item) => {
+                    const p = parseFloat(calculateProbability(item));
+                    if (p >= 50) return 'text-green-400';
+                    if (p >= 10) return 'text-yellow-400';
+                    return 'text-red-400';
+                };
+
+                // 更新某张卡的权重
+                const updateItemWeight = async (item) => {
+                    if (item.weight < 1) item.weight = 1;
+                    await axios.post(`${API_URL}/api/admin/boxes/${currentBox.value.id}/items`, 
+                        { cardId: item.card.id, weight: item.weight }, { headers: headers() });
+                    // 由于是本地深拷贝，UI 会自动反应，不需要重新拉取
+                };
+
+                // 从盲盒中移除卡牌
+                const removeItem = async (itemId) => {
+                    if (confirm('确定要移除该卡牌吗？')) {
+                        await axios.delete(`${API_URL}/api/admin/boxes/${currentBox.value.id}/items/${itemId}`, { headers: headers() });
+                        currentBox.value.items = currentBox.value.items.filter(i => i.id !== itemId);
+                    }
+                };
+
+                // 添加卡牌到盲盒
+                const addItemToBox = async () => {
+                    if (!newItemCardId.value) return alert('请选择卡牌');
+                    if (newItemWeight.value < 1) return alert('权重至少为 1');
+                    await axios.post(`${API_URL}/api/admin/boxes/${currentBox.value.id}/items`, 
+                        { cardId: newItemCardId.value, weight: newItemWeight.value }, { headers: headers() });
+                    // 刷新当前弹窗数据
+                    const res = await axios.get(`${API_URL}/api/admin/boxes`, { headers: headers() });
+                    const updated = res.data.find(b => b.id === currentBox.value.id);
+                    currentBox.value = JSON.parse(JSON.stringify(updated));
+                    newItemCardId.value = '';
+                    newItemWeight.value = 10;
+                };
+
                 return {
-                    isLoggedIn, password, stats, users, 
-                    showEditModal, editForm,
-                    login, logout, formatDate, openEditModal, saveUser, deleteUser
+                    isLoggedIn, password, activeTab, stats, users, cards, boxes,
+                    newCard, newBox,
+                    showEditUserModal, editUserForm, showEditCardModal, editCardForm,
+                    showProbabilityModal, currentBox, newItemCardId, newItemWeight,
+                    availableCards, totalWeight,
+                    login, logout, formatDate, tabClass,
+                    openEditUser, saveUser, deleteUser,
+                    addCard, openEditCard, saveCard, deleteCard,
+                    addBox, toggleBoxStatus, deleteBox,
+                    openProbabilityModal, closeProbabilityModal,
+                    calculateProbability, getProbabilityColor, updateItemWeight, removeItem, addItemToBox
                 };
             }
         }).mount('#app');
