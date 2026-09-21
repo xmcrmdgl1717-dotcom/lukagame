@@ -1,4 +1,4 @@
-﻿export default function BottomNav({ currentTab, setCurrentTab }) {
+export default function BottomNav({ currentTab, setCurrentTab, onShowRecharge }) {
   const navs = [
     { id: 'home', label: '首页', icon: '🏠' },
     { id: 'activity', label: '活动', icon: '🎉' },
@@ -15,7 +15,7 @@
             <div 
               key={nav.id} 
               className="flex flex-col items-center text-[10px] text-red-400 cursor-pointer" 
-              onClick={() => alert('充值弹窗功能待实现，请参考之前的图文教程集成支付。')}
+              onClick={onShowRecharge}
             >
               <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-red-600 rounded-full flex items-center justify-center text-xl -mt-6 shadow-lg shadow-red-900/50 border-2 border-black">
                 {nav.icon}
