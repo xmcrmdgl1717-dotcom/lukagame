@@ -605,12 +605,13 @@ app.delete('/api/admin/notifications/:id', async (req, res) => {
 
 // ================= 服务启动 =================
 const PORT = process.env.PORT || 3001;
+
+
 // ================= 临时：初始化默认管理员 =================
 app.get('/api/admin/init-default', async (req, res) => {
   try {
     const existing = await prisma.admin.findUnique({ where: { username: 'admin' } });
     if (existing) {
-      // 如果已存在，重置密码
       await prisma.admin.update({
         where: { username: 'admin' },
         data: { password: 'admin123', isActive: true, role: 'super' }
@@ -628,4 +629,5 @@ app.get('/api/admin/init-default', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 后端服务器运行在 http://localhost:${PORT}`));
