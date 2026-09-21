@@ -20,6 +20,7 @@ model User {
   withdrawalAmount Int      @default(0)
   createdAt        DateTime @default(now())
   inventory        Inventory[]
+  orders           Order[]
 }
 
 model Card {
@@ -60,4 +61,38 @@ model Inventory {
   card     Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
   @@unique([userId, cardId])
+}
+
+model RechargeOption {
+  id        String   @id @default(uuid())
+  coins     Int
+  bonus     Int      @default(0)
+  price     Int      // 价格，单位：分
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  orders    Order[]
+}
+
+model Order {
+  id        String          @id @default(uuid())
+  userId    String
+  optionId  String
+  amount    Int             // 支付金额，单位：分
+  coins     Int             // 实际到账金币
+  status    String          @default("PENDING") // PENDING / PAID / CANCELLED
+  createdAt DateTime        @default(now())
+  paidAt    DateTime?
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  option    RechargeOption  @relation(fields: [optionId], references: [id])
+}
+
+model Banner {
+  id        String   @id @default(uuid())
+  imageUrl  String
+  link      String   @default("")
+  title     String   @default("")
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
 }
