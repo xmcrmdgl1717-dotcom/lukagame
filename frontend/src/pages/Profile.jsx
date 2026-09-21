@@ -4,7 +4,7 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export default function Profile() {
+export default function Profile({ onGoOrders, onGoNotifications }) {
   const { user, setUser } = useStore();
   const [redeemCode, setRedeemCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
@@ -41,15 +41,6 @@ export default function Profile() {
     } finally { setSubmitting(false); }
   };
 
-  const menuItems = [
-    { label: '我的订单', icon: '📄' },
-    { label: '等级特权', icon: '⭐' },
-    { label: '代金券', icon: '🎫' },
-    { label: '转诊推荐', icon: '🔗' },
-    { label: '交易记录', icon: '🔄' },
-    { label: '常见问题', icon: '❓' },
-  ];
-
   return (
     <div className="p-4">
       <div className="bg-gradient-to-br from-[#1c0e0e] to-[#2a1414] border border-[#3d1a1a] rounded-xl p-5 flex gap-4 items-center mb-8 shadow-lg">
@@ -61,56 +52,54 @@ export default function Profile() {
         </div>
       </div>
 
+      {/* 快捷入口：订单、消息 */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <button onClick={onGoOrders} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:bg-[#2a1414] transition">
+          <span className="text-2xl">📄</span>
+          <span className="text-sm text-white font-bold">我的订单</span>
+        </button>
+        <button onClick={onGoNotifications} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:bg-[#2a1414] transition">
+          <span className="text-2xl">🔔</span>
+          <span className="text-sm text-white font-bold">消息中心</span>
+        </button>
+      </div>
+
       {/* 兑换码 */}
       <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 mb-6 shadow-lg">
         <div className="text-sm font-bold text-white mb-3">🎁 兑换码</div>
         <div className="flex gap-2">
-          <input
-            value={redeemCode}
-            onChange={(e) => setRedeemCode(e.target.value)}
-            placeholder="请输入兑换码"
-            className="flex-1 bg-[#2a1414] border border-[#4a1c12] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500"
-          />
-          <button
-            onClick={handleRedeem}
-            disabled={redeeming}
-            className="bg-red-600 hover:bg-red-700 disabled:bg-gray-700 text-white text-sm px-5 py-2 rounded-lg font-bold"
-          >
+          <input value={redeemCode} onChange={(e) => setRedeemCode(e.target.value)} placeholder="请输入兑换码"
+            className="flex-1 bg-[#2a1414] border border-[#4a1c12] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500" />
+          <button onClick={handleRedeem} disabled={redeeming}
+            className="bg-red-600 hover:bg-red-700 disabled:bg-gray-700 text-white text-sm px-5 py-2 rounded-lg font-bold">
             {redeeming ? '兑换中...' : '兑换'}
           </button>
         </div>
       </div>
 
-      {/* 客服工单 */}
+      {/* 工单 */}
       <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 mb-6 shadow-lg">
         <div className="text-sm font-bold text-white mb-3">🎧 联系客服</div>
         <div className="space-y-2">
-          <input
-            value={ticketTitle}
-            onChange={(e) => setTicketTitle(e.target.value)}
-            placeholder="问题标题"
-            className="w-full bg-[#2a1414] border border-[#4a1c12] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500"
-          />
-          <textarea
-            value={ticketContent}
-            onChange={(e) => setTicketContent(e.target.value)}
-            rows="3"
-            placeholder="详细描述您的问题..."
-            className="w-full bg-[#2a1414] border border-[#4a1c12] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500"
-          ></textarea>
-          <button
-            onClick={handleSubmitTicket}
-            disabled={submitting}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 text-white text-sm py-2 rounded-lg font-bold"
-          >
+          <input value={ticketTitle} onChange={(e) => setTicketTitle(e.target.value)} placeholder="问题标题"
+            className="w-full bg-[#2a1414] border border-[#4a1c12] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500" />
+          <textarea value={ticketContent} onChange={(e) => setTicketContent(e.target.value)} rows="3" placeholder="详细描述..."
+            className="w-full bg-[#2a1414] border border-[#4a1c12] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500"></textarea>
+          <button onClick={handleSubmitTicket} disabled={submitting}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 text-white text-sm py-2 rounded-lg font-bold">
             {submitting ? '提交中...' : '提交工单'}
           </button>
         </div>
       </div>
 
       <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl overflow-hidden shadow-lg">
-        {menuItems.map((item, index) => (
-          <div key={index} className="flex justify-between items-center p-4 border-b border-[#2a1414] last:border-0 hover:bg-[#2a1414] transition-colors cursor-pointer">
+        {[
+          { label: '等级特权', icon: '⭐' },
+          { label: '代金券', icon: '🎫' },
+          { label: '转诊推荐', icon: '🔗' },
+          { label: '常见问题', icon: '❓' },
+        ].map((item, index) => (
+          <div key={index} className="flex justify-between items-center p-4 border-b border-[#2a1414] last:border-0 hover:bg-[#2a1414] cursor-pointer">
             <div className="flex items-center gap-3 text-sm text-gray-300">
               <span className="text-lg">{item.icon}</span>
               <span>{item.label}</span>
@@ -123,11 +112,6 @@ export default function Profile() {
       <button className="w-full mt-8 bg-[#2a1414] border border-[#4d2a2a] text-red-400 py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#3d1a1a] transition-colors">
         退出登录
       </button>
-
-      <div className="text-center text-[10px] text-gray-600 mt-8 leading-relaxed">
-        <p>隐私政策 | 条款及细则 | 退款政策</p>
-        <p>© 2026 LUKA. All rights reserved.</p>
-      </div>
     </div>
   );
 }
