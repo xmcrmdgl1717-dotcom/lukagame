@@ -15,20 +15,14 @@ import OrderList from './pages/orders';
 import BannerList from './pages/banners';
 import TaskList from './pages/tasks';
 import RedeemCodeList from './pages/redeem-codes';
+import NotificationList from './pages/notifications';
+import TicketList from './pages/tickets';
+import AdminList from './pages/admins';
 
 const ProtectedLayout = () => (
   <AppLayout>
     <Outlet />
   </AppLayout>
-);
-
-const Placeholder: React.FC<{ title: string }> = ({ title }) => (
-  <div>
-    <h1 className="text-2xl font-bold mb-6">{title}</h1>
-    <div className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-8 text-center text-gray-500">
-      模块将在后续阶段实现
-    </div>
-  </div>
 );
 
 export default function App() {
@@ -65,9 +59,9 @@ export default function App() {
             <Route path="/banners" element={<BannerList />} />
             <Route path="/tasks" element={<TaskList />} />
             <Route path="/redeem-codes" element={<RedeemCodeList />} />
-            <Route path="/notifications" element={<Placeholder title="通知管理" />} />
-            <Route path="/tickets" element={<Placeholder title="客服工单" />} />
-            <Route path="/admins" element={<Placeholder title="管理员" />} />
+            <Route path="/notifications" element={<NotificationList />} />
+            <Route path="/tickets" element={<TicketList />} />
+            <Route path="/admins" element={<AdminList />} />
           </Route>
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
