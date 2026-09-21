@@ -31,6 +31,10 @@ import VipLevels from './pages/vip-levels';
 import MenuManage from './pages/menus';
 import GameList from './pages/games';
 import AdList from './pages/ads';
+import PaymentChannelList from './pages/payment-channels';
+import WithdrawalList from './pages/withdrawals';
+import TransactionList from './pages/transactions';
+import DrawLogList from './pages/drawlogs';
 
 const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   DashboardPage,
@@ -55,6 +59,10 @@ const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   MenuManage,
   GameList,
   AdList,
+  PaymentChannelList,
+  WithdrawalList,
+  TransactionList,
+  DrawLogList,
 };
 
 function buildRoutes(menus: AdminMenu[]): React.ReactElement[] {
