@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { Refine } from '@refinedev/core';
 import routerProvider from '@refinedev/react-router-v6';
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
@@ -8,25 +8,29 @@ import { SensitiveConfirmProvider } from './components/SensitiveConfirm';
 import AppLayout from './components/AppLayout';
 import { LoginPage } from './pages/login';
 import { DashboardPage } from './pages/dashboard';
-import UserList from './pages/users';
-import CardList from './pages/cards';
-import BoxList from './pages/boxes';
-import RechargeList from './pages/recharge';
-import OrderList from './pages/orders';
-import BannerList from './pages/banners';
-import TaskList from './pages/tasks';
-import RedeemCodeList from './pages/redeem-codes';
-import NotificationList from './pages/notifications';
-import TicketList from './pages/tickets';
-import AdminList from './pages/admins';
-import RoleList from './pages/roles';
-import PermissionList from './pages/permissions';
-import AuditLogList from './pages/audit-logs';
-import SessionList from './pages/sessions';
+
+// ✅ 懒加载：每个页面单独打包，按需加载
+const UserList = lazy(() => import('./pages/users'));
+const CardList = lazy(() => import('./pages/cards'));
+const BoxList = lazy(() => import('./pages/boxes'));
+const RechargeList = lazy(() => import('./pages/recharge'));
+const OrderList = lazy(() => import('./pages/orders'));
+const BannerList = lazy(() => import('./pages/banners'));
+const TaskList = lazy(() => import('./pages/tasks'));
+const RedeemCodeList = lazy(() => import('./pages/redeem-codes'));
+const NotificationList = lazy(() => import('./pages/notifications'));
+const TicketList = lazy(() => import('./pages/tickets'));
+const AdminList = lazy(() => import('./pages/admins'));
+const RoleList = lazy(() => import('./pages/roles'));
+const PermissionList = lazy(() => import('./pages/permissions'));
+const AuditLogList = lazy(() => import('./pages/audit-logs'));
+const SessionList = lazy(() => import('./pages/sessions'));
 
 const ProtectedLayout = () => (
   <AppLayout>
-    <Outlet />
+    <Suspense fallback={<div className="text-center text-gray-500 py-20">页面加载中...</div>}>
+      <Outlet />
+    </Suspense>
   </AppLayout>
 );
 
