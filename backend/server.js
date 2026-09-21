@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
-const { execSync } = require('child_process');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
@@ -20,7 +19,6 @@ function getClientIp(req) {
 function getClientUA(req) {
   return (req.headers['user-agent'] || '').slice(0, 200);
 }
-
 
 // ================= 权限定义 =================
 const ALL_PERMISSIONS = [
@@ -480,7 +478,6 @@ async function migrateRoles() {
     console.log('✅ 角色迁移完成');
   } catch (e) { console.error('角色迁移失败:', e); }
 }
-migrateRoles();
 
 app.post('/api/admin/login', async (req, res) => {
   const { username, password } = req.body;
@@ -1598,6 +1595,86 @@ app.get('/api/admin/reports/vip-distribution', requirePermission('reports.view')
   res.json({ list: result });
 });
 
+// ================= 菜单自动同步 =================
+async function syncMenus() {
+  const menus = [
+    { id: 'menu-dashboard', parentId: null, title: '仪表盘', type: 'MENU', icon: '📊', path: '/', component: 'DashboardPage', permission: '', sortOrder: 1 },
+
+    { id: 'menu-user-group', parentId: null, title: '用户管理', type: 'DIRECTORY', icon: '👥', path: '', component: '', permission: '', sortOrder: 2 },
+    { id: 'menu-users', parentId: 'menu-user-group', title: '用户列表', type: 'MENU', icon: '👥', path: '/users', component: 'UserList', permission: 'users.view', sortOrder: 1 },
+    { id: 'menu-user-groups', parentId: 'menu-user-group', title: '用户分组', type: 'MENU', icon: '📁', path: '/user-groups', component: 'UserGroupList', permission: 'groups.view', sortOrder: 2 },
+    { id: 'menu-bankcards', parentId: 'menu-user-group', title: '绑卡管理', type: 'MENU', icon: '💳', path: '/bankcards', component: 'BankCardList', permission: 'bankcards.view', sortOrder: 3 },
+    { id: 'menu-vip-levels', parentId: 'menu-user-group', title: 'VIP等级设置', type: 'MENU', icon: '👑', path: '/vip-levels', component: 'VipLevels', permission: 'users.vip', sortOrder: 4 },
+
+    { id: 'menu-games', parentId: null, title: '游戏管理', type: 'MENU', icon: '🎮', path: '/games', component: 'GameList', permission: 'games.view', sortOrder: 3 },
+
+    { id: 'menu-fund-group', parentId: null, title: '资金管理', type: 'DIRECTORY', icon: '💰', path: '', component: '', permission: '', sortOrder: 4 },
+    { id: 'menu-payment-channels', parentId: 'menu-fund-group', title: '支付管理', type: 'MENU', icon: '💳', path: '/payment-channels', component: 'PaymentChannelList', permission: 'payments.view', sortOrder: 1 },
+    { id: 'menu-orders', parentId: 'menu-fund-group', title: '充值记录', type: 'MENU', icon: '📥', path: '/orders', component: 'OrderList', permission: 'orders.view', sortOrder: 2 },
+    { id: 'menu-withdrawals', parentId: 'menu-fund-group', title: '提现记录', type: 'MENU', icon: '📤', path: '/withdrawals', component: 'WithdrawalList', permission: 'withdrawals.view', sortOrder: 3 },
+    { id: 'menu-transactions', parentId: 'menu-fund-group', title: '交易明细', type: 'MENU', icon: '📊', path: '/transactions', component: 'TransactionList', permission: 'transactions.view', sortOrder: 4 },
+
+    { id: 'menu-drawlog-group', parentId: null, title: '抽奖管理', type: 'DIRECTORY', icon: '🎰', path: '', component: '', permission: '', sortOrder: 5 },
+    { id: 'menu-drawlogs', parentId: 'menu-drawlog-group', title: '抽奖记录', type: 'MENU', icon: '📝', path: '/drawlogs', component: 'DrawLogList', permission: 'drawlogs.view', sortOrder: 1 },
+
+    { id: 'menu-report-group', parentId: null, title: '报表管理', type: 'DIRECTORY', icon: '📈', path: '', component: '', permission: '', sortOrder: 6 },
+    { id: 'menu-report-summary', parentId: 'menu-report-group', title: '汇总报表', type: 'MENU', icon: '📊', path: '/reports/summary', component: 'ReportSummary', permission: 'reports.view', sortOrder: 1 },
+    { id: 'menu-report-finance', parentId: 'menu-report-group', title: '资金报表', type: 'MENU', icon: '💰', path: '/reports/finance', component: 'ReportFinance', permission: 'reports.view', sortOrder: 2 },
+    { id: 'menu-report-draw', parentId: 'menu-report-group', title: '抽奖报表', type: 'MENU', icon: '🎰', path: '/reports/draw', component: 'ReportDraw', permission: 'reports.view', sortOrder: 3 },
+    { id: 'menu-report-user-draw', parentId: 'menu-report-group', title: '用户抽奖报表', type: 'MENU', icon: '👤', path: '/reports/user-draw', component: 'ReportUserDraw', permission: 'reports.view', sortOrder: 4 },
+    { id: 'menu-report-user-finance', parentId: 'menu-report-group', title: '用户资金报表', type: 'MENU', icon: '💵', path: '/reports/user-finance', component: 'ReportUserFinance', permission: 'reports.view', sortOrder: 5 },
+    { id: 'menu-report-vip', parentId: 'menu-report-group', title: 'VIP分布报表', type: 'MENU', icon: '👑', path: '/reports/vip-distribution', component: 'ReportVipDistribution', permission: 'reports.view', sortOrder: 6 },
+
+    { id: 'menu-cards', parentId: null, title: '卡牌管理', type: 'MENU', icon: '🃏', path: '/cards', component: 'CardList', permission: 'cards.view', sortOrder: 7 },
+    { id: 'menu-boxes', parentId: null, title: '盲盒管理', type: 'MENU', icon: '📦', path: '/boxes', component: 'BoxList', permission: 'boxes.view', sortOrder: 8 },
+    { id: 'menu-recharge', parentId: null, title: '充值套餐', type: 'MENU', icon: '💰', path: '/recharge-options', component: 'RechargeList', permission: 'recharge.view', sortOrder: 9 },
+
+    { id: 'menu-ad-group', parentId: null, title: '广告管理', type: 'DIRECTORY', icon: '📣', path: '', component: '', permission: '', sortOrder: 10 },
+    { id: 'menu-ads', parentId: 'menu-ad-group', title: '广告列表', type: 'MENU', icon: '📺', path: '/ads', component: 'AdList', permission: 'ads.view', sortOrder: 1 },
+    { id: 'menu-banners', parentId: 'menu-ad-group', title: '轮播图', type: 'MENU', icon: '🖼️', path: '/banners', component: 'BannerList', permission: 'banners.view', sortOrder: 2 },
+
+    { id: 'menu-tasks', parentId: null, title: '任务管理', type: 'MENU', icon: '🎯', path: '/tasks', component: 'TaskList', permission: 'tasks.view', sortOrder: 11 },
+    { id: 'menu-redeem', parentId: null, title: '兑换码', type: 'MENU', icon: '🎁', path: '/redeem-codes', component: 'RedeemCodeList', permission: 'redeem.view', sortOrder: 12 },
+    { id: 'menu-notifications', parentId: null, title: '通知管理', type: 'MENU', icon: '🔔', path: '/notifications', component: 'NotificationList', permission: 'notifications.view', sortOrder: 13 },
+    { id: 'menu-tickets', parentId: null, title: '客服工单', type: 'MENU', icon: '🎧', path: '/tickets', component: 'TicketList', permission: 'tickets.view', sortOrder: 14 },
+
+    { id: 'menu-system-group', parentId: null, title: '系统管理', type: 'DIRECTORY', icon: '⚙️', path: '', component: '', permission: '', sortOrder: 99 },
+    { id: 'menu-admins', parentId: 'menu-system-group', title: '管理员列表', type: 'MENU', icon: '👤', path: '/admins', component: 'AdminList', permission: 'admins.view', sortOrder: 1 },
+    { id: 'menu-roles', parentId: 'menu-system-group', title: '角色管理', type: 'MENU', icon: '🎭', path: '/admins/roles', component: 'RoleList', permission: 'roles.view', sortOrder: 2 },
+    { id: 'menu-permissions', parentId: 'menu-system-group', title: '权限说明', type: 'MENU', icon: '📖', path: '/admins/permissions', component: 'PermissionList', permission: '', sortOrder: 3 },
+    { id: 'menu-menus', parentId: 'menu-system-group', title: '菜单管理', type: 'MENU', icon: '🧩', path: '/admins/menus', component: 'MenuManage', permission: 'menus.edit', sortOrder: 4 },
+    { id: 'menu-audit-logs', parentId: 'menu-system-group', title: '操作日志', type: 'MENU', icon: '📝', path: '/admins/audit-logs', component: 'AuditLogList', permission: 'audit.view', sortOrder: 5 },
+    { id: 'menu-sessions', parentId: 'menu-system-group', title: '会话管理', type: 'MENU', icon: '💻', path: '/admins/sessions', component: 'SessionList', permission: 'audit.view', sortOrder: 6 },
+  ];
+
+  let created = 0;
+  let updated = 0;
+  for (const m of menus) {
+    const existing = await prisma.adminMenu.findUnique({ where: { id: m.id } });
+    await prisma.adminMenu.upsert({
+      where: { id: m.id },
+      update: {
+        title: m.title, icon: m.icon, path: m.path, component: m.component,
+        permission: m.permission, sortOrder: m.sortOrder, parentId: m.parentId,
+      },
+      create: m,
+    });
+    if (existing) updated++;
+    else created++;
+  }
+  console.log(`✅ 菜单同步完成：新增 ${created} 条，更新 ${updated} 条`);
+}
+
 // ================= 服务启动 =================
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 后端服务器运行在 http://localhost:${PORT}`));
+
+async function bootstrap() {
+  await migrateRoles();
+  await syncMenus();
+  app.listen(PORT, '0.0.0.0', () => console.log(`🚀 后端服务器运行在 http://localhost:${PORT}`));
+}
+
+bootstrap().catch(e => {
+  console.error('启动失败:', e);
+  process.exit(1);
+});
