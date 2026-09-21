@@ -18,6 +18,9 @@ import RedeemCodeList from './pages/redeem-codes';
 import NotificationList from './pages/notifications';
 import TicketList from './pages/tickets';
 import AdminList from './pages/admins';
+import RoleList from './pages/roles';
+import PermissionList from './pages/permissions';
+import AuditLogList from './pages/audit-logs';
 
 const ProtectedLayout = () => (
   <AppLayout>
@@ -62,6 +65,9 @@ export default function App() {
             <Route path="/notifications" element={<NotificationList />} />
             <Route path="/tickets" element={<TicketList />} />
             <Route path="/admins" element={<AdminList />} />
+            <Route path="/admins/roles" element={<RoleList />} />
+            <Route path="/admins/permissions" element={<PermissionList />} />
+            <Route path="/admins/audit-logs" element={<AuditLogList />} />
           </Route>
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
