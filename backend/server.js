@@ -1,5 +1,6 @@
-﻿const express = require('express');
+const express = require('express');
 const cors = require('cors');
+const { execSync } = require('child_process');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
@@ -8,6 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// 1. 登录接口
 app.post('/api/login', async (req, res) => {
   const { username } = req.body;
   const user = await prisma.user.findUnique({
@@ -18,11 +20,13 @@ app.post('/api/login', async (req, res) => {
   res.json(user);
 });
 
+// 2. 获取盲盒列表
 app.get('/api/boxes', async (req, res) => {
   const boxes = await prisma.box.findMany();
   res.json(boxes);
 });
 
+// 3. 核心抽卡接口
 app.post('/api/draw', async (req, res) => {
   const { userId, boxId, count } = req.body;
 
@@ -76,5 +80,20 @@ app.post('/api/draw', async (req, res) => {
   }
 });
 
-const PORT = 3001;
-app.listen(PORT, () => console.log(`🚀 后端服务器运行在 http://localhost:${PORT}`));
+// 4. 【新增】线上数据库初始化接口（只执行一次）
+app.get('/api/setup-db', async (req, res) => {
+  try {
+    console.log('开始执行数据库初始化...');
+    // 执行 prisma db push
+    execSync('npx prisma db push', { stdio: 'inherit' });
+    // 执行 seed.js
+    execSync('node seed.js', { stdio: 'inherit' });
+    res.json({ success: true, message: '数据库初始化完成！请回到前端刷新页面。' });
+  } catch (error) {
+    console.error('初始化失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 后端服务器运行在 http://localhost:${PORT}`));
