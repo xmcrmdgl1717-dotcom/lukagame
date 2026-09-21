@@ -1,6 +1,9 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useStore } from '../store';
 import axios from 'axios';
+
+// 自动读取 Render 的环境变量，本地开发则回退到 localhost
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function Home() {
   const { user, boxes, updateCoins, setUser } = useStore();
@@ -13,17 +16,21 @@ export default function Home() {
     }
     
     try {
-      const res = await axios.post('http://localhost:3001/api/draw', {
+      // 使用环境变量中的 API 地址进行抽卡
+      const res = await axios.post(`${API_URL}/api/draw`, {
         userId: user.id, 
         boxId: box.id, 
         count
       });
       
+      // 更新本地金币数量
       updateCoins(-(box.price * count));
       
-      const updatedUser = await axios.post('http://localhost:3001/api/login', { username: 'test' });
+      // 重新获取用户数据，刷新库存状态
+      const updatedUser = await axios.post(`${API_URL}/api/login`, { username: 'test' });
       setUser(updatedUser.data);
 
+      // 展示抽卡结果
       setDrawnResult(res.data.drawnCards);
       setDrawing(true);
     } catch (e) {
@@ -33,6 +40,7 @@ export default function Home() {
 
   return (
     <div className="p-4">
+      {/* 顶部栏 */}
       <div className="flex justify-between items-center mb-6">
         <div className="text-3xl font-black italic text-red-500 tracking-wider">LUKA!</div>
         <div className="bg-[#2a1414] text-red-400 text-xs px-3 py-1 rounded-full border border-red-900/50">
@@ -40,6 +48,7 @@ export default function Home() {
         </div>
       </div>
 
+      {/* 盲盒列表 */}
       <div className="text-sm font-bold mb-3 text-gray-300">热门包裹</div>
       <div className="space-y-4">
         {boxes.map(box => (
@@ -58,6 +67,7 @@ export default function Home() {
         ))}
       </div>
 
+      {/* 抽卡结果全屏弹窗 */}
       {drawing && drawnResult.length > 0 && (
         <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-4">
           <div className="text-2xl font-bold text-red-500 mb-8 glow-text animate-pulse">抽卡结果</div>
