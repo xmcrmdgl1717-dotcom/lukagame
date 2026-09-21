@@ -1,37 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTable, useCreate, useUpdate, useDelete } from '@refinedev/core';
+import axios from 'axios';
 
 interface AdminItem {
   id: string;
   username: string;
+  roleId: string | null;
   role: string;
-  permissions: string;
+  roleDisplayName: string;
+  rolePermissions: string;
   isActive: boolean;
   createdAt: string;
   lastLoginAt: string;
 }
 
-const ALL_PERMISSIONS = [
-  { key: 'users', label: '用户管理' },
-  { key: 'cards', label: '卡牌管理' },
-  { key: 'boxes', label: '盲盒管理' },
-  { key: 'recharge', label: '充值套餐' },
-  { key: 'orders', label: '订单管理' },
-  { key: 'banners', label: '轮播图' },
-  { key: 'tasks', label: '任务管理' },
-  { key: 'redeem', label: '兑换码' },
-  { key: 'notifications', label: '通知管理' },
-  { key: 'tickets', label: '客服工单' },
-  { key: 'admins', label: '管理员' },
-];
+interface RoleItem {
+  id: string;
+  name: string;
+  displayName: string;
+  permissions: string;
+  isSystem: boolean;
+}
 
-const roleLabel = (role: string) => {
-  if (role === 'super') return '超级管理员';
-  if (role === 'admin') return '管理员';
-  if (role === 'operator') return '运营';
-  if (role === 'viewer') return '只读';
-  return role;
-};
+const API_URL = import.meta.env.VITE_API_URL || 'https://luka-1i4g.onrender.com';
 
 const formatDate = (d: string) => {
   if (!d) return '-';
@@ -49,36 +40,52 @@ export default function AdminList() {
   const { mutate: updateAdmin } = useUpdate();
   const { mutate: deleteAdmin } = useDelete();
 
-  const [newAdmin, setNewAdmin] = useState({
-    username: '',
-    password: '',
-    role: 'operator',
-    permissions: [] as string[],
-  });
+  const [roles, setRoles] = useState<RoleItem[]>([]);
+  const [newAdmin, setNewAdmin] = useState({ username: '', password: '', roleId: '' });
   const [creating, setCreating] = useState(false);
 
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState<any>({ permissionsArr: [] });
+  const [editForm, setEditForm] = useState<any>({ password: '', roleId: '', isActive: true });
   const [saving, setSaving] = useState(false);
 
   const admins = tableQueryResult.data?.data || [];
 
+  // 加载角色列表
+  useEffect(() => {
+    const adminInfo = JSON.parse(localStorage.getItem('adminInfo') || 'null');
+    const password = localStorage.getItem('adminPassword') || '';
+    axios
+      .get(`${API_URL}/api/admin/roles`, {
+        headers: {
+          'x-admin-username': adminInfo?.username || '',
+          'x-admin-password': password,
+        },
+      })
+      .then((res) => {
+        setRoles(res.data);
+        // 默认选中第一个非 super 角色作为默认
+        const defaultRole = res.data.find((r: RoleItem) => r.name !== 'super');
+        if (defaultRole) {
+          setNewAdmin((n) => ({ ...n, roleId: defaultRole.id }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const handleCreate = () => {
-    if (!newAdmin.username || !newAdmin.password) return alert('请填写用户名和密码');
+    if (!newAdmin.username || !newAdmin.password || !newAdmin.roleId) {
+      return alert('请填写用户名、密码和角色');
+    }
     setCreating(true);
     createAdmin(
-      {
-        resource: 'admins',
-        values: {
-          username: newAdmin.username,
-          password: newAdmin.password,
-          role: newAdmin.role,
-          permissions: newAdmin.role === 'super' ? '' : newAdmin.permissions.join(','),
-        },
-      },
+      { resource: 'admins', values: newAdmin },
       {
         onSuccess: () => {
-          setNewAdmin({ username: '', password: '', role: 'operator', permissions: [] });
+          setNewAdmin({
+            username: '',
+            password: '',
+            roleId: roles.find((r) => r.name !== 'super')?.id || '',
+          });
           setCreating(false);
           tableQueryResult.refetch();
         },
@@ -92,26 +99,26 @@ export default function AdminList() {
 
   const openEdit = (a: AdminItem) => {
     setEditForm({
-      ...a,
+      id: a.id,
+      username: a.username,
       password: '',
-      permissionsArr: a.permissions ? a.permissions.split(',') : [],
+      roleId: a.roleId || '',
+      isActive: a.isActive,
+      role: a.role,
     });
     setShowEditModal(true);
   };
 
   const handleSaveEdit = () => {
     setSaving(true);
+    const values: any = {
+      isActive: editForm.isActive,
+      roleId: editForm.roleId,
+    };
+    if (editForm.password) values.password = editForm.password;
+
     updateAdmin(
-      {
-        resource: 'admins',
-        id: editForm.id,
-        values: {
-          password: editForm.password || undefined,
-          role: editForm.role,
-          permissions: editForm.role === 'super' ? '' : editForm.permissionsArr.join(','),
-          isActive: editForm.isActive,
-        },
-      },
+      { resource: 'admins', id: editForm.id, values },
       {
         onSuccess: () => {
           setShowEditModal(false);
@@ -127,7 +134,7 @@ export default function AdminList() {
   };
 
   const handleDelete = (a: AdminItem) => {
-    if (!confirm(`确定要删除管理员「${a.username}」吗？`)) return;
+    if (!confirm(`确定要删除管理员「${a.username}」吗？此操作不可恢复！`)) return;
     deleteAdmin(
       { resource: 'admins', id: a.id },
       {
@@ -140,14 +147,14 @@ export default function AdminList() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">管理员权限</h1>
+        <h1 className="text-2xl font-bold">管理员列表</h1>
         <div className="text-sm text-gray-500">共 {admins.length} 位管理员</div>
       </div>
 
       {/* 新增管理员 */}
       <div className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4 mb-6">
         <div className="text-sm font-bold mb-3">添加新管理员</div>
-        <div className="flex flex-wrap gap-2 items-center mb-3">
+        <div className="flex flex-wrap gap-2 items-center">
           <input
             value={newAdmin.username}
             onChange={(e) => setNewAdmin({ ...newAdmin, username: e.target.value })}
@@ -162,14 +169,16 @@ export default function AdminList() {
             className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm w-40 focus:outline-none focus:border-red-500"
           />
           <select
-            value={newAdmin.role}
-            onChange={(e) => setNewAdmin({ ...newAdmin, role: e.target.value })}
-            className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm"
+            value={newAdmin.roleId}
+            onChange={(e) => setNewAdmin({ ...newAdmin, roleId: e.target.value })}
+            className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm w-48"
           >
-            <option value="super">超级管理员</option>
-            <option value="admin">管理员</option>
-            <option value="operator">运营</option>
-            <option value="viewer">只读</option>
+            <option value="">-- 选择角色 --</option>
+            {roles.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.displayName} ({r.name})
+              </option>
+            ))}
           </select>
           <button
             onClick={handleCreate}
@@ -179,50 +188,9 @@ export default function AdminList() {
             {creating ? '添加中...' : '+ 添加'}
           </button>
         </div>
-
-        {newAdmin.role !== 'super' && (
-          <div>
-            <div className="text-xs text-gray-400 mb-2">选择权限（勾选后该管理员可以访问对应模块）：</div>
-            <div className="flex flex-wrap gap-2">
-              {ALL_PERMISSIONS.map((p) => (
-                <label
-                  key={p.key}
-                  className={`flex items-center gap-1 text-xs px-2 py-1 rounded cursor-pointer ${
-                    newAdmin.permissions.includes(p.key)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-[#0d0d0d] text-gray-400'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    value={p.key}
-                    checked={newAdmin.permissions.includes(p.key)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setNewAdmin({
-                          ...newAdmin,
-                          permissions: [...newAdmin.permissions, p.key],
-                        });
-                      } else {
-                        setNewAdmin({
-                          ...newAdmin,
-                          permissions: newAdmin.permissions.filter((x) => x !== p.key),
-                        });
-                      }
-                    }}
-                    className="hidden"
-                  />
-                  {p.label}
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-        {newAdmin.role === 'super' && (
-          <div className="text-xs text-yellow-400">
-            ⚠️ 超级管理员默认拥有全部权限，无需单独勾选
-          </div>
-        )}
+        <div className="text-xs text-gray-500 mt-2">
+          提示：管理员权限由其所属角色决定，如需修改权限请前往「角色管理」
+        </div>
       </div>
 
       {/* 列表 */}
@@ -235,7 +203,6 @@ export default function AdminList() {
               <tr>
                 <th className="p-3">用户名</th>
                 <th className="p-3">角色</th>
-                <th className="p-3">权限</th>
                 <th className="p-3">状态</th>
                 <th className="p-3">最近登录</th>
                 <th className="p-3 text-center">操作</th>
@@ -245,21 +212,18 @@ export default function AdminList() {
               {admins.map((a) => (
                 <tr key={a.id} className="border-b border-[#2a2a2a] hover:bg-[#1a1a1a]">
                   <td className="p-3 font-bold">{a.username}</td>
-                  <td className="p-3 text-orange-400">{roleLabel(a.role)}</td>
-                  <td className="p-3 text-xs text-gray-400 max-w-[280px]">
-                    {a.role === 'super' ? (
-                      <span className="text-yellow-400">全部权限</span>
-                    ) : a.permissions ? (
-                      a.permissions
-                        .split(',')
-                        .map((p) => {
-                          const found = ALL_PERMISSIONS.find((x) => x.key === p);
-                          return found?.label || p;
-                        })
-                        .join('、')
-                    ) : (
-                      <span className="text-gray-600">无</span>
-                    )}
+                  <td className="p-3">
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded ${
+                        a.role === 'super'
+                          ? 'bg-red-900/60 text-red-200'
+                          : a.role === 'admin'
+                          ? 'bg-orange-900/60 text-orange-200'
+                          : 'bg-blue-900/60 text-blue-200'
+                      }`}
+                    >
+                      {a.roleDisplayName || a.role}
+                    </span>
                   </td>
                   <td className="p-3">
                     <span
@@ -276,13 +240,15 @@ export default function AdminList() {
                   <td className="p-3 text-center">
                     <button
                       onClick={() => openEdit(a)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded mr-1"
+                      disabled={a.role === 'super'}
+                      className="bg-blue-600 hover:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs px-3 py-1 rounded mr-1"
                     >
                       编辑
                     </button>
                     <button
                       onClick={() => handleDelete(a)}
-                      className="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded"
+                      disabled={a.role === 'super'}
+                      className="bg-red-600 hover:bg-red-700 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs px-3 py-1 rounded"
                     >
                       删除
                     </button>
@@ -291,7 +257,7 @@ export default function AdminList() {
               ))}
               {admins.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center text-gray-500 py-10">
+                  <td colSpan={5} className="text-center text-gray-500 py-10">
                     暂无管理员
                   </td>
                 </tr>
@@ -304,7 +270,7 @@ export default function AdminList() {
       {/* 编辑弹窗 */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-lg">
+          <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-md">
             <h3 className="text-lg font-bold mb-4">编辑管理员: {editForm.username}</h3>
             <div className="space-y-3 text-sm">
               <div>
@@ -320,54 +286,18 @@ export default function AdminList() {
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">角色</label>
                 <select
-                  value={editForm.role || 'admin'}
-                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                  value={editForm.roleId || ''}
+                  onChange={(e) => setEditForm({ ...editForm, roleId: e.target.value })}
                   className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white"
                 >
-                  <option value="super">超级管理员</option>
-                  <option value="admin">管理员</option>
-                  <option value="operator">运营</option>
-                  <option value="viewer">只读</option>
+                  <option value="">-- 选择角色 --</option>
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.displayName} ({r.name})
+                    </option>
+                  ))}
                 </select>
               </div>
-
-              {editForm.role !== 'super' && (
-                <div>
-                  <label className="block text-gray-400 mb-2 text-xs">权限配置</label>
-                  <div className="flex flex-wrap gap-2">
-                    {ALL_PERMISSIONS.map((p) => (
-                      <label
-                        key={p.key}
-                        className={`flex items-center gap-1 text-xs px-2 py-1 rounded cursor-pointer ${
-                          editForm.permissionsArr?.includes(p.key)
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-[#0d0d0d] text-gray-400'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          value={p.key}
-                          checked={editForm.permissionsArr?.includes(p.key)}
-                          onChange={(e) => {
-                            const arr = editForm.permissionsArr || [];
-                            if (e.target.checked) {
-                              setEditForm({ ...editForm, permissionsArr: [...arr, p.key] });
-                            } else {
-                              setEditForm({
-                                ...editForm,
-                                permissionsArr: arr.filter((x: string) => x !== p.key),
-                              });
-                            }
-                          }}
-                          className="hidden"
-                        />
-                        {p.label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">状态</label>
                 <select
