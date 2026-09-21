@@ -47,13 +47,19 @@ export default function BoxList() {
   const [itemCard, setItemCard] = useState('');
   const [itemWeight, setItemWeight] = useState(10);
 
+  // ✅ 修复：先 await，再 setState
   const onCoverNew = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    setNewBox((b) => ({ ...b, coverUrl: await readAsBase64(f) }));
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const img = await readAsBase64(f);
+    setNewBox((b) => ({ ...b, coverUrl: img }));
   };
+
   const onCoverEdit = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    setEditForm((b: any) => ({ ...b, coverUrl: await readAsBase64(f) }));
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const img = await readAsBase64(f);
+    setEditForm((b: any) => ({ ...b, coverUrl: img }));
   };
 
   const handleCreate = () => {
