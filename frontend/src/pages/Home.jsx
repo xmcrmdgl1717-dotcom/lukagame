@@ -10,18 +10,16 @@ export default function Home({ onShowLogin }) {
   const [drawnResult, setDrawnResult] = useState([]);
   const [banners, setBanners] = useState([]);
   const [currentBanner, setCurrentBanner] = useState(0);
+  const [leaderboard, setLeaderboard] = useState([]);
 
-  // 加载轮播图
   useEffect(() => {
     axios.get(`${API_URL}/api/banners`).then(res => setBanners(res.data)).catch(() => {});
+    axios.get(`${API_URL}/api/leaderboard/weekly`).then(res => setLeaderboard(res.data)).catch(() => {});
   }, []);
 
-  // 自动轮播
   useEffect(() => {
     if (banners.length === 0) return;
-    const timer = setInterval(() => {
-      setCurrentBanner((prev) => (prev + 1) % banners.length);
-    }, 3000);
+    const timer = setInterval(() => setCurrentBanner(prev => (prev + 1) % banners.length), 3000);
     return () => clearInterval(timer);
   }, [banners.length]);
 
@@ -53,7 +51,7 @@ export default function Home({ onShowLogin }) {
         ) : (
           <>
             <div className="flex transition-transform duration-500 ease-in-out" style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
-              {banners.map((b, idx) => (
+              {banners.map(b => (
                 <div key={b.id} className="w-full flex-shrink-0 relative cursor-pointer" onClick={() => handleBannerClick(b.link)}>
                   <img src={b.imageUrl} alt={b.title} className="w-full h-48 object-cover" />
                   <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-black/60 to-transparent"></div>
@@ -70,7 +68,30 @@ export default function Home({ onShowLogin }) {
         )}
       </div>
 
-      {/* 2. 功能模块 */}
+      {/* 2. 周消耗榜 */}
+      <div className="bg-gradient-to-br from-[#2d1410] to-[#4a1c12] border border-[#6b2a1e] rounded-2xl p-5 shadow-lg">
+        <div className="text-center mb-3">
+          <div className="text-orange-400 font-bold text-sm tracking-widest mb-1">1 Week Spending Leaderboard</div>
+          <div className="text-gray-300 text-[10px]">The more you open, the higher your rank!</div>
+        </div>
+        {leaderboard.length === 0 ? (
+          <div className="text-center text-gray-500 text-xs py-4">暂无数据</div>
+        ) : (
+          <div className="space-y-2">
+            {leaderboard.slice(0, 3).map((row, idx) => (
+              <div key={idx} className="flex justify-between items-center bg-black/30 rounded-lg px-3 py-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className={`font-bold ${idx === 0 ? 'text-yellow-400' : idx === 1 ? 'text-gray-300' : 'text-orange-400'}`}>TOP {idx + 1}</span>
+                  <span className="text-white">{row.username}</span>
+                </div>
+                <span className="text-orange-500 font-bold">{row.totalCost.toLocaleString()} 🪙</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 3. 功能模块 */}
       <div className="grid grid-cols-3 gap-3 text-center">
         {['Influencer Promos', 'Raffles', 'Leaderboard'].map((item, idx) => (
           <div key={idx} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-3 flex flex-col items-center">
@@ -82,7 +103,7 @@ export default function Home({ onShowLogin }) {
 
       <div className="text-center text-xs font-bold text-gray-400 tracking-widest my-6">PACKS</div>
 
-      {/* 3. 神秘包 */}
+      {/* 4. 神秘包 */}
       <div className="bg-gradient-to-r from-red-900 to-red-700 rounded-2xl p-5 border border-red-500 relative overflow-hidden shadow-lg">
         <div className="text-3xl text-red-400 font-black mb-2 opacity-80">???</div>
         <div className="text-center mb-4">
@@ -91,7 +112,7 @@ export default function Home({ onShowLogin }) {
         <div className="text-white font-bold text-sm mb-1">666666 🪙</div>
       </div>
 
-      {/* 4. HEAVEN & HELL */}
+      {/* 5. HEAVEN & HELL */}
       <div className="bg-[#1a0f0c] border border-[#3d1a1a] rounded-2xl p-4 relative overflow-hidden shadow-lg">
         <div className="flex justify-between items-center mb-3">
           <div className="text-orange-400 font-bold text-sm tracking-wide">HEAVEN & HELL</div>
@@ -109,7 +130,7 @@ export default function Home({ onShowLogin }) {
         </div>
       </div>
 
-      {/* 5. Great / Ultra / Master */}
+      {/* 6. Great / Ultra / Master */}
       <div className="space-y-4">
         {[
           { name: 'GREAT', price: 75, color: 'from-blue-900 to-blue-700', img: 'https://via.placeholder.com/60x80/333/fff?text=G' },
