@@ -7,74 +7,91 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Role {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  displayName String
-  description String   @default("")
-  permissions String   @default("")
-  isSystem    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  admins      Admin[]
-}
-
-model Admin {
-  id          String   @id @default(uuid())
-  username    String   @unique
-  password    String
-  roleId      String?
-  roleRef     Role?    @relation(fields: [roleId], references: [id])
-  role        String   @default("admin")
-  permissions String   @default("")
-  isActive    Boolean  @default(true)
-  totpSecret  String?  @default("")
-  totpEnabled Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  lastLoginAt DateTime @default(now())
-  sessions    AdminSession[]
-}
-
-model AdminSession {
-  id           String   @id @default(uuid())
-  adminId      String
-  adminName    String
-  ip           String   @default("")
-  userAgent    String   @default("")
-  createdAt    DateTime @default(now())
-  lastActiveAt DateTime @default(now())
-  admin        Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
-}
-
-model AuditLog {
-  id         String   @id @default(uuid())
-  adminId    String
-  adminName  String
-  action     String
-  targetType String   @default("")
-  targetId   String   @default("")
-  detail     String   @default("")
-  ip         String   @default("")
-  createdAt  DateTime @default(now())
-}
+// ================= 用户体系 =================
 
 model User {
   id               String   @id @default(uuid())
   username         String   @unique
   password         String
   coins            Int      @default(10000)
-  lastLoginAt      DateTime @default(now())
+  vipLevel         Int      @default(0)   // 当前 VIP 等级
+  totalRecharge    Int      @default(0)   // 累计充值额（分）
+  totalConsume     Int      @default(0)   // 累计消耗金币（用于 VIP 升级）
+  groupId          String?  // 用户分组
   tags             String   @default("")
   remark           String   @default("")
+  lastLoginAt      DateTime @default(now())
   rechargeCount    Int      @default(0)
   withdrawalCount  Int      @default(0)
   withdrawalAmount Int      @default(0)
   createdAt        DateTime @default(now())
+
+  group            UserGroup? @relation(fields: [groupId], references: [id])
   inventory        Inventory[]
   orders           Order[]
   userTasks        UserTask[]
   redeemUses       RedeemCodeUse[]
   tickets          Ticket[]
   drawLogs         DrawLog[]
+  bankCards        BankCard[]
+}
+
+model UserGroup {
+  id          String   @id @default(uuid())
+  name        String   @unique   // 分组名: 大R、潜在、流失
+  displayName String
+  description String   @default("")
+  color       String   @default("#6366f1") // 显示颜色
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  users       User[]
+}
+
+model BankCard {
+  id          String   @id @default(uuid())
+  userId      String
+  cardNumber  String   // 卡号（建议脱敏存储）
+  bankName    String   @default("")
+  holderName  String   @default("")
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VipLevel {
+  id             String   @id @default(uuid())
+  level          Int      @unique   // 0, 1, 2 ... 9
+  name           String              // VIP0, VIP1 ...
+  sortOrder      Int      @default(0)
+  iconUrl        String   @default("")   // VIP 图标
+  rechargeAmount Int      @default(0)    // 累计充值门槛（分）
+  consumeAmount  Int      @default(0)    // 累计消耗门槛（金币）
+  benefits       String   @default("")   // JSON: 其他权益（返水、专属客服等）
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+}
+
+// ================= 抽奖体系 =================
+
+model Game {
+  id              String   @id @default(uuid())
+  name            String   @unique
+  displayName     String
+  description     String   @default("")
+  icon            String   @default("")
+  coverUrl        String   @default("")
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  // 入场门槛
+  minVipLevel     Int      @default(0)
+  minCoins        Int      @default(0)
+  allowedRoles    String   @default("")
+  // 排行榜
+  enableLeaderboard Boolean @default(false)
+  leaderboardMetric String  @default("CONSUME")
+  leaderboardType   String  @default("WEEKLY")
+  createdAt       DateTime @default(now())
+  boxes           Box[]
 }
 
 model Card {
@@ -82,20 +99,23 @@ model Card {
   name      String
   rarity    String
   imageUrl  String     @default("")
+  value     Int        @default(0)   // 卡牌价值（用于产出统计）
   createdAt DateTime   @default(now())
   boxItems  BoxItem[]
   inventory Inventory[]
 }
 
 model Box {
-  id        String     @id @default(uuid())
-  name      String
-  price     Int
-  coverUrl  String     @default("")
-  isActive  Boolean    @default(true)
-  createdAt DateTime   @default(now())
-  items     BoxItem[]
-  drawLogs  DrawLog[]
+  id         String     @id @default(uuid())
+  name       String
+  price      Int
+  coverUrl   String     @default("")
+  isActive   Boolean    @default(true)
+  gameId     String?
+  game       Game?      @relation(fields: [gameId], references: [id])
+  createdAt  DateTime   @default(now())
+  items      BoxItem[]
+  drawLogs   DrawLog[]
 }
 
 model BoxItem {
@@ -116,6 +136,8 @@ model Inventory {
   card     Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
   @@unique([userId, cardId])
 }
+
+// ================= 资金体系 =================
 
 model RechargeOption {
   id        String   @id @default(uuid())
@@ -141,6 +163,42 @@ model Order {
   option    RechargeOption  @relation(fields: [optionId], references: [id])
 }
 
+model Withdrawal {
+  id          String   @id @default(uuid())
+  userId      String
+  amount      Int      // 提现金额（分）
+  bankCardId  String   @default("")
+  status      String   @default("PENDING") // PENDING/APPROVED/REJECTED/PAID
+  remark      String   @default("")
+  createdAt   DateTime @default(now())
+  processedAt DateTime?
+}
+
+model Transaction {
+  id         String   @id @default(uuid())
+  userId     String
+  type       String   // RECHARGE / CONSUME / REWARD / WITHDRAWAL / VIP_BONUS
+  amount     Int      // 正数=入账，负数=出账
+  balance    Int      // 交易后余额
+  refType    String   @default("")   // 关联类型: ORDER / DRAW / TASK
+  refId      String   @default("")
+  remark     String   @default("")
+  createdAt  DateTime @default(now())
+}
+
+model PaymentChannel {
+  id         String   @id @default(uuid())
+  name       String   @unique  // alipay, wechat, stripe
+  displayName String
+  iconUrl    String   @default("")
+  config     String   @default("")   // JSON: 渠道配置
+  isActive   Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+}
+
+// ================= 运营体系 =================
+
 model Banner {
   id        String   @id @default(uuid())
   imageUrl  String
@@ -149,6 +207,22 @@ model Banner {
   sortOrder Int      @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+}
+
+model Ad {
+  id          String    @id @default(uuid())
+  title       String
+  imageUrl    String
+  linkType    String    @default("URL")
+  linkValue   String    @default("")
+  position    String    @default("HOME_BANNER")
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  startAt     DateTime?
+  endAt       DateTime?
+  clickCount  Int       @default(0)
+  viewCount   Int       @default(0)
+  createdAt   DateTime  @default(now())
 }
 
 model Task {
@@ -224,6 +298,7 @@ model DrawLog {
   boxId     String
   cost      Int
   count     Int      @default(1)
+  outputValue Int    @default(0)   // 产出卡牌总价值
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   box       Box      @relation(fields: [boxId], references: [id], onDelete: Cascade)
@@ -245,4 +320,73 @@ model NotificationRead {
   readAt         DateTime @default(now())
   notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
   @@unique([notificationId, userId])
+}
+
+// ================= 后台体系 =================
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  displayName String
+  description String   @default("")
+  permissions String   @default("")
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  admins      Admin[]
+}
+
+model Admin {
+  id          String   @id @default(uuid())
+  username    String   @unique
+  password    String
+  roleId      String?
+  roleRef     Role?    @relation(fields: [roleId], references: [id])
+  role        String   @default("admin")
+  permissions String   @default("")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  lastLoginAt DateTime @default(now())
+  sessions    AdminSession[]
+}
+
+model AdminSession {
+  id           String   @id @default(uuid())
+  adminId      String
+  adminName    String
+  ip           String   @default("")
+  userAgent    String   @default("")
+  createdAt    DateTime @default(now())
+  lastActiveAt DateTime @default(now())
+  admin        Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  adminId    String
+  adminName  String
+  action     String
+  targetType String   @default("")
+  targetId   String   @default("")
+  detail     String   @default("")
+  ip         String   @default("")
+  createdAt  DateTime @default(now())
+}
+
+// B 方案：动态菜单
+model AdminMenu {
+  id         String   @id @default(uuid())
+  parentId   String?
+  title      String
+  type       String   @default("MENU")  // DIRECTORY / MENU
+  icon       String   @default("")
+  path       String   @default("")
+  component  String   @default("")     // 对应前端组件注册表 key
+  permission String   @default("")
+  sortOrder  Int      @default(0)
+  isVisible  Boolean  @default(true)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  parent     AdminMenu?  @relation("MenuChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children   AdminMenu[] @relation("MenuChildren")
 }
