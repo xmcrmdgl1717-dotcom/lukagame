@@ -38,13 +38,19 @@ export default function CardList() {
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
 
+  // ✅ 修复：先把 base64 算出来，再 setState
   const onNewImg = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    setNewCard((c) => ({ ...c, imageUrl: await readAsBase64(f) }));
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const img = await readAsBase64(f);
+    setNewCard((c) => ({ ...c, imageUrl: img }));
   };
+
   const onEditImg = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    setEditForm((c: any) => ({ ...c, imageUrl: await readAsBase64(f) }));
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const img = await readAsBase64(f);
+    setEditForm((c: any) => ({ ...c, imageUrl: img }));
   };
 
   const handleCreate = () => {
@@ -60,7 +66,7 @@ export default function CardList() {
     setSaving(true);
     updateCard({ resource: 'cards', id: editForm.id, values: { name: editForm.name, rarity: editForm.rarity, imageUrl: editForm.imageUrl } }, {
       onSuccess: () => { setShowEdit(false); setSaving(false); tableQueryResult.refetch(); },
-      onError: (e: any) => { alert('保存失败'); setSaving(false); },
+      onError: () => { alert('保存失败'); setSaving(false); },
     });
   };
 
