@@ -1408,6 +1408,59 @@ app.delete('/api/admin/menus/:id', requirePermission('menus.edit'), async (req, 
   } catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
+// ============ 菜单管理（B 方案） ============
+app.get('/api/admin/menus', async (req, res) => {
+  const menus = await prisma.adminMenu.findMany({ orderBy: { sortOrder: 'asc' } });
+  const tree = [];
+  const map = {};
+  menus.forEach(m => { map[m.id] = { ...m, children: [] }; });
+  menus.forEach(m => {
+    if (m.parentId && map[m.parentId]) map[m.parentId].children.push(map[m.id]);
+    else tree.push(map[m.id]);
+  });
+  res.json(tree);
+});
+
+app.post('/api/admin/menus', requirePermission('menus.edit'), async (req, res) => {
+  const { parentId, title, type, icon, path, component, permission, sortOrder } = req.body;
+  try {
+    const menu = await prisma.adminMenu.create({
+      data: {
+        parentId: parentId || null, title, type: type || 'MENU',
+        icon: icon || '', path: path || '', component: component || '',
+        permission: permission || '', sortOrder: parseInt(sortOrder || 0),
+      },
+    });
+    await writeAuditLog(req.admin, 'menu.create', 'menu', menu.id, { title });
+    res.json({ success: true, menu });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.put('/api/admin/menus/:id', requirePermission('menus.edit'), async (req, res) => {
+  const { title, icon, path, component, permission, sortOrder, isVisible, isActive } = req.body;
+  const data = {};
+  if (title) data.title = title;
+  if (icon !== undefined) data.icon = icon;
+  if (path !== undefined) data.path = path;
+  if (component !== undefined) data.component = component;
+  if (permission !== undefined) data.permission = permission;
+  if (sortOrder !== undefined) data.sortOrder = parseInt(sortOrder);
+  if (isVisible !== undefined) data.isVisible = isVisible;
+  if (isActive !== undefined) data.isActive = isActive;
+  try {
+    const menu = await prisma.adminMenu.update({ where: { id: req.params.id }, data });
+    res.json({ success: true, menu });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/menus/:id', requirePermission('menus.edit'), async (req, res) => {
+  try {
+    await prisma.adminMenu.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: '删除失败' }); }
+});
+
+
 // ============ 审计日志 ============
 app.get('/api/admin/audit-logs', requirePermission('audit.view'), async (req, res) => {
   const { action, adminName } = req.query;
