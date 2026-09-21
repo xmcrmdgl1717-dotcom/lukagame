@@ -9,7 +9,6 @@ app.use(cors());
 app.use(express.json());
 
 // ================= 用户端 API =================
-
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
   const user = await prisma.user.findUnique({
@@ -32,11 +31,8 @@ app.post('/api/register', async (req, res) => {
   } catch (error) { res.status(500).json({ error: '注册失败' }); }
 });
 
-app.get('/api/boxes', async (req, res) => {
-  res.json(await prisma.box.findMany({ where: { isActive: true } }));
-});
+app.get('/api/boxes', async (req, res) => res.json(await prisma.box.findMany({ where: { isActive: true } })));
 
-// 抽卡（同时累加任务进度）
 app.post('/api/draw', async (req, res) => {
   const { userId, boxId, count } = req.body;
   try {
@@ -46,7 +42,6 @@ app.post('/api/draw', async (req, res) => {
       const totalCost = box.price * count;
       if (user.coins < totalCost) throw new Error('金币不足');
       await tx.user.update({ where: { id: userId }, data: { coins: { decrement: totalCost } } });
-
       const drawnCards = [];
       const totalWeight = box.items.reduce((sum, item) => sum + item.weight, 0);
       for (let i = 0; i < count; i++) {
@@ -63,35 +58,26 @@ app.post('/api/draw', async (req, res) => {
           create: { userId, cardId: card.id, quantity: 1 }
         });
       }
-
-      // === 任务进度更新 ===
       await updateTaskProgress(tx, userId, 'DRAW', count);
       await updateTaskProgress(tx, userId, 'SPEND', totalCost);
-
       return { success: true, drawnCards };
     });
     res.json(result);
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
-// 工具函数：累加任务进度
 async function updateTaskProgress(tx, userId, action, amount) {
   const tasks = await tx.task.findMany({ where: { action, isActive: true } });
   for (const task of tasks) {
-    const existing = await tx.userTask.findUnique({
-      where: { userId_taskId: { userId, taskId: task.id } }
-    });
+    const existing = await tx.userTask.findUnique({ where: { userId_taskId: { userId, taskId: task.id } } });
     if (existing) {
-      if (!existing.isClaimed) {
-        await tx.userTask.update({ where: { id: existing.id }, data: { progress: { increment: amount } } });
-      }
+      if (!existing.isClaimed) await tx.userTask.update({ where: { id: existing.id }, data: { progress: { increment: amount } } });
     } else {
       await tx.userTask.create({ data: { userId, taskId: task.id, progress: amount } });
     }
   }
 }
 
-// 获取用户的任务列表
 app.get('/api/tasks/:userId', async (req, res) => {
   const { userId } = req.params;
   try {
@@ -99,9 +85,7 @@ app.get('/api/tasks/:userId', async (req, res) => {
     const result = [];
     for (const task of tasks) {
       let ut = await prisma.userTask.findUnique({ where: { userId_taskId: { userId, taskId: task.id } } });
-      if (!ut) {
-        ut = await prisma.userTask.create({ data: { userId, taskId: task.id, progress: 0 } });
-      }
+      if (!ut) ut = await prisma.userTask.create({ data: { userId, taskId: task.id, progress: 0 } });
       result.push({
         taskId: task.id, title: task.title, description: task.description,
         action: task.action, targetCount: task.targetCount, rewardCoins: task.rewardCoins,
@@ -112,7 +96,6 @@ app.get('/api/tasks/:userId', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 领取任务奖励
 app.post('/api/tasks/claim', async (req, res) => {
   const { userId, taskId } = req.body;
   try {
@@ -129,10 +112,7 @@ app.post('/api/tasks/claim', async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// 充值相关
-app.get('/api/recharge-options', async (req, res) => {
-  res.json(await prisma.rechargeOption.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
-});
+app.get('/api/recharge-options', async (req, res) => res.json(await prisma.rechargeOption.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } })));
 
 app.post('/api/recharge', async (req, res) => {
   const { userId, optionId } = req.body;
@@ -144,10 +124,7 @@ app.post('/api/recharge', async (req, res) => {
       const order = await tx.order.create({
         data: { userId, optionId, amount: option.price, coins: totalCoins, status: 'PAID', paidAt: new Date() }
       });
-      await tx.user.update({
-        where: { id: userId },
-        data: { coins: { increment: totalCoins }, rechargeCount: { increment: 1 } }
-      });
+      await tx.user.update({ where: { id: userId }, data: { coins: { increment: totalCoins }, rechargeCount: { increment: 1 } } });
       await updateTaskProgress(tx, userId, 'RECHARGE', 1);
       return { success: true, order, coinsAdded: totalCoins };
     });
@@ -155,11 +132,8 @@ app.post('/api/recharge', async (req, res) => {
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
-app.get('/api/banners', async (req, res) => {
-  res.json(await prisma.banner.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
-});
+app.get('/api/banners', async (req, res) => res.json(await prisma.banner.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } })));
 
-// === 兑换码：用户使用 ===
 app.post('/api/redeem', async (req, res) => {
   const { userId, code } = req.body;
   if (!code) return res.status(400).json({ error: '请输入兑换码' });
@@ -170,31 +144,75 @@ app.post('/api/redeem', async (req, res) => {
       if (rc.usedCount >= rc.maxUses) throw new Error('兑换码已用完');
       const alreadyUsed = await tx.redeemCodeUse.findUnique({ where: { codeId_userId: { codeId: rc.id, userId } } });
       if (alreadyUsed) throw new Error('您已使用过该兑换码');
-
       await tx.redeemCodeUse.create({ data: { codeId: rc.id, userId } });
       await tx.redeemCode.update({ where: { id: rc.id }, data: { usedCount: { increment: 1 } } });
-      if (rc.coins > 0) {
-        await tx.user.update({ where: { id: userId }, data: { coins: { increment: rc.coins } } });
-      }
+      if (rc.coins > 0) await tx.user.update({ where: { id: userId }, data: { coins: { increment: rc.coins } } });
       return { success: true, coins: rc.coins };
     });
     res.json(result);
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+// ===== 用户端工单 =====
+app.post('/api/tickets', async (req, res) => {
+  const { userId, title, content } = req.body;
+  if (!title || !content) return res.status(400).json({ error: '请填写标题和内容' });
+  try {
+    const ticket = await prisma.ticket.create({ data: { userId, title, content } });
+    res.json({ success: true, ticket });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/tickets/:userId', async (req, res) => {
+  const tickets = await prisma.ticket.findMany({
+    where: { userId: req.params.userId },
+    include: { replies: { orderBy: { createdAt: 'asc' } } },
+    orderBy: { createdAt: 'desc' }
+  });
+  res.json(tickets);
+});
+
 // ================= 管理后台 API =================
-const ADMIN_PASSWORD = 'admin123';
-app.use('/api/admin', (req, res, next) => {
-  if (req.headers['x-admin-password'] !== ADMIN_PASSWORD) return res.status(401).json({ error: '密码错误' });
+
+// 管理员登录（不经过密码中间件）
+app.post('/api/admin/login', async (req, res) => {
+  const { username, password } = req.body;
+  const admin = await prisma.admin.findUnique({ where: { username } });
+  if (!admin || admin.password !== password || !admin.isActive) return res.status(401).json({ error: '账号或密码错误' });
+  await prisma.admin.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } });
+  res.json({ success: true, admin: { id: admin.id, username: admin.username, role: admin.role } });
+});
+
+// 校验中间件（接收 admin-id 头 + password 头，简单实现）
+app.use('/api/admin', async (req, res, next) => {
+  // /api/admin/login 已经在上面处理过了
+  const username = req.headers['x-admin-username'];
+  const pwd = req.headers['x-admin-password'];
+  if (!username || !pwd) return res.status(401).json({ error: '未授权' });
+  const admin = await prisma.admin.findUnique({ where: { username } });
+  if (!admin || admin.password !== pwd || !admin.isActive) return res.status(401).json({ error: '账号或密码错误' });
+  req.admin = admin;
   next();
 });
 
+// 权限校验工具
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!roles.includes(req.admin.role) && req.admin.role !== 'super') {
+      return res.status(403).json({ error: '权限不足' });
+    }
+    next();
+  };
+}
+
+// --- 数据概览 ---
 app.get('/api/admin/stats', async (req, res) => {
   res.json({
     userCount: await prisma.user.count(),
     cardCount: await prisma.card.count(),
     boxCount: await prisma.box.count(),
     orderCount: await prisma.order.count(),
+    openTicketCount: await prisma.ticket.count({ where: { status: { not: 'CLOSED' } } }),
     totalRevenue: (await prisma.order.aggregate({ where: { status: 'PAID' }, _sum: { amount: true } }))._sum.amount || 0
   });
 });
@@ -297,7 +315,7 @@ app.delete('/api/admin/recharge-options/:id', async (req, res) => {
   catch (e) { res.status(400).json({ error: '删除失败，可能有订单引用' }); }
 });
 
-// --- 订单管理 ---
+// --- 订单 ---
 app.get('/api/admin/orders', async (req, res) => {
   res.json(await prisma.order.findMany({ include: { user: { select: { username: true } }, option: true }, orderBy: { createdAt: 'desc' }, take: 200 }));
 });
@@ -336,7 +354,7 @@ app.delete('/api/admin/banners/:id', async (req, res) => {
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// --- 任务管理（新增） ---
+// --- 任务管理 ---
 app.get('/api/admin/tasks', async (req, res) => res.json(await prisma.task.findMany({ orderBy: { sortOrder: 'asc' } })));
 app.post('/api/admin/tasks', async (req, res) => {
   const { title, description, action, targetCount, rewardCoins, sortOrder } = req.body;
@@ -364,7 +382,7 @@ app.delete('/api/admin/tasks/:id', async (req, res) => {
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// --- 兑换码管理（新增） ---
+// --- 兑换码管理 ---
 app.get('/api/admin/redeem-codes', async (req, res) => res.json(await prisma.redeemCode.findMany({ orderBy: { createdAt: 'desc' }, take: 200 })));
 app.post('/api/admin/redeem-codes', async (req, res) => {
   const { code, coins, maxUses } = req.body;
@@ -375,7 +393,6 @@ app.post('/api/admin/redeem-codes', async (req, res) => {
     res.json({ success: true, code: newCode });
   } catch (e) { res.status(400).json({ error: '兑换码可能已存在' }); }
 });
-// 批量生成
 app.post('/api/admin/redeem-codes/batch', async (req, res) => {
   const { count, coins, maxUses, prefix } = req.body;
   try {
@@ -384,9 +401,7 @@ app.post('/api/admin/redeem-codes/batch', async (req, res) => {
     for (let i = 0; i < total; i++) {
       const randomPart = Math.random().toString(36).substring(2, 10).toUpperCase();
       const code = `${(prefix || 'LUKA').toUpperCase()}-${randomPart}`;
-      const c = await prisma.redeemCode.create({
-        data: { code, coins: parseInt(coins || 0), maxUses: parseInt(maxUses || 1) }
-      });
+      const c = await prisma.redeemCode.create({ data: { code, coins: parseInt(coins || 0), maxUses: parseInt(maxUses || 1) } });
       created.push(c.code);
     }
     res.json({ success: true, codes: created });
@@ -395,6 +410,66 @@ app.post('/api/admin/redeem-codes/batch', async (req, res) => {
 app.delete('/api/admin/redeem-codes/:id', async (req, res) => {
   try { await prisma.redeemCode.delete({ where: { id: req.params.id } }); res.json({ success: true }); }
   catch (e) { res.status(400).json({ error: '删除失败' }); }
+});
+
+// --- 工单管理（管理员） ---
+app.get('/api/admin/tickets', async (req, res) => {
+  res.json(await prisma.ticket.findMany({
+    include: { user: { select: { username: true } }, replies: { orderBy: { createdAt: 'asc' } } },
+    orderBy: { updatedAt: 'desc' }
+  }));
+});
+app.post('/api/admin/tickets/:id/reply', async (req, res) => {
+  const { content } = req.body;
+  if (!content) return res.status(400).json({ error: '请填写回复内容' });
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.ticketReply.create({ data: { ticketId: req.params.id, fromAdmin: true, content } });
+      await tx.ticket.update({ where: { id: req.params.id }, data: { status: 'PROCESSING', updatedAt: new Date() } });
+    });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.put('/api/admin/tickets/:id/close', async (req, res) => {
+  try {
+    await prisma.ticket.update({ where: { id: req.params.id }, data: { status: 'CLOSED' } });
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.delete('/api/admin/tickets/:id', async (req, res) => {
+  try { await prisma.ticket.delete({ where: { id: req.params.id } }); res.json({ success: true }); }
+  catch (e) { res.status(400).json({ error: '删除失败' }); }
+});
+
+// --- 管理员账号管理（仅 super 可用） ---
+app.get('/api/admin/admins', requireRole('super'), async (req, res) => {
+  res.json(await prisma.admin.findMany({ select: { id: true, username: true, role: true, isActive: true, createdAt: true, lastLoginAt: true }, orderBy: { createdAt: 'asc' } }));
+});
+app.post('/api/admin/admins', requireRole('super'), async (req, res) => {
+  const { username, password, role } = req.body;
+  if (!username || !password) return res.status(400).json({ error: '请填写用户名和密码' });
+  try {
+    const admin = await prisma.admin.create({ data: { username, password, role: role || 'admin' } });
+    res.json({ success: true, admin: { id: admin.id, username: admin.username, role: admin.role } });
+  } catch (e) { res.status(400).json({ error: '用户名可能已存在' }); }
+});
+app.put('/api/admin/admins/:id', requireRole('super'), async (req, res) => {
+  const { password, role, isActive } = req.body;
+  const data = {};
+  if (password) data.password = password;
+  if (role) data.role = role;
+  if (isActive !== undefined) data.isActive = isActive;
+  try {
+    await prisma.admin.update({ where: { id: req.params.id }, data });
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.delete('/api/admin/admins/:id', requireRole('super'), async (req, res) => {
+  try {
+    if (req.admin.id === req.params.id) return res.status(400).json({ error: '不能删除自己' });
+    await prisma.admin.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
 // ================= 服务启动 =================
