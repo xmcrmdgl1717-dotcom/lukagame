@@ -35,6 +35,12 @@ import PaymentChannelList from './pages/payment-channels';
 import WithdrawalList from './pages/withdrawals';
 import TransactionList from './pages/transactions';
 import DrawLogList from './pages/drawlogs';
+import ReportSummary from './pages/reports/summary';
+import ReportFinance from './pages/reports/finance';
+import ReportDraw from './pages/reports/draw';
+import ReportUserDraw from './pages/reports/user-draw';
+import ReportUserFinance from './pages/reports/user-finance';
+import ReportVipDistribution from './pages/reports/vip-distribution';
 
 const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   DashboardPage,
@@ -63,6 +69,12 @@ const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   WithdrawalList,
   TransactionList,
   DrawLogList,
+  ReportSummary,
+  ReportFinance,
+  ReportDraw,
+  ReportUserDraw,
+  ReportUserFinance,
+  ReportVipDistribution,
 };
 
 function buildRoutes(menus: AdminMenu[]): React.ReactElement[] {
