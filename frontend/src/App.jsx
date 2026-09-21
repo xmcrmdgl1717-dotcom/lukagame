@@ -17,11 +17,26 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState('home');
   const [showLogin, setShowLogin] = useState(false);
   const [showRecharge, setShowRecharge] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { setUser, setBoxes, user } = useStore();
 
   useEffect(() => {
     axios.get(`${API_URL}/api/boxes`).then(res => setBoxes(res.data));
   }, [setBoxes]);
+
+  // 未读消息轮询
+  useEffect(() => {
+    if (!user) { setUnreadCount(0); return; }
+    const fetchUnread = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/notifications/${user.id}/unread-count`);
+        setUnreadCount(res.data.unread);
+      } catch (e) {}
+    };
+    fetchUnread();
+    const timer = setInterval(fetchUnread, 30000); // 每 30 秒轮询
+    return () => clearInterval(timer);
+  }, [user]);
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
@@ -32,11 +47,24 @@ export default function App() {
     <div className="max-w-md mx-auto min-h-screen bg-[#0a0a0a] text-white pb-20 relative shadow-2xl overflow-hidden">
       <div className="flex justify-between items-center p-4 bg-[#140a0a] border-b border-[#332222]">
         <div className="text-2xl font-black italic text-red-500 tracking-wider">LUKA!</div>
-        {!user ? (
-          <button onClick={() => setShowLogin(true)} className="text-xs text-gray-400 border border-gray-600 px-4 py-1.5 rounded-full hover:text-white hover:border-white transition">Sign In</button>
-        ) : (
-          <div className="text-xs text-yellow-500 font-bold bg-[#2a1414] px-3 py-1.5 rounded-full border border-yellow-900/50">💰 {user.coins.toLocaleString()}</div>
-        )}
+        <div className="flex items-center gap-3">
+          {/* 消息铃铛 + 红点 */}
+          {user && (
+            <button onClick={() => setCurrentTab('notifications')} className="relative">
+              <span className="text-xl">🔔</span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+          )}
+          {!user ? (
+            <button onClick={() => setShowLogin(true)} className="text-xs text-gray-400 border border-gray-600 px-4 py-1.5 rounded-full hover:text-white hover:border-white transition">Sign In</button>
+          ) : (
+            <div className="text-xs text-yellow-500 font-bold bg-[#2a1414] px-3 py-1.5 rounded-full border border-yellow-900/50">💰 {user.coins.toLocaleString()}</div>
+          )}
+        </div>
       </div>
 
       <div className="p-4">
@@ -50,7 +78,7 @@ export default function App() {
           />
         )}
         {currentTab === 'orders' && <Orders />}
-        {currentTab === 'notifications' && <Notifications />}
+        {currentTab === 'notifications' && <Notifications onRead={() => setUnreadCount(0)} />}
       </div>
 
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} onLoginSuccess={handleLoginSuccess} />}
