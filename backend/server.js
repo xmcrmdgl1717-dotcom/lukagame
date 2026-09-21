@@ -199,8 +199,13 @@ app.post('/api/games/:id/check-access', async (req, res) => {
   res.json({ allowed: true });
 });
 
+// 盲盒列表（支持 featured / gameId 筛选）
 app.get('/api/boxes', async (req, res) => {
-  res.json(await prisma.box.findMany({ where: { isActive: true }, include: { game: true } }));
+  const { featured, gameId } = req.query;
+  const where = { isActive: true };
+  if (featured === 'true') where.isFeatured = true;
+  if (gameId) where.gameId = gameId;
+  res.json(await prisma.box.findMany({ where, include: { game: true } }));
 });
 
 app.post('/api/draw', async (req, res) => {
@@ -865,23 +870,30 @@ app.get('/api/admin/boxes', requirePermission('boxes.view'), async (req, res) =>
   }));
 });
 app.post('/api/admin/boxes', requirePermission('boxes.create'), async (req, res) => {
-  const { name, price, coverUrl, gameId } = req.body;
+  const { name, price, coverUrl, gameId, isFeatured } = req.body;
   try {
     const box = await prisma.box.create({
-      data: { name, price: parseInt(price), coverUrl: coverUrl || '', gameId: gameId || null },
+      data: {
+        name,
+        price: parseInt(price),
+        coverUrl: coverUrl || '',
+        gameId: gameId || null,
+        isFeatured: !!isFeatured,
+      },
     });
     await writeAuditLog(req.admin, 'box.create', 'box', box.id, { name });
     res.json({ success: true, box });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.put('/api/admin/boxes/:id', requirePermission('boxes.edit'), async (req, res) => {
-  const { name, price, coverUrl, isActive, gameId } = req.body;
+  const { name, price, coverUrl, isActive, gameId, isFeatured } = req.body;
   const data = {};
   if (name) data.name = name;
   if (price !== undefined) data.price = parseInt(price);
   if (coverUrl !== undefined) data.coverUrl = coverUrl;
   if (isActive !== undefined) data.isActive = isActive;
   if (gameId !== undefined) data.gameId = gameId || null;
+  if (isFeatured !== undefined) data.isFeatured = !!isFeatured;
   try {
     const box = await prisma.box.update({ where: { id: req.params.id }, data });
     await writeAuditLog(req.admin, 'box.update', 'box', box.id, { name });
@@ -1354,7 +1366,7 @@ app.get('/api/admin/permissions', async (req, res) => {
   res.json(ALL_PERMISSIONS);
 });
 
-// ============ 菜单管理（B 方案） ============
+// ============ 菜单管理 ============
 app.get('/api/admin/menus', async (req, res) => {
   const menus = await prisma.adminMenu.findMany({ orderBy: { sortOrder: 'asc' } });
   const tree = [];
