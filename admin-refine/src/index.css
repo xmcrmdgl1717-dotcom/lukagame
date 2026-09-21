@@ -8,8 +8,152 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background-color: #0d0d0d;
   color: #fff;
+  transition: background-color 0.2s, color 0.2s;
 }
+
+/* ============================================================
+   🌙 深色主题滚动条（默认）
+   ============================================================ */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #1a1a1a; }
+::-webkit-scrollbar-thumb { background: #4a1c12; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #6b2a1e; }
+
+/* ============================================================
+   ☀️ 浅色主题覆盖规则
+   ============================================================ */
 body.light-mode {
   background-color: #f5f6f8;
-  color: #1a1a1a;
+  color: #111827;
 }
+
+/* ---------- 1. 背景色覆盖 ---------- */
+body.light-mode .bg-\[\#0d0d0d\] { background-color: #ffffff !important; }
+body.light-mode .bg-\[\#161616\] { background-color: #ffffff !important; }
+body.light-mode .bg-\[\#1a1a1a\] { background-color: #f9fafb !important; }
+body.light-mode .bg-\[\#1f1f1f\] { background-color: #f3f4f6 !important; }
+body.light-mode .bg-\[\#2a2a2a\] { background-color: #e5e7eb !important; }
+body.light-mode .bg-\[\#3a3a3a\] { background-color: #d1d5db !important; }
+body.light-mode .bg-\[\#1c0e0e\] { background-color: #ffffff !important; }
+body.light-mode .bg-\[\#2a1414\] { background-color: #f9fafb !important; }
+
+/* ---------- 2. 边框色覆盖 ---------- */
+body.light-mode .border-\[\#2a2a2a\] { border-color: #e5e7eb !important; }
+body.light-mode .border-\[\#3a1a1a\] { border-color: #e5e7eb !important; }
+body.light-mode .border-\[\#2a1414\] { border-color: #e5e7eb !important; }
+body.light-mode .border-\[\#3d1a1a\] { border-color: #e5e7eb !important; }
+body.light-mode .border-\[\#6b2a1e\] { border-color: #e5e7eb !important; }
+body.light-mode .border-\[\#4a1c12\] { border-color: #e5e7eb !important; }
+body.light-mode .border-\[\#332222\] { border-color: #e5e7eb !important; }
+
+/* ---------- 3. 文字色覆盖 ---------- */
+body.light-mode .text-white { color: #111827 !important; }
+body.light-mode .text-gray-300 { color: #374151 !important; }
+body.light-mode .text-gray-400 { color: #6b7280 !important; }
+body.light-mode .text-gray-500 { color: #6b7280 !important; }
+body.light-mode .text-gray-600 { color: #9ca3af !important; }
+
+/* 强调色在浅色背景上加深，保证可读性 */
+body.light-mode .text-yellow-400 { color: #b45309 !important; }
+body.light-mode .text-yellow-500 { color: #b45309 !important; }
+body.light-mode .text-green-400 { color: #16a34a !important; }
+body.light-mode .text-blue-400 { color: #2563eb !important; }
+body.light-mode .text-orange-400 { color: #ea580c !important; }
+body.light-mode .text-orange-500 { color: #ea580c !important; }
+body.light-mode .text-purple-400 { color: #7c3aed !important; }
+body.light-mode .text-red-400 { color: #dc2626 !important; }
+body.light-mode .text-red-500 { color: #dc2626 !important; }
+
+/* ---------- 4. 输入框 / 下拉框 / 文本域 ---------- */
+body.light-mode input,
+body.light-mode select,
+body.light-mode textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border-color: #d1d5db !important;
+}
+body.light-mode input::placeholder,
+body.light-mode textarea::placeholder {
+  color: #9ca3af !important;
+}
+body.light-mode input:focus,
+body.light-mode select:focus,
+body.light-mode textarea:focus {
+  border-color: #dc2626 !important;
+  outline: none;
+}
+
+/* ---------- 5. 表格 ---------- */
+body.light-mode tr:hover { background-color: #f9fafb !important; }
+body.light-mode .hover\:bg-\[\#1a1a1a\]:hover { background-color: #f9fafb !important; }
+body.light-mode .hover\:bg-\[\#3a3a3a\]:hover { background-color: #e5e7eb !important; }
+body.light-mode .hover\:bg-\[\#2a2a2a\]:hover { background-color: #f3f4f6 !important; }
+body.light-mode .hover\:bg-\[\#3d1a1a\]:hover { background-color: #f9fafb !important; }
+body.light-mode .hover\:bg-\[\#2a1414\]:hover { background-color: #f3f4f6 !important; }
+
+/* ---------- 6. 状态徽章（深色背景 → 浅色背景 + 深色文字） ---------- */
+body.light-mode .bg-green-900\/60 { background-color: #dcfce7 !important; }
+body.light-mode .bg-red-900\/60 { background-color: #fee2e2 !important; }
+body.light-mode .bg-blue-900\/60 { background-color: #dbeafe !important; }
+body.light-mode .bg-yellow-900\/60 { background-color: #fef3c7 !important; }
+body.light-mode .bg-orange-900\/60 { background-color: #ffedd5 !important; }
+body.light-mode .bg-purple-900\/60 { background-color: #f3e8ff !important; }
+body.light-mode .bg-blue-900 { background-color: #dbeafe !important; }
+body.light-mode .bg-red-900 { background-color: #fee2e2 !important; }
+body.light-mode .bg-orange-900 { background-color: #ffedd5 !important; }
+body.light-mode .bg-green-900 { background-color: #dcfce7 !important; }
+
+/* 徽章文字颜色加深 */
+body.light-mode .text-green-200 { color: #166534 !important; }
+body.light-mode .text-red-200 { color: #991b1b !important; }
+body.light-mode .text-blue-200 { color: #1e40af !important; }
+body.light-mode .text-yellow-200 { color: #854d0e !important; }
+body.light-mode .text-orange-200 { color: #9a3412 !important; }
+body.light-mode .text-purple-200 { color: #6b21a8 !important; }
+
+/* ---------- 7. 侧边栏菜单 hover / 激活 ---------- */
+body.light-mode .hover\:bg-red-600\/10:hover { background-color: rgba(220, 38, 38, 0.06) !important; }
+body.light-mode .bg-red-600\/20 { background-color: rgba(220, 38, 38, 0.1) !important; }
+body.light-mode .bg-red-600\/10 { background-color: rgba(220, 38, 38, 0.05) !important; }
+
+/* ---------- 8. 卡片阴影（浅色下轻微投影更有层次） ---------- */
+body.light-mode .rounded-xl { box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.06); }
+body.light-mode .rounded-lg { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04); }
+
+/* ---------- 9. 弹窗遮罩 ---------- */
+body.light-mode .bg-black\/70 { background-color: rgba(0, 0, 0, 0.5) !important; }
+
+/* ---------- 10. 禁用按钮 ---------- */
+body.light-mode button:disabled { opacity: 0.4 !important; cursor: not-allowed; }
+
+/* ---------- 11. 浅色主题滚动条 ---------- */
+body.light-mode ::-webkit-scrollbar { width: 8px; height: 8px; }
+body.light-mode ::-webkit-scrollbar-track { background: #f3f4f6; }
+body.light-mode ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+body.light-mode ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* ---------- 12. 主内容区文字（防止继承暗色） ---------- */
+body.light-mode main { color: #111827; }
+body.light-mode aside { color: #111827; }
+
+/* ---------- 13. 按钮保持原色（红/蓝/绿按钮不变） ---------- */
+body.light-mode .bg-red-600 { background-color: #dc2626 !important; }
+body.light-mode .bg-blue-600 { background-color: #2563eb !important; }
+body.light-mode .bg-green-600 { background-color: #16a34a !important; }
+body.light-mode .bg-orange-600 { background-color: #ea580c !important; }
+body.light-mode .bg-purple-600 { background-color: #9333ea !important; }
+body.light-mode .bg-gray-600 { background-color: #4b5563 !important; }
+body.light-mode .bg-gray-700 { background-color: #e5e7eb !important; color: #374151 !important; }
+body.light-mode .bg-gray-800 { background-color: #f3f4f6 !important; }
+
+/* 按钮文字保持白色 */
+body.light-mode .bg-red-600,
+body.light-mode .bg-blue-600,
+body.light-mode .bg-green-600,
+body.light-mode .bg-orange-600,
+body.light-mode .bg-purple-600 { color: #ffffff !important; }
+
+/* ---------- 14. 骨架 / 加载态 ---------- */
+body.light-mode .text-gray-700 { color: #374151 !important; }
+body.light-mode .text-gray-800 { color: #1f2937 !important; }
+body.light-mode .text-gray-900 { color: #111827 !important; }
