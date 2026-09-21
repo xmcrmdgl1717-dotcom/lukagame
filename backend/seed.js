@@ -2,7 +2,6 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  // ================= 权限列表 =================
   const ALL_PERM = [
     'users.view','users.edit','users.delete','users.vip',
     'groups.view','groups.edit',
@@ -35,7 +34,6 @@ async function main() {
     create: { name: 'super', displayName: '超级管理员', description: '拥有全部权限', permissions: ALL_PERM, isSystem: true },
   });
 
-  // ================= 管理员 =================
   const superRole = await prisma.role.findUnique({ where: { name: 'super' } });
   await prisma.admin.upsert({
     where: { username: 'admin' },
@@ -93,20 +91,13 @@ async function main() {
   const c2 = await prisma.card.upsert({ where: { id: 'card-2' }, update: {}, create: { id: 'card-2', name: '皮卡丘', rarity: 'SR', value: 5000 } });
   const c3 = await prisma.card.upsert({ where: { id: 'card-3' }, update: {}, create: { id: 'card-3', name: '杰尼龟', rarity: 'R', value: 500 } });
 
-  // ================= 游戏（专区） =================
+  // ================= 游戏 =================
   const game = await prisma.game.upsert({
     where: { name: 'heaven_hell' },
     update: {},
     create: {
-      name: 'heaven_hell',
-      displayName: '天堂与地狱',
-      description: '经典卡牌抽奖',
-      icon: '🎴',
-      minVipLevel: 0,
-      minCoins: 0,
-      enableLeaderboard: true,
-      leaderboardMetric: 'CONSUME',
-      leaderboardType: 'WEEKLY',
+      name: 'heaven_hell', displayName: '天堂与地狱', description: '经典卡牌抽奖', icon: '🎴',
+      minVipLevel: 0, minCoins: 0, enableLeaderboard: true, leaderboardMetric: 'CONSUME', leaderboardType: 'WEEKLY',
     },
   });
 
@@ -134,7 +125,6 @@ async function main() {
   // ================= 轮播图 =================
   const banners = [
     { id: 'bn-1', imageUrl: 'https://via.placeholder.com/800x400/2d1410/ff6600?text=Welcome', link: 'https://luka.game', title: 'Welcome', sortOrder: 1 },
-    { id: 'bn-2', imageUrl: 'https://via.placeholder.com/800x400/1a0f2a/aa66ff?text=Heaven+Hell', link: 'https://luka.game', title: 'Heaven & Hell', sortOrder: 2 },
   ];
   for (const b of banners) await prisma.banner.upsert({ where: { id: b.id }, update: {}, create: b });
 
@@ -142,9 +132,39 @@ async function main() {
   const tasks = [
     { id: 'task-1', title: '每日抽卡 1 次', action: 'DRAW', targetCount: 1, rewardCoins: 100, sortOrder: 1 },
     { id: 'task-2', title: '每日抽卡 10 次', action: 'DRAW', targetCount: 10, rewardCoins: 500, sortOrder: 2 },
-    { id: 'task-3', title: '累计消耗 5000 金币', action: 'SPEND', targetCount: 5000, rewardCoins: 500, sortOrder: 3 },
   ];
   for (const t of tasks) await prisma.task.upsert({ where: { id: t.id }, update: {}, create: t });
+
+  // ================= 菜单（B 方案：默认菜单树） =================
+  const menus = [
+    // 一级菜单
+    { id: 'menu-dashboard', parentId: null, title: '仪表盘', type: 'MENU', icon: '📊', path: '/', component: 'DashboardPage', permission: '', sortOrder: 1 },
+
+    { id: 'menu-user-group', parentId: null, title: '用户管理', type: 'DIRECTORY', icon: '👥', path: '', component: '', permission: '', sortOrder: 2 },
+    { id: 'menu-users', parentId: 'menu-user-group', title: '用户列表', type: 'MENU', icon: '👥', path: '/users', component: 'UserList', permission: 'users.view', sortOrder: 1 },
+    { id: 'menu-vip-levels', parentId: 'menu-user-group', title: 'VIP等级设置', type: 'MENU', icon: '👑', path: '/vip-levels', component: 'VipLevels', permission: 'users.vip', sortOrder: 2 },
+
+    { id: 'menu-cards', parentId: null, title: '卡牌管理', type: 'MENU', icon: '🃏', path: '/cards', component: 'CardList', permission: 'cards.view', sortOrder: 3 },
+    { id: 'menu-boxes', parentId: null, title: '盲盒管理', type: 'MENU', icon: '📦', path: '/boxes', component: 'BoxList', permission: 'boxes.view', sortOrder: 4 },
+    { id: 'menu-recharge', parentId: null, title: '充值套餐', type: 'MENU', icon: '💰', path: '/recharge-options', component: 'RechargeList', permission: 'recharge.view', sortOrder: 5 },
+    { id: 'menu-orders', parentId: null, title: '订单管理', type: 'MENU', icon: '📄', path: '/orders', component: 'OrderList', permission: 'orders.view', sortOrder: 6 },
+    { id: 'menu-banners', parentId: null, title: '轮播图', type: 'MENU', icon: '🖼️', path: '/banners', component: 'BannerList', permission: 'banners.view', sortOrder: 7 },
+    { id: 'menu-tasks', parentId: null, title: '任务管理', type: 'MENU', icon: '🎯', path: '/tasks', component: 'TaskList', permission: 'tasks.view', sortOrder: 8 },
+    { id: 'menu-redeem', parentId: null, title: '兑换码', type: 'MENU', icon: '🎁', path: '/redeem-codes', component: 'RedeemCodeList', permission: 'redeem.view', sortOrder: 9 },
+    { id: 'menu-notifications', parentId: null, title: '通知管理', type: 'MENU', icon: '🔔', path: '/notifications', component: 'NotificationList', permission: 'notifications.view', sortOrder: 10 },
+    { id: 'menu-tickets', parentId: null, title: '客服工单', type: 'MENU', icon: '🎧', path: '/tickets', component: 'TicketList', permission: 'tickets.view', sortOrder: 11 },
+
+    { id: 'menu-system-group', parentId: null, title: '系统管理', type: 'DIRECTORY', icon: '⚙️', path: '', component: '', permission: '', sortOrder: 99 },
+    { id: 'menu-admins', parentId: 'menu-system-group', title: '管理员列表', type: 'MENU', icon: '👤', path: '/admins', component: 'AdminList', permission: 'admins.view', sortOrder: 1 },
+    { id: 'menu-roles', parentId: 'menu-system-group', title: '角色管理', type: 'MENU', icon: '🎭', path: '/admins/roles', component: 'RoleList', permission: 'roles.view', sortOrder: 2 },
+    { id: 'menu-permissions', parentId: 'menu-system-group', title: '权限说明', type: 'MENU', icon: '📖', path: '/admins/permissions', component: 'PermissionList', permission: '', sortOrder: 3 },
+    { id: 'menu-menus', parentId: 'menu-system-group', title: '菜单管理', type: 'MENU', icon: '🧩', path: '/admins/menus', component: 'MenuManage', permission: 'menus.edit', sortOrder: 4 },
+    { id: 'menu-audit-logs', parentId: 'menu-system-group', title: '操作日志', type: 'MENU', icon: '📝', path: '/admins/audit-logs', component: 'AuditLogList', permission: 'audit.view', sortOrder: 5 },
+    { id: 'menu-sessions', parentId: 'menu-system-group', title: '会话管理', type: 'MENU', icon: '💻', path: '/admins/sessions', component: 'SessionList', permission: 'audit.view', sortOrder: 6 },
+  ];
+  for (const m of menus) {
+    await prisma.adminMenu.upsert({ where: { id: m.id }, update: {}, create: m });
+  }
 
   console.log('✅ 数据初始化完成');
   console.log('管理员: admin / admin123');
