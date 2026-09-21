@@ -23,29 +23,32 @@ model User {
 }
 
 model Card {
-  id       String    @id @default(uuid())
-  name     String
-  rarity   String
-  imageUrl String
-  boxItems BoxItem[]
+  id        String     @id @default(uuid())
+  name      String
+  rarity    String
+  imageUrl  String     @default("")
+  createdAt DateTime   @default(now())
+  boxItems  BoxItem[]
   inventory Inventory[]
 }
 
 model Box {
-  id       String    @id @default(uuid())
-  name     String
-  price    Int
-  coverUrl String
-  items    BoxItem[]
+  id        String     @id @default(uuid())
+  name      String
+  price     Int
+  coverUrl  String     @default("")
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  items     BoxItem[]
 }
 
 model BoxItem {
-  id       String @id @default(uuid())
-  boxId    String
-  cardId   String
-  weight   Int
-  box      Box    @relation(fields: [boxId], references: [id])
-  card     Card   @relation(fields: [cardId], references: [id])
+  id     String @id @default(uuid())
+  boxId  String
+  cardId String
+  weight Int
+  box    Box    @relation(fields: [boxId], references: [id], onDelete: Cascade)
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
 }
 
 model Inventory {
@@ -54,7 +57,7 @@ model Inventory {
   cardId   String
   quantity Int    @default(1)
   user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  card     Card   @relation(fields: [cardId], references: [id])
+  card     Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
   @@unique([userId, cardId])
 }
