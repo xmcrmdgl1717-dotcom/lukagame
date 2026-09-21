@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import axios from 'axios';
 
@@ -9,14 +9,44 @@ export default function Home({ onShowLogin }) {
   const [drawing, setDrawing] = useState(false);
   const [drawnResult, setDrawnResult] = useState([]);
 
+  // ================= 轮播图逻辑 =================
+  const [currentBanner, setCurrentBanner] = useState(0);
+  const banners = [
+    {
+      title: '1 Week Spending Leaderboard',
+      subtitle: 'The more you open, the higher your rank!',
+      bgGradient: 'from-[#2d1410] to-[#4a1c12]', // 可替换为真实图片
+    },
+    {
+      title: 'Heaven & Hell 限时活动',
+      subtitle: '抽出你的第一张 SSR 卡牌，赢取额外奖励',
+      bgGradient: 'from-[#1a0f2a] to-[#3a1a4a]',
+    },
+    {
+      title: '新用户专享福利',
+      subtitle: '注册即送 10,000 金币，畅玩抽卡',
+      bgGradient: 'from-[#0f1a2a] to-[#1a2a4a]',
+    }
+  ];
+
+  // 自动轮播定时器，每 3 秒切换
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentBanner((prev) => (prev + 1) % banners.length);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [banners.length]);
+
+  // ================= 业务逻辑 =================
   const handleDraw = async (box, count) => {
-    if (!user) return onShowLogin(); // 未登录直接弹出登录框
+    if (!user) return onShowLogin(); // 未登录时调用父组件弹窗
     if (user.coins < box.price * count) return alert('金币不足，请先充值！');
     
     try {
       const res = await axios.post(`${API_URL}/api/draw`, { userId: user.id, boxId: box.id, count });
       updateCoins(-(box.price * count));
       
+      // 刷新用户数据（同步库存和金币）
       const updatedUser = await axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' });
       setUser(updatedUser.data);
       
@@ -31,36 +61,60 @@ export default function Home({ onShowLogin }) {
 
   return (
     <div className="p-4 space-y-6">
-      {/* 1. 顶部 Banner 区（已升级为 Banner 图样式） */}
-      <div 
-        className="border border-[#6b2a1e] rounded-2xl p-5 relative overflow-hidden shadow-2xl bg-cover bg-center"
-        style={{ 
-          backgroundImage: "linear-gradient(to bottom, rgba(20,5,0,0.6), rgba(20,5,0,0.95)), url('https://via.placeholder.com/800x400/2d1410/4a1c12?text=1+Week+Spending+Leaderboard')" 
-        }}
-      >
-        {/* Banner 头部文字 */}
-        <div className="text-center mb-4">
-          <div className="text-orange-400 font-bold text-sm tracking-widest mb-1">1 Week Spending Leaderboard</div>
-          <div className="text-gray-300 text-[10px] mb-3">The more you open, the higher your rank!</div>
-          
-          {/* 未登录时的 Banner 登录按钮 */}
-          {!user ? (
-            <button 
-              onClick={onShowLogin} 
-              className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-6 py-2 rounded-full shadow-lg transition transform hover:scale-105"
+      {/* 1. 顶部轮播图 Banner 区 */}
+      <div className="relative overflow-hidden rounded-2xl border border-[#6b2a1e] shadow-2xl">
+        {/* 滑动容器 */}
+        <div 
+          className="flex transition-transform duration-500 ease-in-out"
+          style={{ transform: `translateX(-${currentBanner * 100}%)` }}
+        >
+          {banners.map((banner, idx) => (
+            <div 
+              key={idx} 
+              className={`w-full flex-shrink-0 p-5 bg-gradient-to-br ${banner.bgGradient} relative`}
             >
-              登录 / 注册查看分数
-            </button>
-          ) : (
-            <div className="text-3xl font-black text-orange-400">81,500 🪙</div>
-          )}
+              {/* 背景图片占位：以后有真实图，把上面 bgGradient 换成 img 标签 */}
+              {/* <img src={banner.image} className="absolute inset-0 w-full h-full object-cover opacity-50" /> */}
+
+              {/* 文字内容 */}
+              <div className="relative z-10 text-center mb-4">
+                <div className="text-orange-400 font-bold text-sm tracking-widest mb-1">{banner.title}</div>
+                <div className="text-gray-300 text-[10px] mb-3">{banner.subtitle}</div>
+                
+                {/* 未登录显示登录按钮，已登录显示分数 */}
+                {!user ? (
+                  <button 
+                    onClick={onShowLogin} 
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-6 py-2 rounded-full shadow-lg transition transform hover:scale-105"
+                  >
+                    登录 / 注册查看分数
+                  </button>
+                ) : (
+                  <div className="text-3xl font-black text-orange-400">81,500 🪙</div>
+                )}
+              </div>
+
+              {/* 排行榜数据（只在第一张图显示） */}
+              {idx === 0 && (
+                <div className="relative z-10 flex justify-around text-center text-[10px] text-gray-300">
+                  <div className="bg-black/40 p-2 rounded-lg w-1/4 backdrop-blur-sm"><span className="block text-orange-500 font-bold">TOP 1</span>30,000 🪙</div>
+                  <div className="bg-black/40 p-2 rounded-lg w-1/4 backdrop-blur-sm"><span className="block text-orange-500 font-bold">TOP 2</span>10,000 🪙</div>
+                  <div className="bg-black/40 p-2 rounded-lg w-1/4 backdrop-blur-sm"><span className="block text-orange-500 font-bold">TOP 3</span>4,000 🪙</div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
 
-        {/* 排行榜前三名 */}
-        <div className="flex justify-around text-center text-[10px] text-gray-300">
-          <div className="bg-black/40 p-2 rounded-lg w-1/4 backdrop-blur-sm"><span className="block text-orange-500 font-bold">TOP 1</span>30,000 🪙</div>
-          <div className="bg-black/40 p-2 rounded-lg w-1/4 backdrop-blur-sm"><span className="block text-orange-500 font-bold">TOP 2</span>10,000 🪙</div>
-          <div className="bg-black/40 p-2 rounded-lg w-1/4 backdrop-blur-sm"><span className="block text-orange-500 font-bold">TOP 3</span>4,000 🪙</div>
+        {/* 轮播指示点 */}
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+          {banners.map((_, idx) => (
+            <button 
+              key={idx} 
+              onClick={() => setCurrentBanner(idx)}
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${currentBanner === idx ? 'bg-orange-500 w-4' : 'bg-gray-500/50'}`}
+            />
+          ))}
         </div>
       </div>
 
