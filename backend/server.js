@@ -166,7 +166,6 @@ app.post('/api/register', async (req, res) => {
   } catch (error) { res.status(500).json({ error: '注册失败' }); }
 });
 
-// 游戏列表（用户端）
 app.get('/api/games', async (req, res) => {
   res.json(await prisma.game.findMany({
     where: { isActive: true },
@@ -174,7 +173,6 @@ app.get('/api/games', async (req, res) => {
   }));
 });
 
-// 游戏详情 + 盲盒列表
 app.get('/api/games/:id', async (req, res) => {
   const game = await prisma.game.findUnique({
     where: { id: req.params.id },
@@ -184,14 +182,12 @@ app.get('/api/games/:id', async (req, res) => {
   res.json(game);
 });
 
-// 检查游戏入场条件
 app.post('/api/games/:id/check-access', async (req, res) => {
   const { userId } = req.body;
   const game = await prisma.game.findUnique({ where: { id: req.params.id } });
   if (!game) return res.status(404).json({ error: '游戏不存在' });
   if (!game.isActive) return res.json({ allowed: false, reason: '游戏未开放' });
   if (!userId) return res.json({ allowed: false, reason: '请先登录' });
-
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return res.json({ allowed: false, reason: '用户不存在' });
   if (game.minVipLevel > 0 && user.vipLevel < game.minVipLevel) {
@@ -217,7 +213,6 @@ app.post('/api/draw', async (req, res) => {
       });
       const user = await tx.user.findUnique({ where: { id: userId } });
 
-      // 游戏入场检查
       if (box.game && box.game.minVipLevel > 0 && user.vipLevel < box.game.minVipLevel) {
         throw new Error(`需要 VIP${box.game.minVipLevel} 以上`);
       }
@@ -264,9 +259,7 @@ app.post('/api/draw', async (req, res) => {
       return { success: true, drawnCards };
     });
 
-    // 事务外触发 VIP 升级检查
     checkVipUpgrade(userId).catch(() => {});
-
     res.json(result);
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
@@ -359,7 +352,6 @@ app.post('/api/recharge', async (req, res) => {
       await updateTaskProgress(tx, userId, 'RECHARGE', 1);
       return { success: true, order, coinsAdded: totalCoins };
     });
-
     checkVipUpgrade(userId).catch(() => {});
     res.json(result);
   } catch (error) { res.status(400).json({ error: error.message }); }
@@ -1364,9 +1356,9 @@ app.get('/api/admin/permissions', async (req, res) => {
 });
 
 // ============ 菜单管理（B 方案） ============
+// 注意：GET 不要求 menus.edit 权限，任何登录的管理员都能拉取菜单树（前端会自行按权限过滤）
 app.get('/api/admin/menus', async (req, res) => {
   const menus = await prisma.adminMenu.findMany({ orderBy: { sortOrder: 'asc' } });
-  // 组装成树
   const tree = [];
   const map = {};
   menus.forEach(m => { map[m.id] = { ...m, children: [] }; });
@@ -1376,6 +1368,7 @@ app.get('/api/admin/menus', async (req, res) => {
   });
   res.json(tree);
 });
+
 app.post('/api/admin/menus', requirePermission('menus.edit'), async (req, res) => {
   const { parentId, title, type, icon, path, component, permission, sortOrder } = req.body;
   try {
@@ -1390,6 +1383,7 @@ app.post('/api/admin/menus', requirePermission('menus.edit'), async (req, res) =
     res.json({ success: true, menu });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
+
 app.put('/api/admin/menus/:id', requirePermission('menus.edit'), async (req, res) => {
   const { title, icon, path, component, permission, sortOrder, isVisible, isActive } = req.body;
   const data = {};
@@ -1406,6 +1400,7 @@ app.put('/api/admin/menus/:id', requirePermission('menus.edit'), async (req, res
     res.json({ success: true, menu });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
+
 app.delete('/api/admin/menus/:id', requirePermission('menus.edit'), async (req, res) => {
   try {
     await prisma.adminMenu.delete({ where: { id: req.params.id } });
@@ -1439,7 +1434,6 @@ app.get('/api/admin/reports/summary', requirePermission('reports.view'), async (
   const totalConsume = draws.reduce((s, d) => s + d.cost, 0);
   const totalDrawCount = draws.reduce((s, d) => s + d.count, 0);
 
-  // 按天聚合
   const dailyData = {};
   for (let i = 0; i < days; i++) {
     const d = new Date(); d.setDate(d.getDate() - i);
