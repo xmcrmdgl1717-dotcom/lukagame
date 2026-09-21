@@ -8,6 +8,9 @@ export default function Profile() {
   const { user, setUser } = useStore();
   const [redeemCode, setRedeemCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
+  const [ticketTitle, setTicketTitle] = useState('');
+  const [ticketContent, setTicketContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const handleRedeem = async () => {
     if (!user) return alert('请先登录');
@@ -24,13 +27,26 @@ export default function Profile() {
     } finally { setRedeeming(false); }
   };
 
+  const handleSubmitTicket = async () => {
+    if (!user) return alert('请先登录');
+    if (!ticketTitle.trim() || !ticketContent.trim()) return alert('请填写标题和内容');
+    setSubmitting(true);
+    try {
+      await axios.post(`${API_URL}/api/tickets`, { userId: user.id, title: ticketTitle, content: ticketContent });
+      alert('提交成功，客服会尽快回复您！');
+      setTicketTitle('');
+      setTicketContent('');
+    } catch (e) {
+      alert('提交失败');
+    } finally { setSubmitting(false); }
+  };
+
   const menuItems = [
     { label: '我的订单', icon: '📄' },
     { label: '等级特权', icon: '⭐' },
     { label: '代金券', icon: '🎫' },
     { label: '转诊推荐', icon: '🔗' },
     { label: '交易记录', icon: '🔄' },
-    { label: '联系客服', icon: '🎧' },
     { label: '常见问题', icon: '❓' },
   ];
 
@@ -61,6 +77,33 @@ export default function Profile() {
             className="bg-red-600 hover:bg-red-700 disabled:bg-gray-700 text-white text-sm px-5 py-2 rounded-lg font-bold"
           >
             {redeeming ? '兑换中...' : '兑换'}
+          </button>
+        </div>
+      </div>
+
+      {/* 客服工单 */}
+      <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 mb-6 shadow-lg">
+        <div className="text-sm font-bold text-white mb-3">🎧 联系客服</div>
+        <div className="space-y-2">
+          <input
+            value={ticketTitle}
+            onChange={(e) => setTicketTitle(e.target.value)}
+            placeholder="问题标题"
+            className="w-full bg-[#2a1414] border border-[#4a1c12] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500"
+          />
+          <textarea
+            value={ticketContent}
+            onChange={(e) => setTicketContent(e.target.value)}
+            rows="3"
+            placeholder="详细描述您的问题..."
+            className="w-full bg-[#2a1414] border border-[#4a1c12] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500"
+          ></textarea>
+          <button
+            onClick={handleSubmitTicket}
+            disabled={submitting}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 text-white text-sm py-2 rounded-lg font-bold"
+          >
+            {submitting ? '提交中...' : '提交工单'}
           </button>
         </div>
       </div>
