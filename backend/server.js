@@ -9,6 +9,26 @@ app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
 
 // ================= 权限定义 =================
+const crypto = require('crypto');
+
+// 生成会话 Token
+function generateSessionToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+// 从请求头获取真实 IP
+function getClientIp(req) {
+  return (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+    || req.headers['x-real-ip']
+    || req.connection?.remoteAddress
+    || '';
+}
+
+// 从请求头获取 User-Agent
+function getClientUA(req) {
+  return (req.headers['user-agent'] || '').slice(0, 200);
+}
+
 const ALL_PERMISSIONS = [
   // 用户管理
   { key: 'users.view', label: '查看用户', group: '用户管理' },
