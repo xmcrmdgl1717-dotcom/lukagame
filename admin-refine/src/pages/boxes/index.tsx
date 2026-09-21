@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useTable, useCreate, useUpdate, useDelete, useCustom } from '@refinedev/core';
+import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 
 interface BoxItem {
   id: string;
@@ -20,6 +21,8 @@ interface CardItem {
   rarity: string;
   imageUrl: string;
 }
+
+const API_URL = import.meta.env.VITE_API_URL || 'https://luka-1i4g.onrender.com';
 
 const readFileAsBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -43,6 +46,7 @@ export default function BoxList() {
   const { mutate: updateBox } = useUpdate();
   const { mutate: deleteBox } = useDelete();
   const { mutate: customRequest } = useCustom();
+  const { confirm } = useSensitiveConfirm();
 
   const [newBox, setNewBox] = useState({ name: '', price: 300, coverUrl: '' });
   const [creating, setCreating] = useState(false);
@@ -51,7 +55,6 @@ export default function BoxList() {
   const [editForm, setEditForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
 
-  // 概率配置弹窗
   const [showProbModal, setShowProbModal] = useState(false);
   const [currentBox, setCurrentBox] = useState<BoxItem | null>(null);
   const [newItemCardId, setNewItemCardId] = useState('');
@@ -60,7 +63,6 @@ export default function BoxList() {
   const boxes = tableQueryResult.data?.data || [];
   const allCards = cardsQuery.data?.data || [];
 
-  // 上传图片
   const handleNewCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -75,7 +77,6 @@ export default function BoxList() {
     setEditForm((f: any) => ({ ...f, coverUrl: base64 }));
   };
 
-  // 新增
   const handleCreate = () => {
     if (!newBox.name || !newBox.price) return alert('请填写名称和价格');
     setCreating(true);
@@ -95,7 +96,6 @@ export default function BoxList() {
     );
   };
 
-  // 编辑
   const openEdit = (box: BoxItem) => {
     setEditForm({ ...box });
     setShowEditModal(true);
@@ -123,7 +123,6 @@ export default function BoxList() {
     );
   };
 
-  // 上下架
   const toggleStatus = (box: BoxItem) => {
     updateBox(
       { resource: 'boxes', id: box.id, values: { isActive: !box.isActive } },
@@ -131,9 +130,9 @@ export default function BoxList() {
     );
   };
 
-  // 删除
-  const handleDelete = (box: BoxItem) => {
-    if (!confirm(`确定要删除盲盒「${box.name}」吗？所有概率配置会一并删除！`)) return;
+  const handleDelete = async (box: BoxItem) => {
+    const ok = await confirm(`确定要删除盲盒「${box.name}」吗？所有概率配置会一并删除！`);
+    if (!ok) return;
     deleteBox(
       { resource: 'boxes', id: box.id },
       {
@@ -143,7 +142,6 @@ export default function BoxList() {
     );
   };
 
-  // ========== 概率配置 ==========
   const openProbModal = (box: BoxItem) => {
     setCurrentBox(JSON.parse(JSON.stringify(box)));
     setNewItemCardId('');
@@ -171,8 +169,10 @@ export default function BoxList() {
     return 'text-red-400';
   };
 
-  const updateItemWeight = (item: any) => {
+  const updateItemWeight = async (item: any) => {
     if (item.weight < 1) item.weight = 1;
+    const ok = await confirm(`确定要将「${item.card.name}」的权重改为 ${item.weight}？这会立即影响真实概率。`);
+    if (!ok) return;
     customRequest(
       {
         url: `/api/admin/boxes/${currentBox!.id}/items`,
@@ -185,8 +185,9 @@ export default function BoxList() {
     );
   };
 
-  const removeItem = (itemId: string) => {
-    if (!confirm('确定要移除该卡牌吗？')) return;
+  const removeItem = async (itemId: string) => {
+    const ok = await confirm('确定要从盲盒中移除该卡牌吗？');
+    if (!ok) return;
     customRequest(
       {
         url: `/api/admin/boxes/${currentBox!.id}/items/${itemId}`,
@@ -214,16 +215,12 @@ export default function BoxList() {
       },
       {
         onSuccess: async () => {
-          // 重新拉取盲盒数据
-          const res: any = await fetch(
-            `${import.meta.env.VITE_API_URL || 'https://luka-1i4g.onrender.com'}/api/admin/boxes`,
-            {
-              headers: {
-                'x-admin-username': JSON.parse(localStorage.getItem('adminInfo') || 'null')?.username || '',
-                'x-admin-password': localStorage.getItem('adminPassword') || '',
-              },
-            }
-          );
+          const res: any = await fetch(`${API_URL}/api/admin/boxes`, {
+            headers: {
+              'x-admin-username': JSON.parse(localStorage.getItem('adminInfo') || 'null')?.username || '',
+              'x-admin-password': localStorage.getItem('adminPassword') || '',
+            },
+          });
           const all = await res.json();
           const updated = all.find((b: any) => b.id === currentBox!.id);
           setCurrentBox(JSON.parse(JSON.stringify(updated)));
@@ -246,7 +243,6 @@ export default function BoxList() {
         <div className="text-sm text-gray-500">共 {boxes.length} 个盲盒</div>
       </div>
 
-      {/* 新增盲盒 */}
       <div className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4 mb-6">
         <div className="text-sm font-bold mb-3">新增盲盒</div>
         <div className="flex flex-wrap gap-2 items-center">
@@ -280,7 +276,6 @@ export default function BoxList() {
         </div>
       </div>
 
-      {/* 盲盒列表 */}
       {tableQueryResult.isLoading ? (
         <div className="text-center text-gray-500 py-20">加载中...</div>
       ) : boxes.length === 0 ? (
@@ -332,7 +327,6 @@ export default function BoxList() {
         </div>
       )}
 
-      {/* 编辑盲盒弹窗 */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-md">
@@ -385,13 +379,11 @@ export default function BoxList() {
         </div>
       )}
 
-      {/* 概率配置弹窗 */}
       {showProbModal && currentBox && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">概率配置 - {currentBox.name}</h3>
 
-            {/* 已有卡牌 */}
             <div className="mb-4">
               <div className="text-sm text-gray-400 mb-2">
                 当前盲盒内卡牌（共 {currentBox.items.length} 种）
@@ -447,7 +439,6 @@ export default function BoxList() {
               )}
             </div>
 
-            {/* 添加卡牌 */}
             <div className="border-t border-[#2a2a2a] pt-4">
               <div className="text-sm text-gray-400 mb-2">添加卡牌到该盲盒</div>
               <div className="flex gap-2">
