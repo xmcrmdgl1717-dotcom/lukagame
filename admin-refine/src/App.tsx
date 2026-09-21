@@ -11,6 +11,8 @@ import { useMenuTree, AdminMenu } from './hooks/useMenuTree';
 import { LoginPage } from './pages/login';
 import { DashboardPage } from './pages/dashboard';
 import UserList from './pages/users';
+import UserGroupList from './pages/user-groups';
+import BankCardList from './pages/bankcards';
 import CardList from './pages/cards';
 import BoxList from './pages/boxes';
 import RechargeList from './pages/recharge';
@@ -27,10 +29,14 @@ import AuditLogList from './pages/audit-logs';
 import SessionList from './pages/sessions';
 import VipLevels from './pages/vip-levels';
 import MenuManage from './pages/menus';
+import GameList from './pages/games';
+import AdList from './pages/ads';
 
 const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   DashboardPage,
   UserList,
+  UserGroupList,
+  BankCardList,
   CardList,
   BoxList,
   RechargeList,
@@ -47,6 +53,8 @@ const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   SessionList,
   VipLevels,
   MenuManage,
+  GameList,
+  AdList,
 };
 
 function buildRoutes(menus: AdminMenu[]): React.ReactElement[] {
@@ -72,21 +80,14 @@ const ProtectedLayout = ({ menus }: { menus: AdminMenu[] }) => (
   </AppLayout>
 );
 
-// 所有页面都必须在 Refine 内部
 function AppContent() {
   const { data: auth, isLoading: authLoading } = useIsAuthenticated();
   const { menus, loading: menuLoading } = useMenuTree();
 
-  // 认证状态还没加载完
   if (authLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-[#0d0d0d] text-gray-400">
-        验证登录状态...
-      </div>
-    );
+    return <div className="flex items-center justify-center h-screen bg-[#0d0d0d] text-gray-400">验证登录状态...</div>;
   }
 
-  // 未登录 → 只渲染登录页
   if (!auth?.authenticated) {
     return (
       <Routes>
@@ -96,13 +97,8 @@ function AppContent() {
     );
   }
 
-  // 已登录但菜单加载中
   if (menuLoading || !menus) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-[#0d0d0d] text-gray-400">
-        加载菜单中...
-      </div>
-    );
+    return <div className="flex items-center justify-center h-screen bg-[#0d0d0d] text-gray-400">加载菜单中...</div>;
   }
 
   const dynamicRoutes = buildRoutes(menus);
