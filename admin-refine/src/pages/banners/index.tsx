@@ -29,8 +29,20 @@ export default function BannerList() {
   const [ed, setEd] = useState<any>({});
   const [saving, setSaving] = useState(false);
 
-  const onNewImg = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (!f) return; setN((b) => ({ ...b, imageUrl: await readAsBase64(f) })); };
-  const onEdImg = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (!f) return; setEd((b: any) => ({ ...b, imageUrl: await readAsBase64(f) })); };
+  // ✅ 修复：先 await，再 setState
+  const onNewImg = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const img = await readAsBase64(f);
+    setN((b) => ({ ...b, imageUrl: img }));
+  };
+
+  const onEdImg = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const img = await readAsBase64(f);
+    setEd((b: any) => ({ ...b, imageUrl: img }));
+  };
 
   const createFn = () => {
     if (!n.imageUrl) return alert('请上传图片');
