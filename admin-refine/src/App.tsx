@@ -12,6 +12,9 @@ import CardList from './pages/cards';
 import BoxList from './pages/boxes';
 import RechargeList from './pages/recharge';
 import OrderList from './pages/orders';
+import BannerList from './pages/banners';
+import TaskList from './pages/tasks';
+import RedeemCodeList from './pages/redeem-codes';
 
 const ProtectedLayout = () => (
   <AppLayout>
@@ -59,9 +62,9 @@ export default function App() {
             <Route path="/boxes" element={<BoxList />} />
             <Route path="/recharge-options" element={<RechargeList />} />
             <Route path="/orders" element={<OrderList />} />
-            <Route path="/banners" element={<Placeholder title="轮播图" />} />
-            <Route path="/tasks" element={<Placeholder title="任务管理" />} />
-            <Route path="/redeem-codes" element={<Placeholder title="兑换码" />} />
+            <Route path="/banners" element={<BannerList />} />
+            <Route path="/tasks" element={<TaskList />} />
+            <Route path="/redeem-codes" element={<RedeemCodeList />} />
             <Route path="/notifications" element={<Placeholder title="通知管理" />} />
             <Route path="/tickets" element={<Placeholder title="客服工单" />} />
             <Route path="/admins" element={<Placeholder title="管理员" />} />
