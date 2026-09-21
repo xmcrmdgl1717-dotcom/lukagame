@@ -4,7 +4,7 @@ import routerProvider from '@refinedev/react-router-v6';
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { dataProvider } from './providers/dataProvider';
 import { authProvider } from './providers/authProvider';
-import { AppLayout } from './components/AppLayout';
+import AppLayout from './components/AppLayout';
 import { LoginPage } from './pages/login';
 import { DashboardPage } from './pages/dashboard';
 
@@ -12,6 +12,15 @@ const ProtectedLayout = () => (
   <AppLayout>
     <Outlet />
   </AppLayout>
+);
+
+const Placeholder: React.FC<{ title: string }> = ({ title }) => (
+  <div>
+    <h1 className="text-2xl font-bold mb-6">{title}</h1>
+    <div className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-8 text-center text-gray-500">
+      模块将在下一阶段实现
+    </div>
+  </div>
 );
 
 export default function App() {
@@ -40,7 +49,6 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedLayout />}>
             <Route index element={<DashboardPage />} />
-            {/* 其他页面暂时为空壳，第二阶段填充 */}
             <Route path="/users" element={<Placeholder title="用户管理" />} />
             <Route path="/cards" element={<Placeholder title="卡牌管理" />} />
             <Route path="/boxes" element={<Placeholder title="盲盒管理" />} />
@@ -59,12 +67,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-
-const Placeholder: React.FC<{ title: string }> = ({ title }) => (
-  <div>
-    <h1 className="text-2xl font-bold mb-6">{title}</h1>
-    <div className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-8 text-center text-gray-500">
-      模块将在下一阶段实现
-    </div>
-  </div>
-);
