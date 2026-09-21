@@ -1,46 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useLogout, useGetIdentity, usePermissions } from '@refinedev/core';
 import { Link, useLocation } from 'react-router-dom';
-
-interface MenuItem {
-  name: string;
-  label: string;
-  icon: string;
-  path?: string;
-  children?: MenuItem[];
-}
-
-const MENU_TREE: MenuItem[] = [
-  { name: 'dashboard', label: '仪表盘', icon: '📊', path: '/' },
-  { name: 'users', label: '用户管理', icon: '👥', path: '/users' },
-  { name: 'cards', label: '卡牌管理', icon: '🃏', path: '/cards' },
-  { name: 'boxes', label: '盲盒管理', icon: '📦', path: '/boxes' },
-  { name: 'recharge', label: '充值套餐', icon: '💰', path: '/recharge-options' },
-  { name: 'orders', label: '订单管理', icon: '📄', path: '/orders' },
-  { name: 'banners', label: '轮播图', icon: '🖼️', path: '/banners' },
-  { name: 'tasks', label: '任务管理', icon: '🎯', path: '/tasks' },
-  { name: 'redeem', label: '兑换码', icon: '🎁', path: '/redeem-codes' },
-  { name: 'notifications', label: '通知管理', icon: '🔔', path: '/notifications' },
-  { name: 'tickets', label: '客服工单', icon: '🎧', path: '/tickets' },
-  {
-    name: 'admin-group',
-    label: '管理员',
-    icon: '🔑',
-    children: [
-      { name: 'admins', label: '管理员列表', icon: '👤', path: '/admins' },
-      { name: 'roles', label: '角色管理', icon: '🎭', path: '/admins/roles' },
-      { name: 'permissions', label: '权限说明', icon: '📖', path: '/admins/permissions' },
-      { name: 'audit-logs', label: '操作日志', icon: '📋', path: '/admins/audit-logs' },
-      { name: 'sessions', label: '会话管理', icon: '💻', path: '/admins/sessions' },
-    ],
-  },
-];
+import type { AdminMenu } from '../hooks/useMenuTree';
 
 interface AppLayoutProps {
+  menus: AdminMenu[];
   children: React.ReactNode;
 }
 
-export default function AppLayout({ children }: AppLayoutProps) {
+export default function AppLayout({ menus, children }: AppLayoutProps) {
   const { data: identity } = useGetIdentity<any>();
   const { data: permissions } = usePermissions<string[]>();
   const { mutate: logout } = useLogout();
@@ -49,9 +17,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [theme, setTheme] = useState<'dark' | 'light'>(
     (localStorage.getItem('theme') as 'dark' | 'light') || 'dark'
   );
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    'admin-group': true,
-  });
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (theme === 'light') document.body.classList.add('light-mode');
@@ -60,21 +26,31 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }, [theme]);
 
   const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
-  const toggleGroup = (name: string) =>
-    setExpandedGroups((g) => ({ ...g, [name]: !g[name] }));
+  const toggleGroup = (id: string) => setExpandedGroups((g) => ({ ...g, [id]: !g[id] }));
 
-  const hasPermission = (menuName: string) => {
+  // 权限过滤
+  const hasPermission = (perm: string) => {
+    if (!perm) return true;
     if (!permissions) return false;
-    if (menuName === 'dashboard') return true;
-    return permissions.some((p) => p.startsWith(menuName + '.'));
+    // super 拥有全部
+    return permissions.includes(perm) || permissions.length > 40;
   };
 
-  const visibleMenus = MENU_TREE.filter((item) => {
-    if (item.children) {
-      return item.children.some((c) => hasPermission(c.name));
-    }
-    return hasPermission(item.name);
-  });
+  // 递归过滤菜单
+  const filterMenus = (list: AdminMenu[]): AdminMenu[] => {
+    return list
+      .filter((m) => m.isActive && m.isVisible)
+      .map((m) => ({
+        ...m,
+        children: m.children ? filterMenus(m.children) : [],
+      }))
+      .filter((m) => {
+        if (m.type === 'DIRECTORY') return (m.children?.length || 0) > 0;
+        return hasPermission(m.permission);
+      });
+  };
+
+  const visibleMenus = filterMenus(menus || []);
 
   const isDark = theme === 'dark';
   const bgMain = isDark ? 'bg-[#0d0d0d]' : 'bg-[#f5f6f8]';
@@ -83,10 +59,55 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const textPrimary = isDark ? 'text-white' : 'text-gray-900';
   const textSecondary = isDark ? 'text-gray-400' : 'text-gray-500';
 
-  const isMenuActive = (item: MenuItem) => {
-    if (!item.path) return false;
-    if (item.path === '/') return location.pathname === '/';
-    return location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+  const isMenuActive = (path: string) => {
+    if (!path) return false;
+    if (path === '/') return location.pathname === '/';
+    return location.pathname === path || location.pathname.startsWith(path + '/');
+  };
+
+  const renderMenuItem = (item: AdminMenu) => {
+    if (item.type === 'DIRECTORY' && item.children?.length) {
+      const expanded = expandedGroups[item.id] ?? true;
+      const hasActiveChild = item.children.some((c) => isMenuActive(c.path));
+      return (
+        <div key={item.id} className="mb-1">
+          <button
+            onClick={() => toggleGroup(item.id)}
+            className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition ${
+              hasActiveChild
+                ? 'bg-red-600/20 text-red-400 font-bold'
+                : `${textSecondary} hover:bg-red-600/10`
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-base">{item.icon}</span>
+              <span>{item.title}</span>
+            </div>
+            <span className="text-xs">{expanded ? '▾' : '▸'}</span>
+          </button>
+          {expanded && (
+            <div className="mt-1 ml-4 space-y-1">
+              {item.children.map((child) => renderMenuItem(child))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // MENU
+    const active = isMenuActive(item.path);
+    return (
+      <Link
+        key={item.id}
+        to={item.path}
+        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm mb-1 transition ${
+          active ? 'bg-red-600 text-white font-bold' : `${textSecondary} hover:bg-red-600/10`
+        }`}
+      >
+        <span className="text-base">{item.icon || '•'}</span>
+        <span>{item.title}</span>
+      </Link>
+    );
   };
 
   return (
@@ -100,69 +121,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-2">
-          {visibleMenus.map((item) => {
-            if (item.children) {
-              const expanded = expandedGroups[item.name];
-              const hasActiveChild = item.children.some((c) => isMenuActive(c));
-              return (
-                <div key={item.name} className="mb-1">
-                  <button
-                    onClick={() => toggleGroup(item.name)}
-                    className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm transition ${
-                      hasActiveChild
-                        ? 'bg-red-600/20 text-red-400 font-bold'
-                        : `${textSecondary} hover:bg-red-600/10`
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-base">{item.icon}</span>
-                      <span>{item.label}</span>
-                    </div>
-                    <span className="text-xs">{expanded ? '▾' : '▸'}</span>
-                  </button>
-                  {expanded && (
-                    <div className="mt-1 ml-4 space-y-1">
-                      {item.children
-                        .filter((c) => hasPermission(c.name))
-                        .map((child) => {
-                          const active = isMenuActive(child);
-                          return (
-                            <Link
-                              key={child.name}
-                              to={child.path!}
-                              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition ${
-                                active
-                                  ? 'bg-red-600 text-white font-bold'
-                                  : `${textSecondary} hover:bg-red-600/10`
-                              }`}
-                            >
-                              <span>{child.icon}</span>
-                              <span>{child.label}</span>
-                            </Link>
-                          );
-                        })}
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            const active = isMenuActive(item);
-            return (
-              <Link
-                key={item.name}
-                to={item.path!}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm mb-1 transition ${
-                  active
-                    ? 'bg-red-600 text-white font-bold'
-                    : `${textSecondary} hover:bg-red-600/10`
-                }`}
-              >
-                <span className="text-base">{item.icon}</span>
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+          {visibleMenus.length === 0 ? (
+            <div className={`text-center ${textSecondary} text-xs py-10`}>没有可访问的菜单</div>
+          ) : (
+            visibleMenus.map((item) => renderMenuItem(item))
+          )}
         </nav>
 
         <div className={`p-2 border-t ${borderColor} flex gap-2`}>
