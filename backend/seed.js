@@ -2,7 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  // ================= 系统角色 =================
+  // ================= 权限列表 =================
   const ALL_PERM = [
     'users.view','users.edit','users.delete','users.vip',
     'groups.view','groups.edit',
@@ -35,7 +35,7 @@ async function main() {
     create: { name: 'super', displayName: '超级管理员', description: '拥有全部权限', permissions: ALL_PERM, isSystem: true },
   });
 
-  // ================= 默认管理员 =================
+  // ================= 管理员 =================
   const superRole = await prisma.role.findUnique({ where: { name: 'super' } });
   await prisma.admin.upsert({
     where: { username: 'admin' },
@@ -57,11 +57,7 @@ async function main() {
     { level: 9, name: 'VIP9', sortOrder: 10, rechargeAmount: 300000000, consumeAmount: 900000000 },
   ];
   for (const v of vipLevels) {
-    await prisma.vipLevel.upsert({
-      where: { level: v.level },
-      update: {},
-      create: v,
-    });
+    await prisma.vipLevel.upsert({ where: { level: v.level }, update: {}, create: v });
   }
 
   // ================= 用户分组 =================
