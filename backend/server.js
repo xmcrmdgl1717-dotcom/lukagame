@@ -1646,4 +1646,52 @@ async function syncMenus() {
     { id: 'menu-report-vip', parentId: 'menu-report-group', title: 'VIP分布报表', type: 'MENU', icon: '👑', path: '/reports/vip-distribution', component: 'ReportVipDistribution', permission: 'reports.view', sortOrder: 6 },
     { id: 'menu-ad-group', parentId: null, title: '广告管理', type: 'DIRECTORY', icon: '📣', path: '', component: '', permission: '', sortOrder: 6 },
     { id: 'menu-ad-channels', parentId: 'menu-ad-group', title: '投放渠道', type: 'MENU', icon: '📡', path: '/ad-channels', component: 'AdChannelList', permission: 'adchannels.view', sortOrder: 1 },
-    { id: 'menu-ad-campaigns', parentId: 'menu-ad-group', title: '投放活动', type: 'MENU', icon: '📢', path: '/ad-campaign
+    { id: 'menu-ad-campaigns', parentId: 'menu-ad-group', title: '投放活动', type: 'MENU', icon: '📢', path: '/ad-campaigns', component: 'AdCampaignList', permission: 'adcampaigns.view', sortOrder: 2 },
+    { id: 'menu-kols', parentId: 'menu-ad-group', title: 'KOL/博主管理', type: 'MENU', icon: '👤', path: '/kols', component: 'KolList', permission: 'kols.view', sortOrder: 3 },
+    { id: 'menu-ad-reports', parentId: 'menu-ad-group', title: '广告报表', type: 'MENU', icon: '📊', path: '/ad-reports', component: 'AdReport', permission: 'adreports.view', sortOrder: 4 },
+
+    { id: 'menu-notification-group', parentId: null, title: '通知管理', type: 'DIRECTORY', icon: '🔔', path: '', component: '', permission: '', sortOrder: 7 },
+    { id: 'menu-notifications', parentId: 'menu-notification-group', title: '通知列表', type: 'MENU', icon: '🔔', path: '/notifications', component: 'NotificationList', permission: 'notifications.view', sortOrder: 1 },
+    { id: 'menu-banners', parentId: 'menu-notification-group', title: '轮播图', type: 'MENU', icon: '🖼️', path: '/banners', component: 'BannerList', permission: 'banners.view', sortOrder: 2 },
+    { id: 'menu-popups', parentId: 'menu-notification-group', title: '弹窗管理', type: 'MENU', icon: '💬', path: '/popups', component: 'PopupList', permission: 'popups.view', sortOrder: 3 },
+    { id: 'menu-articles', parentId: 'menu-notification-group', title: '文章管理', type: 'MENU', icon: '📄', path: '/articles', component: 'ArticleList', permission: 'articles.view', sortOrder: 4 },
+    { id: 'menu-ads', parentId: 'menu-notification-group', title: '站内广告', type: 'MENU', icon: '📺', path: '/ads', component: 'AdList', permission: 'ads.view', sortOrder: 5 },
+
+    { id: 'menu-tasks', parentId: null, title: '任务管理', type: 'MENU', icon: '🎯', path: '/tasks', component: 'TaskList', permission: 'tasks.view', sortOrder: 8 },
+    { id: 'menu-redeem', parentId: null, title: '兑换码', type: 'MENU', icon: '🎁', path: '/redeem-codes', component: 'RedeemCodeList', permission: 'redeem.view', sortOrder: 9 },
+    { id: 'menu-tickets', parentId: null, title: '客服工单', type: 'MENU', icon: '🎧', path: '/tickets', component: 'TicketList', permission: 'tickets.view', sortOrder: 10 },
+
+    { id: 'menu-system-group', parentId: null, title: '系统管理', type: 'DIRECTORY', icon: '⚙️', path: '', component: '', permission: '', sortOrder: 99 },
+    { id: 'menu-admins', parentId: 'menu-system-group', title: '管理员列表', type: 'MENU', icon: '👤', path: '/admins', component: 'AdminList', permission: 'admins.view', sortOrder: 1 },
+    { id: 'menu-roles', parentId: 'menu-system-group', title: '角色管理', type: 'MENU', icon: '🎭', path: '/admins/roles', component: 'RoleList', permission: 'roles.view', sortOrder: 2 },
+    { id: 'menu-permissions', parentId: 'menu-system-group', title: '权限说明', type: 'MENU', icon: '📖', path: '/admins/permissions', component: 'PermissionList', permission: '', sortOrder: 3 },
+    { id: 'menu-menus', parentId: 'menu-system-group', title: '菜单管理', type: 'MENU', icon: '🧩', path: '/admins/menus', component: 'MenuManage', permission: 'menus.edit', sortOrder: 4 },
+    { id: 'menu-languages', parentId: 'menu-system-group', title: '语言列表', type: 'MENU', icon: '🌐', path: '/system/languages', component: 'LanguageList', permission: 'languages.view', sortOrder: 5 },
+    { id: 'menu-translations', parentId: 'menu-system-group', title: '翻译词条', type: 'MENU', icon: '📝', path: '/system/translations', component: 'TranslationList', permission: 'languages.view', sortOrder: 6 },
+    { id: 'menu-audit-logs', parentId: 'menu-system-group', title: '操作日志', type: 'MENU', icon: '📝', path: '/admins/audit-logs', component: 'AuditLogList', permission: 'audit.view', sortOrder: 7 },
+    { id: 'menu-sessions', parentId: 'menu-system-group', title: '会话管理', type: 'MENU', icon: '💻', path: '/admins/sessions', component: 'SessionList', permission: 'audit.view', sortOrder: 8 },
+  ];
+
+  let created = 0, updated = 0;
+  for (const m of menus) {
+    const existing = await prisma.adminMenu.findUnique({ where: { id: m.id } });
+    await prisma.adminMenu.upsert({
+      where: { id: m.id },
+      update: { title: m.title, icon: m.icon, path: m.path, component: m.component, permission: m.permission, sortOrder: m.sortOrder, parentId: m.parentId },
+      create: m,
+    });
+    if (existing) updated++; else created++;
+  }
+  console.log(`✅ 菜单同步完成：新增 ${created} 条，更新 ${updated} 条`);
+}
+
+// ================= 服务启动 =================
+const PORT = process.env.PORT || 3001;
+
+async function bootstrap() {
+  await migrateRoles();
+  await syncMenus();
+  app.listen(PORT, '0.0.0.0', () => console.log(`🚀 后端服务器运行在 http://localhost:${PORT}`));
+}
+
+bootstrap().catch(e => { console.error('启动失败:', e); process.exit(1); });
