@@ -18,6 +18,7 @@ import Articles from './pages/Articles';
 import ArticleDetail from './pages/ArticleDetail';
 import StaticPage from './pages/StaticPage';
 import TransactionLog from './pages/TransactionLog';
+import VipCenter from './pages/VipCenter';
 import LoginModal from './components/LoginModal';
 import RechargeModal from './components/RechargeModal';
 
@@ -33,26 +34,19 @@ function AppInner() {
   const [refreshing, setRefreshing] = useState(false);
   const { setUser, setBoxes, user } = useStore();
 
-  useEffect(() => {
-    axios.get(`${API_URL}/api/boxes`).then(res => setBoxes(res.data)).catch(() => {});
-  }, [setBoxes]);
+  useEffect(() => { axios.get(`${API_URL}/api/boxes`).then(res => setBoxes(res.data)).catch(() => {}); }, [setBoxes]);
 
-  // 刷新后自动用持久化用户拉最新数据
   useEffect(() => {
     if (!user) return;
     axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' })
-      .then((res) => { if (res.data && res.data.id) setUser(res.data); })
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      .then((res) => { if (res.data && res.data.id) setUser(res.data); }).catch(() => {});
+    // eslint-disable-next-line
   }, []);
 
   useEffect(() => {
     if (!user) { setUnreadCount(0); return; }
     const fetchUnread = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/notifications/${user.id}/unread-count`);
-        setUnreadCount(res.data.unread);
-      } catch (e) {}
+      try { const res = await axios.get(`${API_URL}/api/notifications/${user.id}/unread-count`); setUnreadCount(res.data.unread); } catch (e) {}
     };
     fetchUnread();
     const timer = setInterval(fetchUnread, 30000);
@@ -65,7 +59,6 @@ function AppInner() {
   const goPage = (page) => { setCurrentPage(page); setCurrentGame(null); };
   const backFromPage = () => setCurrentPage(null);
 
-  // 刷新用户余额
   const handleRefresh = async () => {
     if (!user) return;
     setRefreshing(true);
@@ -73,10 +66,7 @@ function AppInner() {
       const res = await axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' });
       if (res.data && res.data.id) setUser(res.data);
     } catch (e) {}
-    finally {
-      // 至少显示 300ms，让用户看到旋转效果
-      setTimeout(() => setRefreshing(false), 300);
-    }
+    finally { setTimeout(() => setRefreshing(false), 300); }
   };
 
   const renderContent = () => {
@@ -86,10 +76,9 @@ function AppInner() {
       if (currentPage.type === 'articles-list') return <Articles onOpenArticle={(slug) => goPage({ type: 'article', slug })} onBack={backFromPage} />;
       if (currentPage.type === 'card-order-submit') return <CardOrderSubmit onBack={backFromPage} />;
       if (currentPage.type === 'transactions') return <TransactionLog onBack={backFromPage} />;
+      if (currentPage.type === 'vip') return <VipCenter onBack={backFromPage} />;
     }
-
     if (currentGame) return <GameDetail gameId={currentGame.id} onBack={handleBackFromGame} />;
-
     if (currentTab === 'home') return <Home onShowLogin={() => setShowLogin(true)} onGoGame={handleGoGame} />;
     if (currentTab === 'activity') return <Activity />;
     if (currentTab === 'inventory') return <Inventory onGoSubmit={() => goPage({ type: 'card-order-submit' })} />;
@@ -104,6 +93,7 @@ function AppInner() {
           onGoNotifications={() => setCurrentTab('notifications')}
           onGoArticles={() => goPage({ type: 'articles-list' })}
           onGoStatic={(slug) => goPage({ type: 'static', slug })}
+          onGoVip={() => goPage({ type: 'vip' })}
         />
       );
     }
@@ -114,12 +104,10 @@ function AppInner() {
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-[#0a0a0a] text-white pb-20 relative shadow-2xl overflow-hidden">
-      {/* 顶部栏 */}
       <div className="flex justify-between items-center px-3 py-3 bg-[#140a0a] border-b border-[#332222] gap-2">
         <div className="text-xl font-black italic text-red-500 tracking-wider flex-shrink-0">LUKA!</div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <LanguageSwitcher />
-
           {user && (
             <button onClick={() => setCurrentTab('notifications')} className="relative flex-shrink-0">
               <span className="text-lg">🔔</span>
@@ -130,31 +118,12 @@ function AppInner() {
               )}
             </button>
           )}
-
           {!user ? (
-            <button
-              onClick={() => setShowLogin(true)}
-              className="text-[11px] text-gray-400 border border-gray-600 px-2.5 py-1 rounded-full hover:text-white hover:border-white transition whitespace-nowrap"
-            >
-              Sign In
-            </button>
+            <button onClick={() => setShowLogin(true)} className="text-[11px] text-gray-400 border border-gray-600 px-2.5 py-1 rounded-full hover:text-white hover:border-white transition whitespace-nowrap">Sign In</button>
           ) : (
             <div className="flex items-center gap-1">
-              {/* 余额按钮（点击进账变明细） */}
-              <button
-                onClick={() => goPage({ type: 'transactions' })}
-                className="text-[11px] text-yellow-500 font-bold bg-[#2a1414] px-2 py-1 rounded-full border border-yellow-900/50 whitespace-nowrap hover:border-yellow-500 transition"
-              >
-                💰 {user.coins.toLocaleString()}
-              </button>
-
-              {/* 刷新按钮 */}
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-[11px] w-7 h-7 rounded-full flex items-center justify-center shadow-md transition"
-                title="刷新余额"
-              >
+              <button onClick={() => goPage({ type: 'transactions' })} className="text-[11px] text-yellow-500 font-bold bg-[#2a1414] px-2 py-1 rounded-full border border-yellow-900/50 whitespace-nowrap hover:border-yellow-500 transition">💰 {user.coins.toLocaleString()}</button>
+              <button onClick={handleRefresh} disabled={refreshing} className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-[11px] w-7 h-7 rounded-full flex items-center justify-center shadow-md transition" title="刷新余额">
                 <span className={refreshing ? 'animate-spin' : ''}>🔄</span>
               </button>
             </div>
@@ -167,18 +136,7 @@ function AppInner() {
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} onLoginSuccess={handleLoginSuccess} />}
       {showRecharge && <RechargeModal onClose={() => setShowRecharge(false)} />}
 
-      <BottomNav
-        currentTab={currentTab}
-        setCurrentTab={(t) => {
-          setCurrentGame(null);
-          setCurrentPage(null);
-          setCurrentTab(t);
-        }}
-        onShowRecharge={() => {
-          if (!user) return setShowLogin(true);
-          setShowRecharge(true);
-        }}
-      />
+      <BottomNav currentTab={currentTab} setCurrentTab={(t) => { setCurrentGame(null); setCurrentPage(null); setCurrentTab(t); }} onShowRecharge={() => { if (!user) return setShowLogin(true); setShowRecharge(true); }} />
 
       <Popup currentPath={popupPath} />
     </div>
@@ -186,9 +144,5 @@ function AppInner() {
 }
 
 export default function App() {
-  return (
-    <I18nProvider>
-      <AppInner />
-    </I18nProvider>
-  );
+  return (<I18nProvider><AppInner /></I18nProvider>);
 }
