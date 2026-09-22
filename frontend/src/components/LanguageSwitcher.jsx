@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useI18n } from '../i18n';
+import { useI18n } from '../i18n/index.jsx';
 
 export default function LanguageSwitcher() {
   const { lang, languages, changeLang } = useI18n();
   const [open, setOpen] = useState(false);
 
+  // 只有一个语言时不显示
   if (!languages || languages.length <= 1) return null;
 
   const current = languages.find((l) => l.code === lang) || languages[0];
@@ -13,10 +14,9 @@ export default function LanguageSwitcher() {
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="text-xs text-gray-400 border border-gray-600 px-2 py-1 rounded-full hover:text-white hover:border-white transition flex items-center gap-1"
+        className="text-[11px] text-gray-400 border border-gray-600 px-2 py-1 rounded-full hover:text-white hover:border-white transition flex items-center gap-1"
       >
         <span>{current.flag || '🌐'}</span>
-        <span>{current.code}</span>
       </button>
 
       {open && (
