@@ -19,6 +19,7 @@ import ArticleDetail from './pages/ArticleDetail';
 import StaticPage from './pages/StaticPage';
 import TransactionLog from './pages/TransactionLog';
 import VipCenter from './pages/VipCenter';
+import Leaderboard from './pages/Leaderboard'; // 👈 新增
 import LoginModal from './components/LoginModal';
 import RechargeModal from './components/RechargeModal';
 
@@ -77,9 +78,10 @@ function AppInner() {
       if (currentPage.type === 'card-order-submit') return <CardOrderSubmit onBack={backFromPage} />;
       if (currentPage.type === 'transactions') return <TransactionLog onBack={backFromPage} />;
       if (currentPage.type === 'vip') return <VipCenter onBack={backFromPage} />;
+      if (currentPage.type === 'leaderboard') return <Leaderboard onBack={backFromPage} />; // 👈 新增路由
     }
     if (currentGame) return <GameDetail gameId={currentGame.id} onBack={handleBackFromGame} />;
-    if (currentTab === 'home') return <Home onShowLogin={() => setShowLogin(true)} onGoGame={handleGoGame} />;
+    if (currentTab === 'home') return <Home onShowLogin={() => setShowLogin(true)} onGoGame={handleGoGame} onGoLeaderboard={() => goPage({ type: 'leaderboard' })} />; // 👈 传递导航函数
     if (currentTab === 'activity') return <Activity />;
     if (currentTab === 'inventory') return <Inventory onGoSubmit={() => goPage({ type: 'card-order-submit' })} />;
     if (currentTab === 'orders') return <Orders />;
