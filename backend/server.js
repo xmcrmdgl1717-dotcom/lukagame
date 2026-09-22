@@ -125,101 +125,6 @@ const SYSTEM_ROLES = [
   { name: 'support', displayName: '客服专员', description: '处理用户问题和工单', permissions: ['users.view', 'tickets.view', 'tickets.reply', 'tickets.close', 'cardorders.view', 'cardorders.process', 'notifications.view', 'notifications.create', 'orders.view'].join(','), isSystem: true },
 ];
 
-// ================= 临时：初始化多语言数据 =================
-app.get('/api/setup-i18n', async (req, res) => {
-  try {
-    const languages = [
-      { code: 'zh-CN', name: '简体中文', flag: '🇨🇳', isDefault: true, sortOrder: 1 },
-      { code: 'en-US', name: 'English', flag: '🇺🇸', isDefault: false, sortOrder: 2 },
-      { code: 'es-ES', name: 'Español', flag: '🇪🇸', isDefault: false, sortOrder: 3 },
-    ];
-    for (const l of languages) {
-      await prisma.language.upsert({
-        where: { code: l.code },
-        update: { name: l.name, flag: l.flag, sortOrder: l.sortOrder },
-        create: { code: l.code, name: l.name, flag: l.flag, isDefault: l.isDefault, sortOrder: l.sortOrder },
-      });
-    }
-
-    const translations = [
-      { key: 'nav.home', namespace: 'nav', t: { 'zh-CN': '首页', 'en-US': 'Home', 'es-ES': 'Inicio' } },
-      { key: 'nav.activity', namespace: 'nav', t: { 'zh-CN': '活动', 'en-US': 'Activity', 'es-ES': 'Actividad' } },
-      { key: 'nav.recharge', namespace: 'nav', t: { 'zh-CN': '充值', 'en-US': 'Recharge', 'es-ES': 'Recargar' } },
-      { key: 'nav.inventory', namespace: 'nav', t: { 'zh-CN': '存货', 'en-US': 'Inventory', 'es-ES': 'Inventario' } },
-      { key: 'nav.profile', namespace: 'nav', t: { 'zh-CN': '我的', 'en-US': 'Profile', 'es-ES': 'Cuenta' } },
-      { key: 'common.submit', namespace: 'common', t: { 'zh-CN': '提交', 'en-US': 'Submit', 'es-ES': 'Enviar' } },
-      { key: 'common.cancel', namespace: 'common', t: { 'zh-CN': '取消', 'en-US': 'Cancel', 'es-ES': 'Cancelar' } },
-      { key: 'common.confirm', namespace: 'common', t: { 'zh-CN': '确认', 'en-US': 'Confirm', 'es-ES': 'Confirmar' } },
-      { key: 'common.close', namespace: 'common', t: { 'zh-CN': '关闭', 'en-US': 'Close', 'es-ES': 'Cerrar' } },
-      { key: 'auth.login', namespace: 'auth', t: { 'zh-CN': '登录', 'en-US': 'Sign In', 'es-ES': 'Iniciar sesión' } },
-      { key: 'auth.register', namespace: 'auth', t: { 'zh-CN': '注册', 'en-US': 'Sign Up', 'es-ES': 'Registrarse' } },
-      { key: 'auth.logout', namespace: 'auth', t: { 'zh-CN': '退出登录', 'en-US': 'Logout', 'es-ES': 'Cerrar sesión' } },
-      { key: 'auth.username', namespace: 'auth', t: { 'zh-CN': '用户名', 'en-US': 'Username', 'es-ES': 'Usuario' } },
-      { key: 'auth.password', namespace: 'auth', t: { 'zh-CN': '密码', 'en-US': 'Password', 'es-ES': 'Contraseña' } },
-      { key: 'home.games', namespace: 'home', t: { 'zh-CN': '游戏专区', 'en-US': 'Game Zone', 'es-ES': 'Zona de juegos' } },
-      { key: 'home.featured', namespace: 'home', t: { 'zh-CN': '推荐盲盒', 'en-US': 'Featured Packs', 'es-ES': 'Paquetes destacados' } },
-      { key: 'home.leaderboard', namespace: 'home', t: { 'zh-CN': '一周消费排行榜', 'en-US': 'Weekly Leaderboard', 'es-ES': 'Ranking semanal' } },
-      { key: 'home.open_box', namespace: 'home', t: { 'zh-CN': '开箱', 'en-US': 'Open', 'es-ES': 'Abrir' } },
-      { key: 'home.enter', namespace: 'home', t: { 'zh-CN': '进入抽奖', 'en-US': 'Enter', 'es-ES': 'Entrar' } },
-      { key: 'draw.title', namespace: 'draw', t: { 'zh-CN': '抽奖', 'en-US': 'Draw', 'es-ES': 'Sortear' } },
-      { key: 'draw.price', namespace: 'draw', t: { 'zh-CN': '单价', 'en-US': 'Price', 'es-ES': 'Precio' } },
-      { key: 'draw.count', namespace: 'draw', t: { 'zh-CN': '抽奖次数', 'en-US': 'Draw Count', 'es-ES': 'Cantidad' } },
-      { key: 'draw.total', namespace: 'draw', t: { 'zh-CN': '总计', 'en-US': 'Total', 'es-ES': 'Total' } },
-      { key: 'draw.result', namespace: 'draw', t: { 'zh-CN': '抽卡结果', 'en-US': 'Draw Results', 'es-ES': 'Resultados' } },
-      { key: 'profile.orders', namespace: 'profile', t: { 'zh-CN': '我的订单', 'en-US': 'My Orders', 'es-ES': 'Mis pedidos' } },
-      { key: 'profile.inventory', namespace: 'profile', t: { 'zh-CN': '我的库存', 'en-US': 'My Inventory', 'es-ES': 'Mi inventario' } },
-      { key: 'profile.notifications', namespace: 'profile', t: { 'zh-CN': '消息中心', 'en-US': 'Notifications', 'es-ES': 'Notificaciones' } },
-      { key: 'profile.redeem', namespace: 'profile', t: { 'zh-CN': '兑换码', 'en-US': 'Redeem Code', 'es-ES': 'Código de canje' } },
-      { key: 'profile.support', namespace: 'profile', t: { 'zh-CN': '联系客服', 'en-US': 'Contact Support', 'es-ES': 'Contactar soporte' } },
-      { key: 'profile.articles', namespace: 'profile', t: { 'zh-CN': '新闻资讯', 'en-US': 'News', 'es-ES': 'Noticias' } },
-      { key: 'profile.about', namespace: 'profile', t: { 'zh-CN': '关于我们', 'en-US': 'About Us', 'es-ES': 'Sobre nosotros' } },
-      { key: 'profile.terms', namespace: 'profile', t: { 'zh-CN': '用户协议', 'en-US': 'Terms', 'es-ES': 'Términos' } },
-      { key: 'profile.privacy', namespace: 'profile', t: { 'zh-CN': '隐私政策', 'en-US': 'Privacy Policy', 'es-ES': 'Privacidad' } },
-      { key: 'profile.contact', namespace: 'profile', t: { 'zh-CN': '联系我们', 'en-US': 'Contact Us', 'es-ES': 'Contáctenos' } },
-      { key: 'profile.vip', namespace: 'profile', t: { 'zh-CN': 'VIP 等级', 'en-US': 'VIP Level', 'es-ES': 'Nivel VIP' } },
-      { key: 'profile.vipBenefits', namespace: 'profile', t: { 'zh-CN': 'VIP 特权', 'en-US': 'VIP Benefits', 'es-ES': 'Beneficios VIP' } },
-      { key: 'vip.currentLevel', namespace: 'vip', t: { 'zh-CN': '当前等级', 'en-US': 'Current Level', 'es-ES': 'Nivel actual' } },
-      { key: 'vip.nextLevel', namespace: 'vip', t: { 'zh-CN': '下一等级', 'en-US': 'Next Level', 'es-ES': 'Siguiente nivel' } },
-      { key: 'vip.progress', namespace: 'vip', t: { 'zh-CN': '升级进度', 'en-US': 'Progress', 'es-ES': 'Progreso' } },
-      { key: 'vip.rechargeRequired', namespace: 'vip', t: { 'zh-CN': '还需充值', 'en-US': 'Recharge required', 'es-ES': 'Recarga necesaria' } },
-      { key: 'vip.consumeRequired', namespace: 'vip', t: { 'zh-CN': '还需消费', 'en-US': 'Consume required', 'es-ES': 'Consumo necesario' } },
-      { key: 'vip.maxLevel', namespace: 'vip', t: { 'zh-CN': '已达最高等级', 'en-US': 'Max Level Reached', 'es-ES': 'Nivel máximo alcanzado' } },
-      { key: 'cardorder.title', namespace: 'cardorder', t: { 'zh-CN': '卡片发货', 'en-US': 'Card Shipping', 'es-ES': 'Envío de tarjetas' } },
-      { key: 'cardorder.submit', namespace: 'cardorder', t: { 'zh-CN': '申请发货', 'en-US': 'Request Shipping', 'es-ES': 'Solicitar envío' } },
-      { key: 'cardorder.receiver', namespace: 'cardorder', t: { 'zh-CN': '收货人姓名', 'en-US': 'Receiver Name', 'es-ES': 'Nombre del destinatario' } },
-      { key: 'cardorder.phone', namespace: 'cardorder', t: { 'zh-CN': '联系电话', 'en-US': 'Phone', 'es-ES': 'Teléfono' } },
-      { key: 'cardorder.address', namespace: 'cardorder', t: { 'zh-CN': '收货地址', 'en-US': 'Address', 'es-ES': 'Dirección' } },
-      { key: 'cardorder.detail', namespace: 'cardorder', t: { 'zh-CN': '订单详情', 'en-US': 'Order Detail', 'es-ES': 'Detalle del pedido' } },
-      { key: 'cardorder.logistics', namespace: 'cardorder', t: { 'zh-CN': '物流信息', 'en-US': 'Logistics', 'es-ES': 'Logística' } },
-      { key: 'status.pending', namespace: 'status', t: { 'zh-CN': '待处理', 'en-US': 'Pending', 'es-ES': 'Pendiente' } },
-      { key: 'status.processing', namespace: 'status', t: { 'zh-CN': '处理中', 'en-US': 'Processing', 'es-ES': 'Procesando' } },
-      { key: 'status.shipped', namespace: 'status', t: { 'zh-CN': '已发货', 'en-US': 'Shipped', 'es-ES': 'Enviado' } },
-      { key: 'status.done', namespace: 'status', t: { 'zh-CN': '已完成', 'en-US': 'Completed', 'es-ES': 'Completado' } },
-      { key: 'status.rejected', namespace: 'status', t: { 'zh-CN': '已拒绝', 'en-US': 'Rejected', 'es-ES': 'Rechazado' } },
-      { key: 'status.paid', namespace: 'status', t: { 'zh-CN': '已支付', 'en-US': 'Paid', 'es-ES': 'Pagado' } },
-      { key: 'activity.tasks', namespace: 'activity', t: { 'zh-CN': '每日任务', 'en-US': 'Daily Tasks', 'es-ES': 'Tareas diarias' } },
-      { key: 'activity.weekly', namespace: 'activity', t: { 'zh-CN': '周榜', 'en-US': 'Weekly', 'es-ES': 'Semanal' } },
-      { key: 'activity.monthly', namespace: 'activity', t: { 'zh-CN': '月榜', 'en-US': 'Monthly', 'es-ES': 'Mensual' } },
-      { key: 'activity.claim', namespace: 'activity', t: { 'zh-CN': '领取', 'en-US': 'Claim', 'es-ES': 'Reclamar' } },
-      { key: 'inventory.empty', namespace: 'inventory', t: { 'zh-CN': '您的库存为空，快去抽卡吧！', 'en-US': 'Your inventory is empty. Go draw!', 'es-ES': 'Inventario vacío. ¡Ve a sortear!' } },
-      { key: 'orders.empty', namespace: 'orders', t: { 'zh-CN': '暂无订单记录', 'en-US': 'No orders yet', 'es-ES': 'Sin pedidos' } },
-      { key: 'articles.all', namespace: 'articles', t: { 'zh-CN': '全部', 'en-US': 'All', 'es-ES': 'Todo' } },
-    ];
-
-    for (const item of translations) {
-      await prisma.translation.upsert({
-        where: { key: item.key },
-        update: { namespace: item.namespace, translations: JSON.stringify(item.t) },
-        create: { key: item.key, namespace: item.namespace, translations: JSON.stringify(item.t) },
-      });
-    }
-    res.json({ success: true, message: '多语言数据已写入', languages: languages.length, translations: translations.length });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-// ================= 临时接口结束 =================
-
 // ================= 用户端 API =================
 
 app.post('/api/login', async (req, res) => {
@@ -392,14 +297,11 @@ async function checkVipUpgrade(userId) {
   for (const lv of levels) {
     if (user.totalRecharge >= lv.rechargeAmount && user.totalConsume >= lv.consumeAmount) {
       if (user.vipLevel !== lv.level) {
-        // VIP 升级奖励（每级送金币）
         const reward = lv.level * 500;
         await prisma.user.update({ where: { id: userId }, data: { vipLevel: lv.level, coins: { increment: reward } } });
-        // 写交易明细
         await prisma.transaction.create({
           data: { userId, type: 'VIP_BONUS', amount: reward, balance: user.coins + reward, refType: 'VIP', refId: String(lv.level), remark: `VIP${lv.level} 升级奖励` }
         });
-        // 发通知
         await prisma.notification.create({
           data: { userId, title: `🎉 恭喜升级到 VIP${lv.level}！`, content: `您已成功升级到 ${lv.name}，获得 ${reward} 金币奖励。继续充值或消费可解锁更多特权！` }
         });
@@ -470,26 +372,44 @@ app.get('/api/orders/:userId', async (req, res) => {
   res.json(await prisma.order.findMany({ where: { userId: req.params.userId }, include: { option: true }, orderBy: { createdAt: 'desc' }, take: 100 }));
 });
 
-app.get('/api/leaderboard/weekly', async (req, res) => {
-  const since = new Date(); since.setDate(since.getDate() - 7);
-  const result = await prisma.drawLog.groupBy({ by: ['userId'], where: { createdAt: { gte: since } }, _sum: { cost: true }, orderBy: { _sum: { cost: 'desc' } }, take: 10 });
+// ================= 排行榜（日榜 / 周榜 / 月榜） =================
+
+// 通用排行榜查询函数
+async function buildLeaderboard(sinceDate, take = 10) {
+  const result = await prisma.drawLog.groupBy({
+    by: ['userId'],
+    where: { createdAt: { gte: sinceDate } },
+    _sum: { cost: true },
+    orderBy: { _sum: { cost: 'desc' } },
+    take,
+  });
   const data = [];
   for (const row of result) {
     const user = await prisma.user.findUnique({ where: { id: row.userId }, select: { username: true, vipLevel: true } });
     data.push({ username: user?.username || '未知', vipLevel: user?.vipLevel || 0, totalCost: row._sum.cost || 0 });
   }
-  res.json(data);
+  return data;
+}
+
+// 日榜：今日 00:00 起
+app.get('/api/leaderboard/daily', async (req, res) => {
+  const since = new Date();
+  since.setHours(0, 0, 0, 0);
+  res.json(await buildLeaderboard(since, 10));
 });
 
+// 周榜：近 7 天
+app.get('/api/leaderboard/weekly', async (req, res) => {
+  const since = new Date();
+  since.setDate(since.getDate() - 7);
+  res.json(await buildLeaderboard(since, 10));
+});
+
+// 月榜：近 30 天
 app.get('/api/leaderboard/monthly', async (req, res) => {
-  const since = new Date(); since.setDate(since.getDate() - 30);
-  const result = await prisma.drawLog.groupBy({ by: ['userId'], where: { createdAt: { gte: since } }, _sum: { cost: true }, orderBy: { _sum: { cost: 'desc' } }, take: 10 });
-  const data = [];
-  for (const row of result) {
-    const user = await prisma.user.findUnique({ where: { id: row.userId }, select: { username: true, vipLevel: true } });
-    data.push({ username: user?.username || '未知', vipLevel: user?.vipLevel || 0, totalCost: row._sum.cost || 0 });
-  }
-  res.json(data);
+  const since = new Date();
+  since.setDate(since.getDate() - 30);
+  res.json(await buildLeaderboard(since, 10));
 });
 
 app.post('/api/redeem', async (req, res) => {
@@ -787,7 +707,6 @@ app.get('/api/admin/reports/ad', requirePermission('adreports.view'), async (req
   const result = [];
 
   for (const c of channels) {
-    // 该渠道带来的用户
     const users = await prisma.user.findMany({
       where: { adSource: c.name, createdAt: { gte: since } },
       select: { id: true, createdAt: true },
@@ -795,7 +714,6 @@ app.get('/api/admin/reports/ad', requirePermission('adreports.view'), async (req
     const userIds = users.map(u => u.id);
     const registerCount = userIds.length;
 
-    // 付费用户
     const paidOrders = userIds.length > 0 ? await prisma.order.findMany({
       where: { userId: { in: userIds }, status: 'PAID' },
       select: { userId: true, amount: true },
@@ -803,7 +721,6 @@ app.get('/api/admin/reports/ad', requirePermission('adreports.view'), async (req
     const paidUserIds = [...new Set(paidOrders.map(o => o.userId))];
     const totalRevenue = paidOrders.reduce((s, o) => s + o.amount, 0);
 
-    // 活动花费（该渠道所有活动的实际花费）
     const totalCost = await prisma.adCampaign.aggregate({
       where: { channelId: c.id },
       _sum: { actualCost: true },
@@ -824,7 +741,6 @@ app.get('/api/admin/reports/ad', requirePermission('adreports.view'), async (req
     });
   }
 
-  // 按渠道/活动汇总
   const campaigns = await prisma.adCampaign.findMany({ include: { channel: true } });
   const campaignResult = [];
   for (const cp of campaigns) {
@@ -1258,12 +1174,13 @@ app.put('/api/admin/orders/:id/paid', requirePermission('orders.refund'), async 
 
 app.get('/api/admin/payment-channels', requirePermission('payments.view'), async (req, res) => { res.json(await prisma.paymentChannel.findMany({ orderBy: { sortOrder: 'asc' } })); });
 app.put('/api/admin/payment-channels/:id', requirePermission('payments.edit'), async (req, res) => {
-  const { displayName, config, isActive, sortOrder } = req.body;
+  const { displayName, config, isActive, sortOrder, iconUrl } = req.body;
   const data = {};
   if (displayName) data.displayName = displayName;
   if (config !== undefined) data.config = config;
   if (isActive !== undefined) data.isActive = isActive;
   if (sortOrder !== undefined) data.sortOrder = parseInt(sortOrder);
+  if (iconUrl !== undefined) data.iconUrl = iconUrl;
   try { res.json({ success: true, channel: await prisma.paymentChannel.update({ where: { id: req.params.id }, data }) }); }
   catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -1649,18 +1566,15 @@ async function syncMenus() {
     { id: 'menu-ad-campaigns', parentId: 'menu-ad-group', title: '投放活动', type: 'MENU', icon: '📢', path: '/ad-campaigns', component: 'AdCampaignList', permission: 'adcampaigns.view', sortOrder: 2 },
     { id: 'menu-kols', parentId: 'menu-ad-group', title: 'KOL/博主管理', type: 'MENU', icon: '👤', path: '/kols', component: 'KolList', permission: 'kols.view', sortOrder: 3 },
     { id: 'menu-ad-reports', parentId: 'menu-ad-group', title: '广告报表', type: 'MENU', icon: '📊', path: '/ad-reports', component: 'AdReport', permission: 'adreports.view', sortOrder: 4 },
-
     { id: 'menu-notification-group', parentId: null, title: '通知管理', type: 'DIRECTORY', icon: '🔔', path: '', component: '', permission: '', sortOrder: 7 },
     { id: 'menu-notifications', parentId: 'menu-notification-group', title: '通知列表', type: 'MENU', icon: '🔔', path: '/notifications', component: 'NotificationList', permission: 'notifications.view', sortOrder: 1 },
     { id: 'menu-banners', parentId: 'menu-notification-group', title: '轮播图', type: 'MENU', icon: '🖼️', path: '/banners', component: 'BannerList', permission: 'banners.view', sortOrder: 2 },
     { id: 'menu-popups', parentId: 'menu-notification-group', title: '弹窗管理', type: 'MENU', icon: '💬', path: '/popups', component: 'PopupList', permission: 'popups.view', sortOrder: 3 },
     { id: 'menu-articles', parentId: 'menu-notification-group', title: '文章管理', type: 'MENU', icon: '📄', path: '/articles', component: 'ArticleList', permission: 'articles.view', sortOrder: 4 },
     { id: 'menu-ads', parentId: 'menu-notification-group', title: '站内广告', type: 'MENU', icon: '📺', path: '/ads', component: 'AdList', permission: 'ads.view', sortOrder: 5 },
-
     { id: 'menu-tasks', parentId: null, title: '任务管理', type: 'MENU', icon: '🎯', path: '/tasks', component: 'TaskList', permission: 'tasks.view', sortOrder: 8 },
     { id: 'menu-redeem', parentId: null, title: '兑换码', type: 'MENU', icon: '🎁', path: '/redeem-codes', component: 'RedeemCodeList', permission: 'redeem.view', sortOrder: 9 },
     { id: 'menu-tickets', parentId: null, title: '客服工单', type: 'MENU', icon: '🎧', path: '/tickets', component: 'TicketList', permission: 'tickets.view', sortOrder: 10 },
-
     { id: 'menu-system-group', parentId: null, title: '系统管理', type: 'DIRECTORY', icon: '⚙️', path: '', component: '', permission: '', sortOrder: 99 },
     { id: 'menu-admins', parentId: 'menu-system-group', title: '管理员列表', type: 'MENU', icon: '👤', path: '/admins', component: 'AdminList', permission: 'admins.view', sortOrder: 1 },
     { id: 'menu-roles', parentId: 'menu-system-group', title: '角色管理', type: 'MENU', icon: '🎭', path: '/admins/roles', component: 'RoleList', permission: 'roles.view', sortOrder: 2 },
