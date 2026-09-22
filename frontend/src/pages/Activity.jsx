@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
+import { useI18n } from '../i18n/index.jsx';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function Activity() {
   const { user, setUser } = useStore();
+  const { t } = useI18n();
   const [tab, setTab] = useState('tasks');
   const [tasks, setTasks] = useState([]);
   const [weekly, setWeekly] = useState([]);
@@ -17,7 +19,7 @@ export default function Activity() {
     try {
       const res = await axios.get(`${API_URL}/api/tasks/${user.id}`);
       setTasks(res.data);
-    } catch (e) { console.error(e); }
+    } catch (e) {}
     setLoading(false);
   };
 
@@ -25,17 +27,14 @@ export default function Activity() {
     try {
       const [w, m] = await Promise.all([
         axios.get(`${API_URL}/api/leaderboard/weekly`),
-        axios.get(`${API_URL}/api/leaderboard/monthly`)
+        axios.get(`${API_URL}/api/leaderboard/monthly`),
       ]);
       setWeekly(w.data);
       setMonthly(m.data);
-    } catch (e) { console.error(e); }
+    } catch (e) {}
   };
 
-  useEffect(() => {
-    fetchTasks();
-    fetchLeaderboards();
-  }, [user]);
+  useEffect(() => { fetchTasks(); fetchLeaderboards(); }, [user]);
 
   const handleClaim = async (taskId) => {
     try {
@@ -49,14 +48,12 @@ export default function Activity() {
 
   return (
     <div className="p-4">
-      {/* Tab 切换 */}
       <div className="flex justify-around bg-[#1c0e0e] rounded-lg p-1 mb-6">
-        <button onClick={() => setTab('tasks')} className={`flex-1 py-2 text-xs font-bold rounded ${tab === 'tasks' ? 'bg-red-600 text-white' : 'text-gray-400'}`}>每日任务</button>
-        <button onClick={() => setTab('weekly')} className={`flex-1 py-2 text-xs font-bold rounded ${tab === 'weekly' ? 'bg-red-600 text-white' : 'text-gray-400'}`}>周榜</button>
-        <button onClick={() => setTab('monthly')} className={`flex-1 py-2 text-xs font-bold rounded ${tab === 'monthly' ? 'bg-red-600 text-white' : 'text-gray-400'}`}>月榜</button>
+        <button onClick={() => setTab('tasks')} className={`flex-1 py-2 text-xs font-bold rounded ${tab === 'tasks' ? 'bg-red-600 text-white' : 'text-gray-400'}`}>{t('activity.tasks', '每日任务')}</button>
+        <button onClick={() => setTab('weekly')} className={`flex-1 py-2 text-xs font-bold rounded ${tab === 'weekly' ? 'bg-red-600 text-white' : 'text-gray-400'}`}>{t('activity.weekly', '周榜')}</button>
+        <button onClick={() => setTab('monthly')} className={`flex-1 py-2 text-xs font-bold rounded ${tab === 'monthly' ? 'bg-red-600 text-white' : 'text-gray-400'}`}>{t('activity.monthly', '月榜')}</button>
       </div>
 
-      {/* 任务 */}
       {tab === 'tasks' && (
         <>
           {!user ? (
@@ -67,29 +64,29 @@ export default function Activity() {
             <div className="text-center text-gray-500 text-sm py-8">暂无任务</div>
           ) : (
             <div className="space-y-3">
-              {tasks.map(t => {
-                const percent = Math.min((t.progress / t.targetCount) * 100, 100);
-                const canClaim = t.progress >= t.targetCount && !t.isClaimed;
+              {tasks.map(t_item => {
+                const percent = Math.min((t_item.progress / t_item.targetCount) * 100, 100);
+                const canClaim = t_item.progress >= t_item.targetCount && !t_item.isClaimed;
                 return (
-                  <div key={t.taskId} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 shadow-lg">
+                  <div key={t_item.taskId} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 shadow-lg">
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <div className="text-sm font-bold text-white">{t.title}</div>
-                        <div className="text-[10px] text-gray-500 mt-1">{t.description}</div>
+                        <div className="text-sm font-bold text-white">{t_item.title}</div>
+                        <div className="text-[10px] text-gray-500 mt-1">{t_item.description}</div>
                       </div>
-                      <div className="text-xs text-yellow-500 font-bold whitespace-nowrap ml-2">+{t.rewardCoins} 🪙</div>
+                      <div className="text-xs text-yellow-500 font-bold whitespace-nowrap ml-2">+{t_item.rewardCoins} 🪙</div>
                     </div>
                     <div className="flex items-center gap-3 mt-3">
                       <div className="flex-1 bg-gray-800 rounded-full h-2 overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-orange-500 to-red-500" style={{ width: `${percent}%` }}></div>
                       </div>
-                      <div className="text-[10px] text-gray-400 whitespace-nowrap">{t.progress}/{t.targetCount}</div>
-                      {t.isClaimed ? (
-                        <span className="text-xs text-gray-500 px-3 py-1">已领取</span>
+                      <div className="text-[10px] text-gray-400 whitespace-nowrap">{t_item.progress}/{t_item.targetCount}</div>
+                      {t_item.isClaimed ? (
+                        <span className="text-xs text-gray-500 px-3 py-1">{t('activity.claimed', '已领取')}</span>
                       ) : canClaim ? (
-                        <button onClick={() => handleClaim(t.taskId)} className="bg-red-600 text-white text-xs px-4 py-1 rounded font-bold">领取</button>
+                        <button onClick={() => handleClaim(t_item.taskId)} className="bg-red-600 text-white text-xs px-4 py-1 rounded font-bold">{t('activity.claim', '领取')}</button>
                       ) : (
-                        <span className="text-xs text-gray-600 px-3 py-1">进行中</span>
+                        <span className="text-xs text-gray-600 px-3 py-1">{t('activity.progress', '进行中')}</span>
                       )}
                     </div>
                   </div>
@@ -100,7 +97,6 @@ export default function Activity() {
         </>
       )}
 
-      {/* 排行榜 */}
       {(tab === 'weekly' || tab === 'monthly') && (
         <div className="space-y-2">
           {(tab === 'weekly' ? weekly : monthly).length === 0 ? (
