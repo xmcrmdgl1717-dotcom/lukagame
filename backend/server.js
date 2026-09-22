@@ -243,6 +243,7 @@ app.post('/api/draw', async (req, res) => {
     const result = await prisma.$transaction(async (tx) => {
       const box = await tx.box.findUnique({ where: { id: boxId }, include: { game: true, items: { include: { card: true } } } });
       const user = await tx.user.findUnique({ where: { id: userId } });
+      if (!user) throw new Error('用户不存在');
       if (box.game && box.game.minVipLevel > 0 && user.vipLevel < box.game.minVipLevel) throw new Error(`需要 VIP${box.game.minVipLevel} 以上`);
       if (box.game && box.game.minCoins > 0 && user.coins < box.game.minCoins) throw new Error(`需要余额 ${box.game.minCoins} 以上`);
       const totalCost = box.price * count;
@@ -289,7 +290,7 @@ async function updateTaskProgress(tx, userId, action, amount) {
   }
 }
 
-// VIP 升级：加奖励 + 发通知
+// VIP 升级
 async function checkVipUpgrade(userId) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return;
@@ -373,8 +374,6 @@ app.get('/api/orders/:userId', async (req, res) => {
 });
 
 // ================= 排行榜（日榜 / 周榜 / 月榜） =================
-
-// 通用排行榜查询函数
 async function buildLeaderboard(sinceDate, take = 10) {
   const result = await prisma.drawLog.groupBy({
     by: ['userId'],
@@ -391,21 +390,18 @@ async function buildLeaderboard(sinceDate, take = 10) {
   return data;
 }
 
-// 日榜：今日 00:00 起
 app.get('/api/leaderboard/daily', async (req, res) => {
   const since = new Date();
   since.setHours(0, 0, 0, 0);
   res.json(await buildLeaderboard(since, 10));
 });
 
-// 周榜：近 7 天
 app.get('/api/leaderboard/weekly', async (req, res) => {
   const since = new Date();
   since.setDate(since.getDate() - 7);
   res.json(await buildLeaderboard(since, 10));
 });
 
-// 月榜：近 30 天
 app.get('/api/leaderboard/monthly', async (req, res) => {
   const since = new Date();
   since.setDate(since.getDate() - 30);
@@ -516,6 +512,99 @@ app.get('/api/user/transactions/:userId', async (req, res) => {
     const total = await prisma.transaction.count({ where });
     const list = await prisma.transaction.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (parseInt(page) - 1) * parseInt(pageSize), take: parseInt(pageSize) });
     res.json({ list, total, page: parseInt(page), pageSize: parseInt(pageSize) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ================= 用户端提现 =================
+const MIN_WITHDRAW_AMOUNT = 10000; // 最低提现金额：100元 = 10000分
+
+// 获取用户的银行卡列表
+app.get('/api/user/bankcards/:userId', async (req, res) => {
+  try {
+    const cards = await prisma.bankCard.findMany({
+      where: { userId: req.params.userId },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }]
+    });
+    res.json(cards);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 提交提现申请（冻结余额）
+app.post('/api/withdrawals', async (req, res) => {
+  const { userId, amount, cardNumber, bankName, holderName } = req.body;
+
+  if (!userId) return res.status(400).json({ error: '请先登录' });
+  const amt = parseInt(amount);
+  if (!amt || amt <= 0) return res.status(400).json({ error: '请输入有效的提现金额' });
+  if (amt < MIN_WITHDRAW_AMOUNT) return res.status(400).json({ error: `最低提现金额为 ¥${(MIN_WITHDRAW_AMOUNT / 100).toFixed(2)}` });
+  if (!cardNumber || !cardNumber.trim()) return res.status(400).json({ error: '请填写银行卡号' });
+  if (!holderName || !holderName.trim()) return res.status(400).json({ error: '请填写持卡人姓名' });
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      if (!user) throw new Error('用户不存在');
+      if (user.coins < amt) throw new Error('余额不足');
+
+      // 查找或创建银行卡
+      let card = await tx.bankCard.findFirst({ where: { userId, cardNumber: cardNumber.trim() } });
+      if (!card) {
+        card = await tx.bankCard.create({
+          data: { userId, cardNumber: cardNumber.trim(), bankName: (bankName || '').trim(), holderName: holderName.trim(), isDefault: false }
+        });
+      }
+
+      // 扣减余额（冻结）
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          coins: { decrement: amt },
+          withdrawalCount: { increment: 1 },
+          withdrawalAmount: { increment: amt }
+        }
+      });
+
+      // 创建提现申请
+      const withdrawal = await tx.withdrawal.create({
+        data: { userId, amount: amt, bankCardId: card.id, status: 'PENDING' }
+      });
+
+      // 写账变明细
+      await tx.transaction.create({
+        data: {
+          userId,
+          type: 'WITHDRAWAL',
+          amount: -amt,
+          balance: user.coins - amt,
+          refType: 'WITHDRAWAL',
+          refId: withdrawal.id,
+          remark: `申请提现 ¥${(amt / 100).toFixed(2)}`
+        }
+      });
+
+      return { success: true, withdrawal };
+    });
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// 获取用户的提现记录
+app.get('/api/user/withdrawals/:userId', async (req, res) => {
+  try {
+    const list = await prisma.withdrawal.findMany({
+      where: { userId: req.params.userId },
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
+    const result = [];
+    for (const w of list) {
+      let card = null;
+      if (w.bankCardId) card = await prisma.bankCard.findUnique({ where: { id: w.bankCardId } });
+      result.push({ ...w, bankCard: card });
+    }
+    res.json(result);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1186,10 +1275,59 @@ app.put('/api/admin/payment-channels/:id', requirePermission('payments.edit'), a
 });
 
 app.get('/api/admin/withdrawals', requirePermission('withdrawals.view'), async (req, res) => { res.json(await prisma.withdrawal.findMany({ orderBy: { createdAt: 'desc' }, take: 200 })); });
+
+// 提现审批：通过 = 只改状态；拒绝 = 退还冻结的余额 + 写账变
 app.put('/api/admin/withdrawals/:id/approve', requirePermission('withdrawals.approve'), async (req, res) => {
   const { approve, remark } = req.body;
-  try { res.json({ success: true, withdrawal: await prisma.withdrawal.update({ where: { id: req.params.id }, data: { status: approve ? 'APPROVED' : 'REJECTED', remark: remark || '', processedAt: new Date() } }) }); }
-  catch (e) { res.status(400).json({ error: e.message }); }
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const w = await tx.withdrawal.findUnique({ where: { id: req.params.id } });
+      if (!w) throw new Error('提现记录不存在');
+      if (w.status !== 'PENDING') throw new Error('该申请已处理');
+
+      // 拒绝 → 退还余额
+      if (!approve) {
+        const user = await tx.user.findUnique({ where: { id: w.userId } });
+        await tx.user.update({
+          where: { id: w.userId },
+          data: {
+            coins: { increment: w.amount },
+            withdrawalCount: { decrement: 1 },
+            withdrawalAmount: { decrement: w.amount }
+          }
+        });
+        await tx.transaction.create({
+          data: {
+            userId: w.userId,
+            type: 'REWARD',
+            amount: w.amount,
+            balance: (user?.coins || 0) + w.amount,
+            refType: 'WITHDRAWAL_REFUND',
+            refId: w.id,
+            remark: `提现被拒绝，退款 ¥${(w.amount / 100).toFixed(2)}`
+          }
+        });
+        // 发个通知
+        await tx.notification.create({
+          data: {
+            userId: w.userId,
+            title: '提现申请被拒绝',
+            content: `您申请的 ¥${(w.amount / 100).toFixed(2)} 提现被拒绝${remark ? `，原因：${remark}` : ''}。金额已退回余额。`
+          }
+        });
+      }
+
+      return await tx.withdrawal.update({
+        where: { id: req.params.id },
+        data: {
+          status: approve ? 'APPROVED' : 'REJECTED',
+          remark: remark || '',
+          processedAt: new Date()
+        }
+      });
+    });
+    res.json({ success: true, withdrawal: result });
+  } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 app.get('/api/admin/transactions', requirePermission('transactions.view'), async (req, res) => {
@@ -1460,7 +1598,7 @@ app.get('/api/admin/audit-logs', requirePermission('audit.view'), async (req, re
   res.json(await prisma.auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, take: 500 }));
 });
 
-// ============ 报表：汇总 / 资金 / 抽奖 / 用户抽奖 / 用户资金 / VIP 分布 ============
+// ============ 报表 ============
 app.get('/api/admin/reports/summary', requirePermission('reports.view'), async (req, res) => {
   const days = parseInt(req.query.days || '7');
   const since = new Date(); since.setDate(since.getDate() - days);
