@@ -5,7 +5,7 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export default function Home({ onShowLogin, onGoGame }) {
+export default function Home({ onShowLogin, onGoGame, onGoLeaderboard }) {
   const { user, updateCoins, setUser } = useStore();
   const { t } = useI18n();
   const [drawing, setDrawing] = useState(false);
@@ -73,9 +73,12 @@ export default function Home({ onShowLogin, onGoGame }) {
 
       {/* 排行榜 */}
       <div className="bg-gradient-to-br from-[#2d1410] to-[#4a1c12] border border-[#6b2a1e] rounded-2xl p-5 shadow-lg">
-        <div className="text-center mb-3">
-          <div className="text-orange-400 font-bold text-sm tracking-widest mb-1">{t('home.leaderboard', '一周消费排行榜')}</div>
-          <div className="text-gray-300 text-[10px]">The more you open, the higher your rank!</div>
+        <div className="flex justify-between items-center mb-3">
+          <div className="text-orange-400 font-bold text-sm tracking-widest">{t('home.leaderboard', '一周消费排行榜')}</div>
+          {/* 👈 新增跳转按钮 */}
+          <button onClick={onGoLeaderboard} className="text-[10px] text-orange-500 hover:text-orange-400 transition underline">
+            查看完整榜单
+          </button>
         </div>
         {leaderboard.length === 0 ? (
           <div className="text-center text-gray-500 text-xs py-4">暂无数据</div>
