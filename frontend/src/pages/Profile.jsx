@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useStore } from '../store';
+import { useI18n } from '../i18n/index.jsx';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications, onGoArticles, onGoStatic }) {
   const { user, setUser } = useStore();
+  const { t } = useI18n();
   const [redeemCode, setRedeemCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   const [ticketTitle, setTicketTitle] = useState('');
@@ -41,54 +43,48 @@ export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications,
 
   return (
     <div className="p-4">
-      {/* 用户卡片 */}
       <div className="bg-gradient-to-br from-[#1c0e0e] to-[#2a1414] border border-[#3d1a1a] rounded-xl p-5 flex gap-4 items-center mb-6 shadow-lg">
         <div className="w-16 h-16 bg-gradient-to-br from-orange-600 to-red-600 rounded-xl flex items-center justify-center text-3xl shadow-inner">👤</div>
         <div className="flex-1">
           <div className="text-xs text-orange-400 font-bold mb-1">LUKA LICENSE</div>
-          <div className="text-xl font-black text-white mb-1">
-            VIP{user?.vipLevel || 0}
-          </div>
+          <div className="text-xl font-black text-white mb-1">VIP{user?.vipLevel || 0}</div>
           <div className="text-xs text-gray-500">ID: {user?.id?.slice(0, 8)}</div>
         </div>
       </div>
 
-      {/* 快捷入口 */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         <button onClick={onGoOrders} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:bg-[#2a1414] transition">
           <span className="text-2xl">📄</span>
-          <span className="text-sm text-white font-bold">我的订单</span>
+          <span className="text-sm text-white font-bold">{t('profile.orders', '我的订单')}</span>
         </button>
         <button onClick={onGoCardOrders} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:bg-[#2a1414] transition">
           <span className="text-2xl">📦</span>
-          <span className="text-sm text-white font-bold">卡片发货</span>
+          <span className="text-sm text-white font-bold">{t('cardorder.title', '卡片发货')}</span>
         </button>
         <button onClick={onGoNotifications} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:bg-[#2a1414] transition">
           <span className="text-2xl">🔔</span>
-          <span className="text-sm text-white font-bold">消息中心</span>
+          <span className="text-sm text-white font-bold">{t('profile.notifications', '消息中心')}</span>
         </button>
         <button onClick={onGoArticles} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:bg-[#2a1414] transition">
           <span className="text-2xl">📰</span>
-          <span className="text-sm text-white font-bold">新闻资讯</span>
+          <span className="text-sm text-white font-bold">{t('profile.articles', '新闻资讯')}</span>
         </button>
       </div>
 
-      {/* 兑换码 */}
       <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 mb-4 shadow-lg">
-        <div className="text-sm font-bold text-white mb-3">🎁 兑换码</div>
+        <div className="text-sm font-bold text-white mb-3">🎁 {t('profile.redeem', '兑换码')}</div>
         <div className="flex gap-2">
-          <input value={redeemCode} onChange={(e) => setRedeemCode(e.target.value)} placeholder="请输入兑换码"
+          <input value={redeemCode} onChange={(e) => setRedeemCode(e.target.value)} placeholder={t('profile.redeem', '请输入兑换码')}
             className="flex-1 bg-[#2a1414] border border-[#4a1c12] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500" />
           <button onClick={handleRedeem} disabled={redeeming}
             className="bg-red-600 hover:bg-red-700 disabled:bg-gray-700 text-white text-sm px-5 py-2 rounded-lg font-bold">
-            {redeeming ? '兑换中...' : '兑换'}
+            {redeeming ? '...' : t('common.confirm', '兑换')}
           </button>
         </div>
       </div>
 
-      {/* 客服工单 */}
       <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 mb-4 shadow-lg">
-        <div className="text-sm font-bold text-white mb-3">🎧 联系客服</div>
+        <div className="text-sm font-bold text-white mb-3">🎧 {t('profile.support', '联系客服')}</div>
         <div className="space-y-2">
           <input value={ticketTitle} onChange={(e) => setTicketTitle(e.target.value)} placeholder="问题标题"
             className="w-full bg-[#2a1414] border border-[#4a1c12] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500" />
@@ -96,24 +92,19 @@ export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications,
             className="w-full bg-[#2a1414] border border-[#4a1c12] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500"></textarea>
           <button onClick={handleSubmitTicket} disabled={submitting}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 text-white text-sm py-2 rounded-lg font-bold">
-            {submitting ? '提交中...' : '提交工单'}
+            {submitting ? '...' : t('common.submit', '提交工单')}
           </button>
         </div>
       </div>
 
-      {/* 静态页面入口 */}
       <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl overflow-hidden shadow-lg mb-4">
         {[
-          { label: '关于我们', icon: 'ℹ️', slug: 'about' },
-          { label: '用户协议', icon: '📜', slug: 'terms' },
-          { label: '隐私政策', icon: '🔒', slug: 'privacy' },
-          { label: '联系我们', icon: '📞', slug: 'contact' },
+          { label: t('profile.about', '关于我们'), icon: 'ℹ️', slug: 'about' },
+          { label: t('profile.terms', '用户协议'), icon: '📜', slug: 'terms' },
+          { label: t('profile.privacy', '隐私政策'), icon: '🔒', slug: 'privacy' },
+          { label: t('profile.contact', '联系我们'), icon: '📞', slug: 'contact' },
         ].map((item, i) => (
-          <div
-            key={i}
-            onClick={() => onGoStatic(item.slug)}
-            className="flex justify-between items-center p-4 border-b border-[#2a1414] last:border-0 hover:bg-[#2a1414] cursor-pointer transition"
-          >
+          <div key={i} onClick={() => onGoStatic(item.slug)} className="flex justify-between items-center p-4 border-b border-[#2a1414] last:border-0 hover:bg-[#2a1414] cursor-pointer transition">
             <div className="flex items-center gap-3 text-sm text-gray-300">
               <span className="text-lg">{item.icon}</span>
               <span>{item.label}</span>
@@ -124,7 +115,7 @@ export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications,
       </div>
 
       <button className="w-full bg-[#2a1414] border border-[#4d2a2a] text-red-400 py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#3d1a1a] transition">
-        退出登录
+        {t('auth.logout', '退出登录')}
       </button>
     </div>
   );
