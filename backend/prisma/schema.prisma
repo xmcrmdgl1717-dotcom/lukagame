@@ -7,6 +7,100 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ================= 语言 / 翻译 =================
+
+model Language {
+  id        String   @id @default(uuid())
+  code      String   @unique   // zh-CN, en-US, es-ES
+  name      String              // 中文、English、Español
+  flag      String   @default("")
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Translation {
+  id           String   @id @default(uuid())
+  key          String   @unique
+  namespace    String   @default("common")
+  translations String   @default("{}")  // JSON: {"zh-CN": "首页", "en-US": "Home"}
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ================= 卡片发货订单 =================
+
+model CardOrder {
+  id              String    @id @default(uuid())
+  userId          String
+  userName        String    @default("")
+  items           String    @default("[]")  // JSON: [{cardId, cardName, quantity}]
+  receiverName    String
+  receiverPhone   String
+  receiverAddress String
+  status          String    @default("PENDING") // PENDING/PROCESSING/SHIPPED/DONE/REJECTED
+  trackingNo      String    @default("")
+  expressCompany  String    @default("")
+  remark          String    @default("")
+  adminRemark     String    @default("")
+  createdAt       DateTime  @default(now())
+  processedAt     DateTime?
+  shippedAt       DateTime?
+}
+
+// ================= 弹窗 =================
+
+model Popup {
+  id              String    @id @default(uuid())
+  title           String
+  imageUrl        String    @default("")
+  content         String    @default("")
+  buttonText      String    @default("")
+  buttonLink      String    @default("")
+  position        String    @default("HOME")  // HOME / ALL / PATH
+  positionPath    String    @default("")
+  delay           Int       @default(0)       // 延迟秒数
+  frequency       String    @default("ONCE")  // ONCE / DAILY / SESSION / ALWAYS
+  dailyLimit      Int       @default(1)       // 每天最多弹多少次
+  targetVipMin    Int       @default(0)
+  targetVipMax    Int       @default(99)
+  targetTags      String    @default("")
+  targetGroups    String    @default("")
+  registerDaysMin Int       @default(0)
+  registerDaysMax Int       @default(9999)
+  minRecharge     Int       @default(0)
+  startAt         DateTime?
+  endAt           DateTime?
+  isActive        Boolean   @default(true)
+  viewCount       Int       @default(0)
+  clickCount      Int       @default(0)
+  closeCount      Int       @default(0)
+  sortOrder       Int       @default(0)
+  createdAt       DateTime  @default(now())
+}
+
+// ================= 文章 =================
+
+model Article {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  category    String   @default("NEWS")  // SYSTEM / NEWS / HELP / ACTIVITY
+  title       String
+  titleI18n   String   @default("{}")
+  coverUrl    String   @default("")
+  summary     String   @default("")
+  content     String   @default("")
+  contentI18n String   @default("{}")
+  isPublished Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  viewCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ================= 原有表（保持不变） =================
+
 model User {
   id               String   @id @default(uuid())
   username         String   @unique
@@ -104,7 +198,7 @@ model Box {
   price      Int
   coverUrl   String   @default("")
   isActive   Boolean  @default(true)
-  isFeatured Boolean  @default(false)   // 新增：是否在首页推荐
+  isFeatured Boolean  @default(false)
   gameId     String?
   game       Game?    @relation(fields: [gameId], references: [id])
   createdAt  DateTime @default(now())
