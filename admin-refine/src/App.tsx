@@ -46,6 +46,10 @@ import TranslationList from './pages/translations';
 import CardOrderList from './pages/card-orders';
 import PopupList from './pages/popups';
 import ArticleList from './pages/articles';
+import AdChannelList from './pages/ad-channels';
+import AdCampaignList from './pages/ad-campaigns';
+import KolList from './pages/kols';
+import AdReport from './pages/ad-reports';
 
 const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   DashboardPage, UserList, UserGroupList, BankCardList, CardList, BoxList,
@@ -55,6 +59,7 @@ const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   TransactionList, DrawLogList, ReportSummary, ReportFinance, ReportDraw,
   ReportUserDraw, ReportUserFinance, ReportVipDistribution,
   LanguageList, TranslationList, CardOrderList, PopupList, ArticleList,
+  AdChannelList, AdCampaignList, KolList, AdReport,
 };
 
 function buildRoutes(menus: AdminMenu[]): React.ReactElement[] {
@@ -81,16 +86,7 @@ function AppContent() {
   const { menus, loading: menuLoading } = useMenuTree();
 
   if (authLoading) return <div className="flex items-center justify-center h-screen bg-[#0d0d0d] text-gray-400">验证登录状态...</div>;
-
-  if (!auth?.authenticated) {
-    return (
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    );
-  }
-
+  if (!auth?.authenticated) return (<Routes><Route path="/login" element={<LoginPage />} /><Route path="*" element={<Navigate to="/login" replace />} /></Routes>);
   if (menuLoading || !menus) return <div className="flex items-center justify-center h-screen bg-[#0d0d0d] text-gray-400">加载菜单中...</div>;
 
   const dynamicRoutes = buildRoutes(menus);
