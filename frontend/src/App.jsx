@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useStore } from './store';
-import { I18nProvider } from './i18n';
+import { I18nProvider } from './i18n/index.jsx';
 import BottomNav from './components/BottomNav';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import Popup from './components/Popup';
@@ -17,6 +17,7 @@ import CardOrderSubmit from './pages/CardOrderSubmit';
 import Articles from './pages/Articles';
 import ArticleDetail from './pages/ArticleDetail';
 import StaticPage from './pages/StaticPage';
+import TransactionLog from './pages/TransactionLog';
 import LoginModal from './components/LoginModal';
 import RechargeModal from './components/RechargeModal';
 
@@ -25,15 +26,25 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 function AppInner() {
   const [currentTab, setCurrentTab] = useState('home');
   const [currentGame, setCurrentGame] = useState(null);
-  const [currentPage, setCurrentPage] = useState(null); // 用于文章/静态页
+  const [currentPage, setCurrentPage] = useState(null);
   const [showLogin, setShowLogin] = useState(false);
   const [showRecharge, setShowRecharge] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const { setUser, setBoxes, user } = useStore();
 
   useEffect(() => {
     axios.get(`${API_URL}/api/boxes`).then(res => setBoxes(res.data)).catch(() => {});
   }, [setBoxes]);
+
+  // 刷新后自动用持久化用户拉最新数据
+  useEffect(() => {
+    if (!user) return;
+    axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' })
+      .then((res) => { if (res.data && res.data.id) setUser(res.data); })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!user) { setUnreadCount(0); return; }
@@ -51,31 +62,34 @@ function AppInner() {
   const handleLoginSuccess = (userData) => { setUser(userData); setShowLogin(false); };
   const handleGoGame = (game) => setCurrentGame(game);
   const handleBackFromGame = () => setCurrentGame(null);
-
   const goPage = (page) => { setCurrentPage(page); setCurrentGame(null); };
   const backFromPage = () => setCurrentPage(null);
 
+  // 刷新用户余额
+  const handleRefresh = async () => {
+    if (!user) return;
+    setRefreshing(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' });
+      if (res.data && res.data.id) setUser(res.data);
+    } catch (e) {}
+    finally {
+      // 至少显示 300ms，让用户看到旋转效果
+      setTimeout(() => setRefreshing(false), 300);
+    }
+  };
+
   const renderContent = () => {
-    // 1. 打开的系统页面/文章
     if (currentPage) {
-      if (currentPage.type === 'article') {
-        return <ArticleDetail slug={currentPage.slug} onBack={backFromPage} />;
-      }
-      if (currentPage.type === 'static') {
-        return <StaticPage slug={currentPage.slug} onBack={backFromPage} />;
-      }
-      if (currentPage.type === 'articles-list') {
-        return <Articles onOpenArticle={(slug) => goPage({ type: 'article', slug })} onBack={backFromPage} />;
-      }
-      if (currentPage.type === 'card-order-submit') {
-        return <CardOrderSubmit onBack={backFromPage} />;
-      }
+      if (currentPage.type === 'article') return <ArticleDetail slug={currentPage.slug} onBack={backFromPage} />;
+      if (currentPage.type === 'static') return <StaticPage slug={currentPage.slug} onBack={backFromPage} />;
+      if (currentPage.type === 'articles-list') return <Articles onOpenArticle={(slug) => goPage({ type: 'article', slug })} onBack={backFromPage} />;
+      if (currentPage.type === 'card-order-submit') return <CardOrderSubmit onBack={backFromPage} />;
+      if (currentPage.type === 'transactions') return <TransactionLog onBack={backFromPage} />;
     }
 
-    // 2. 游戏详情
     if (currentGame) return <GameDetail gameId={currentGame.id} onBack={handleBackFromGame} />;
 
-    // 3. Tab 页面
     if (currentTab === 'home') return <Home onShowLogin={() => setShowLogin(true)} onGoGame={handleGoGame} />;
     if (currentTab === 'activity') return <Activity />;
     if (currentTab === 'inventory') return <Inventory onGoSubmit={() => goPage({ type: 'card-order-submit' })} />;
@@ -96,30 +110,54 @@ function AppInner() {
     return null;
   };
 
-  // 用于弹窗匹配的当前路径
   const popupPath = currentPage ? `/page/${currentPage.type}` : currentGame ? `/game/${currentGame.id}` : `/${currentTab}`;
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-[#0a0a0a] text-white pb-20 relative shadow-2xl overflow-hidden">
       {/* 顶部栏 */}
-      <div className="flex justify-between items-center p-4 bg-[#140a0a] border-b border-[#332222]">
-        <div className="text-2xl font-black italic text-red-500 tracking-wider">LUKA!</div>
-        <div className="flex items-center gap-2">
+      <div className="flex justify-between items-center px-3 py-3 bg-[#140a0a] border-b border-[#332222] gap-2">
+        <div className="text-xl font-black italic text-red-500 tracking-wider flex-shrink-0">LUKA!</div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           <LanguageSwitcher />
+
           {user && (
-            <button onClick={() => setCurrentTab('notifications')} className="relative">
-              <span className="text-xl">🔔</span>
+            <button onClick={() => setCurrentTab('notifications')} className="relative flex-shrink-0">
+              <span className="text-lg">🔔</span>
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[14px] h-3.5 flex items-center justify-center px-1">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
             </button>
           )}
+
           {!user ? (
-            <button onClick={() => setShowLogin(true)} className="text-xs text-gray-400 border border-gray-600 px-3 py-1 rounded-full hover:text-white hover:border-white transition">Sign In</button>
+            <button
+              onClick={() => setShowLogin(true)}
+              className="text-[11px] text-gray-400 border border-gray-600 px-2.5 py-1 rounded-full hover:text-white hover:border-white transition whitespace-nowrap"
+            >
+              Sign In
+            </button>
           ) : (
-            <div className="text-xs text-yellow-500 font-bold bg-[#2a1414] px-2 py-1 rounded-full border border-yellow-900/50">💰 {user.coins.toLocaleString()}</div>
+            <div className="flex items-center gap-1">
+              {/* 余额按钮（点击进账变明细） */}
+              <button
+                onClick={() => goPage({ type: 'transactions' })}
+                className="text-[11px] text-yellow-500 font-bold bg-[#2a1414] px-2 py-1 rounded-full border border-yellow-900/50 whitespace-nowrap hover:border-yellow-500 transition"
+              >
+                💰 {user.coins.toLocaleString()}
+              </button>
+
+              {/* 刷新按钮 */}
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-[11px] w-7 h-7 rounded-full flex items-center justify-center shadow-md transition"
+                title="刷新余额"
+              >
+                <span className={refreshing ? 'animate-spin' : ''}>🔄</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -142,7 +180,6 @@ function AppInner() {
         }}
       />
 
-      {/* 弹窗 */}
       <Popup currentPath={popupPath} />
     </div>
   );
