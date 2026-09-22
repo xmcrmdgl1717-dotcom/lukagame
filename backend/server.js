@@ -9,145 +9,10 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
 
-
-// ================= 临时：初始化多语言数据 =================
-app.get('/api/setup-i18n', async (req, res) => {
-  try {
-    // 1. 语言列表
-    const languages = [
-      { code: 'zh-CN', name: '简体中文', flag: '🇨🇳', isDefault: true, sortOrder: 1 },
-      { code: 'en-US', name: 'English', flag: '🇺🇸', isDefault: false, sortOrder: 2 },
-      { code: 'es-ES', name: 'Español', flag: '🇪🇸', isDefault: false, sortOrder: 3 },
-    ];
-    for (const l of languages) {
-      await prisma.language.upsert({
-        where: { code: l.code },
-        update: { name: l.name, flag: l.flag, sortOrder: l.sortOrder },
-        create: { code: l.code, name: l.name, flag: l.flag, isDefault: l.isDefault, sortOrder: l.sortOrder },
-      });
-    }
-
-    // 2. 翻译词条
-    const translations = [
-      // 底部导航
-      { key: 'nav.home',      namespace: 'nav', t: { 'zh-CN': '首页',   'en-US': 'Home',      'es-ES': 'Inicio' } },
-      { key: 'nav.activity',  namespace: 'nav', t: { 'zh-CN': '活动',   'en-US': 'Activity',  'es-ES': 'Actividad' } },
-      { key: 'nav.recharge',  namespace: 'nav', t: { 'zh-CN': '充值',   'en-US': 'Recharge',  'es-ES': 'Recargar' } },
-      { key: 'nav.inventory', namespace: 'nav', t: { 'zh-CN': '存货',   'en-US': 'Inventory', 'es-ES': 'Inventario' } },
-      { key: 'nav.profile',   namespace: 'nav', t: { 'zh-CN': '我的',   'en-US': 'Profile',   'es-ES': 'Cuenta' } },
-
-      // 通用
-      { key: 'common.submit',  namespace: 'common', t: { 'zh-CN': '提交', 'en-US': 'Submit',  'es-ES': 'Enviar' } },
-      { key: 'common.cancel',  namespace: 'common', t: { 'zh-CN': '取消', 'en-US': 'Cancel',  'es-ES': 'Cancelar' } },
-      { key: 'common.confirm', namespace: 'common', t: { 'zh-CN': '确认', 'en-US': 'Confirm', 'es-ES': 'Confirmar' } },
-      { key: 'common.close',   namespace: 'common', t: { 'zh-CN': '关闭', 'en-US': 'Close',   'es-ES': 'Cerrar' } },
-
-      // 认证
-      { key: 'auth.login',    namespace: 'auth', t: { 'zh-CN': '登录',     'en-US': 'Sign In',  'es-ES': 'Iniciar sesión' } },
-      { key: 'auth.register', namespace: 'auth', t: { 'zh-CN': '注册',     'en-US': 'Sign Up',  'es-ES': 'Registrarse' } },
-      { key: 'auth.logout',   namespace: 'auth', t: { 'zh-CN': '退出登录', 'en-US': 'Logout',   'es-ES': 'Cerrar sesión' } },
-      { key: 'auth.username', namespace: 'auth', t: { 'zh-CN': '用户名',   'en-US': 'Username', 'es-ES': 'Usuario' } },
-      { key: 'auth.password', namespace: 'auth', t: { 'zh-CN': '密码',     'en-US': 'Password', 'es-ES': 'Contraseña' } },
-
-      // 首页
-      { key: 'home.games',       namespace: 'home', t: { 'zh-CN': '游戏专区',       'en-US': 'Game Zone',          'es-ES': 'Zona de juegos' } },
-      { key: 'home.featured',    namespace: 'home', t: { 'zh-CN': '推荐盲盒',       'en-US': 'Featured Packs',     'es-ES': 'Paquetes destacados' } },
-      { key: 'home.leaderboard', namespace: 'home', t: { 'zh-CN': '一周消费排行榜', 'en-US': 'Weekly Leaderboard', 'es-ES': 'Ranking semanal' } },
-      { key: 'home.open_box',    namespace: 'home', t: { 'zh-CN': '开箱',           'en-US': 'Open',               'es-ES': 'Abrir' } },
-      { key: 'home.enter',       namespace: 'home', t: { 'zh-CN': '进入抽奖',       'en-US': 'Enter',              'es-ES': 'Entrar' } },
-
-      // 抽奖
-      { key: 'draw.title',  namespace: 'draw', t: { 'zh-CN': '抽奖',     'en-US': 'Draw',         'es-ES': 'Sortear' } },
-      { key: 'draw.price',  namespace: 'draw', t: { 'zh-CN': '单价',     'en-US': 'Price',        'es-ES': 'Precio' } },
-      { key: 'draw.count',  namespace: 'draw', t: { 'zh-CN': '抽奖次数', 'en-US': 'Draw Count',   'es-ES': 'Cantidad' } },
-      { key: 'draw.total',  namespace: 'draw', t: { 'zh-CN': '总计',     'en-US': 'Total',        'es-ES': 'Total' } },
-      { key: 'draw.result', namespace: 'draw', t: { 'zh-CN': '抽卡结果', 'en-US': 'Draw Results', 'es-ES': 'Resultados' } },
-
-      // 个人中心
-      { key: 'profile.orders',        namespace: 'profile', t: { 'zh-CN': '我的订单', 'en-US': 'My Orders',       'es-ES': 'Mis pedidos' } },
-      { key: 'profile.inventory',     namespace: 'profile', t: { 'zh-CN': '我的库存', 'en-US': 'My Inventory',    'es-ES': 'Mi inventario' } },
-      { key: 'profile.notifications', namespace: 'profile', t: { 'zh-CN': '消息中心', 'en-US': 'Notifications',   'es-ES': 'Notificaciones' } },
-      { key: 'profile.redeem',        namespace: 'profile', t: { 'zh-CN': '兑换码',   'en-US': 'Redeem Code',     'es-ES': 'Código de canje' } },
-      { key: 'profile.support',       namespace: 'profile', t: { 'zh-CN': '联系客服', 'en-US': 'Contact Support', 'es-ES': 'Contactar soporte' } },
-      { key: 'profile.articles',      namespace: 'profile', t: { 'zh-CN': '新闻资讯', 'en-US': 'News',            'es-ES': 'Noticias' } },
-      { key: 'profile.about',         namespace: 'profile', t: { 'zh-CN': '关于我们', 'en-US': 'About Us',        'es-ES': 'Sobre nosotros' } },
-      { key: 'profile.terms',         namespace: 'profile', t: { 'zh-CN': '用户协议', 'en-US': 'Terms',           'es-ES': 'Términos' } },
-      { key: 'profile.privacy',       namespace: 'profile', t: { 'zh-CN': '隐私政策', 'en-US': 'Privacy Policy',  'es-ES': 'Privacidad' } },
-      { key: 'profile.contact',       namespace: 'profile', t: { 'zh-CN': '联系我们', 'en-US': 'Contact Us',      'es-ES': 'Contáctenos' } },
-
-      // 卡片订单
-      { key: 'cardorder.title',         namespace: 'cardorder', t: { 'zh-CN': '卡片发货',       'en-US': 'Card Shipping',    'es-ES': 'Envío de tarjetas' } },
-      { key: 'cardorder.submit',        namespace: 'cardorder', t: { 'zh-CN': '申请发货',       'en-US': 'Request Shipping', 'es-ES': 'Solicitar envío' } },
-      { key: 'cardorder.receiver',      namespace: 'cardorder', t: { 'zh-CN': '收货人姓名',     'en-US': 'Receiver Name',    'es-ES': 'Nombre del destinatario' } },
-      { key: 'cardorder.phone',         namespace: 'cardorder', t: { 'zh-CN': '联系电话',       'en-US': 'Phone',            'es-ES': 'Teléfono' } },
-      { key: 'cardorder.address',       namespace: 'cardorder', t: { 'zh-CN': '收货地址',       'en-US': 'Address',          'es-ES': 'Dirección' } },
-      { key: 'cardorder.cards',         namespace: 'cardorder', t: { 'zh-CN': '张',             'en-US': 'cards',            'es-ES': 'tarjetas' } },
-      { key: 'cardorder.detail',        namespace: 'cardorder', t: { 'zh-CN': '订单详情',       'en-US': 'Order Detail',     'es-ES': 'Detalle del pedido' } },
-      { key: 'cardorder.items',         namespace: 'cardorder', t: { 'zh-CN': '卡牌明细',       'en-US': 'Card Items',       'es-ES': 'Detalles de tarjetas' } },
-      { key: 'cardorder.receiver_info', namespace: 'cardorder', t: { 'zh-CN': '收货信息',       'en-US': 'Shipping Info',    'es-ES': 'Información de envío' } },
-      { key: 'cardorder.logistics',     namespace: 'cardorder', t: { 'zh-CN': '物流信息',       'en-US': 'Logistics',        'es-ES': 'Logística' } },
-      { key: 'cardorder.express',       namespace: 'cardorder', t: { 'zh-CN': '快递公司',       'en-US': 'Courier',          'es-ES': 'Mensajería' } },
-      { key: 'cardorder.tracking_no',   namespace: 'cardorder', t: { 'zh-CN': '快递单号',       'en-US': 'Tracking No.',     'es-ES': 'Nº de seguimiento' } },
-      { key: 'cardorder.copy',          namespace: 'cardorder', t: { 'zh-CN': '复制单号',       'en-US': 'Copy No.',         'es-ES': 'Copiar Nº' } },
-      { key: 'cardorder.select_cards',  namespace: 'cardorder', t: { 'zh-CN': '选择要发货的卡牌', 'en-US': 'Select Cards',   'es-ES': 'Seleccionar tarjetas' } },
-      { key: 'cardorder.selected',      namespace: 'cardorder', t: { 'zh-CN': '已选卡牌',       'en-US': 'Selected',         'es-ES': 'Seleccionadas' } },
-      { key: 'cardorder.remark',        namespace: 'cardorder', t: { 'zh-CN': '备注（可选）',   'en-US': 'Remark (optional)','es-ES': 'Comentario' } },
-      { key: 'cardorder.submit_btn',    namespace: 'cardorder', t: { 'zh-CN': '提交发货申请',   'en-US': 'Submit Shipping',  'es-ES': 'Enviar solicitud' } },
-      { key: 'cardorder.confirm_submit',namespace: 'cardorder', t: { 'zh-CN': '确认提交发货申请？', 'en-US': 'Confirm submitting?', 'es-ES': '¿Confirmar envío?' } },
-      { key: 'cardorder.submitted',     namespace: 'cardorder', t: { 'zh-CN': '提交成功！管理员会尽快处理', 'en-US': 'Submitted!', 'es-ES': '¡Enviado!' } },
-      { key: 'cardorder.input_name',    namespace: 'cardorder', t: { 'zh-CN': '请填写收货人姓名', 'en-US': 'Please input receiver name', 'es-ES': 'Introduce el nombre' } },
-      { key: 'cardorder.input_phone',   namespace: 'cardorder', t: { 'zh-CN': '请填写联系电话', 'en-US': 'Please input phone',  'es-ES': 'Introduce el teléfono' } },
-      { key: 'cardorder.input_address', namespace: 'cardorder', t: { 'zh-CN': '请填写收货地址', 'en-US': 'Please input address','es-ES': 'Introduce la dirección' } },
-
-      // 状态
-      { key: 'status.pending',    namespace: 'status', t: { 'zh-CN': '待处理', 'en-US': 'Pending',    'es-ES': 'Pendiente' } },
-      { key: 'status.processing', namespace: 'status', t: { 'zh-CN': '处理中', 'en-US': 'Processing', 'es-ES': 'Procesando' } },
-      { key: 'status.shipped',    namespace: 'status', t: { 'zh-CN': '已发货', 'en-US': 'Shipped',    'es-ES': 'Enviado' } },
-      { key: 'status.done',       namespace: 'status', t: { 'zh-CN': '已完成', 'en-US': 'Completed',  'es-ES': 'Completado' } },
-      { key: 'status.rejected',   namespace: 'status', t: { 'zh-CN': '已拒绝', 'en-US': 'Rejected',   'es-ES': 'Rechazado' } },
-      { key: 'status.paid',       namespace: 'status', t: { 'zh-CN': '已支付', 'en-US': 'Paid',       'es-ES': 'Pagado' } },
-
-      // 活动
-      { key: 'activity.tasks',    namespace: 'activity', t: { 'zh-CN': '每日任务', 'en-US': 'Daily Tasks', 'es-ES': 'Tareas diarias' } },
-      { key: 'activity.weekly',   namespace: 'activity', t: { 'zh-CN': '周榜',     'en-US': 'Weekly',      'es-ES': 'Semanal' } },
-      { key: 'activity.monthly',  namespace: 'activity', t: { 'zh-CN': '月榜',     'en-US': 'Monthly',     'es-ES': 'Mensual' } },
-      { key: 'activity.claim',    namespace: 'activity', t: { 'zh-CN': '领取',     'en-US': 'Claim',       'es-ES': 'Reclamar' } },
-      { key: 'activity.claimed',  namespace: 'activity', t: { 'zh-CN': '已领取',   'en-US': 'Claimed',     'es-ES': 'Reclamado' } },
-      { key: 'activity.progress', namespace: 'activity', t: { 'zh-CN': '进行中',   'en-US': 'In Progress', 'es-ES': 'En curso' } },
-
-      // 其他
-      { key: 'inventory.empty', namespace: 'inventory', t: { 'zh-CN': '您的库存为空，快去抽卡吧！', 'en-US': 'Your inventory is empty. Go draw!', 'es-ES': 'Inventario vacío. ¡Ve a sortear!' } },
-      { key: 'orders.empty',    namespace: 'orders',    t: { 'zh-CN': '暂无订单记录', 'en-US': 'No orders yet', 'es-ES': 'Sin pedidos' } },
-      { key: 'articles.all',    namespace: 'articles',  t: { 'zh-CN': '全部', 'en-US': 'All', 'es-ES': 'Todo' } },
-    ];
-
-    for (const item of translations) {
-      await prisma.translation.upsert({
-        where: { key: item.key },
-        update: { namespace: item.namespace, translations: JSON.stringify(item.t) },
-        create: { key: item.key, namespace: item.namespace, translations: JSON.stringify(item.t) },
-      });
-    }
-
-    res.json({ success: true, message: '多语言数据已写入', languages: languages.length, translations: translations.length });
-  } catch (e) {
-    console.error('初始化失败:', e);
-    res.status(500).json({ error: e.message });
-  }
-});
-// ================= 临时接口结束 =================
-
-
-
-
-
-
 // ================= 辅助函数 =================
 function getClientIp(req) {
   return (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
-    || req.headers['x-real-ip']
-    || req.connection?.remoteAddress
-    || '';
+    || req.headers['x-real-ip'] || req.connection?.remoteAddress || '';
 }
 function getClientUA(req) {
   return (req.headers['user-agent'] || '').slice(0, 200);
@@ -191,6 +56,19 @@ const ALL_PERMISSIONS = [
   { key: 'drawlogs.export', label: '导出抽奖记录', group: '抽奖管理' },
   { key: 'cardorders.view', label: '查看卡片订单', group: '抽奖管理' },
   { key: 'cardorders.process', label: '处理卡片订单', group: '抽奖管理' },
+  { key: 'adchannels.view', label: '查看投放渠道', group: '广告管理' },
+  { key: 'adchannels.create', label: '新增投放渠道', group: '广告管理' },
+  { key: 'adchannels.edit', label: '编辑投放渠道', group: '广告管理' },
+  { key: 'adchannels.delete', label: '删除投放渠道', group: '广告管理' },
+  { key: 'adcampaigns.view', label: '查看投放活动', group: '广告管理' },
+  { key: 'adcampaigns.create', label: '新增投放活动', group: '广告管理' },
+  { key: 'adcampaigns.edit', label: '编辑投放活动', group: '广告管理' },
+  { key: 'adcampaigns.delete', label: '删除投放活动', group: '广告管理' },
+  { key: 'kols.view', label: '查看KOL', group: '广告管理' },
+  { key: 'kols.create', label: '新增KOL', group: '广告管理' },
+  { key: 'kols.edit', label: '编辑KOL', group: '广告管理' },
+  { key: 'kols.delete', label: '删除KOL', group: '广告管理' },
+  { key: 'adreports.view', label: '查看广告报表', group: '广告管理' },
   { key: 'banners.view', label: '查看轮播图', group: '通知管理' },
   { key: 'banners.create', label: '新增轮播图', group: '通知管理' },
   { key: 'banners.edit', label: '编辑轮播图', group: '通知管理' },
@@ -203,10 +81,10 @@ const ALL_PERMISSIONS = [
   { key: 'articles.create', label: '新增文章', group: '通知管理' },
   { key: 'articles.edit', label: '编辑文章', group: '通知管理' },
   { key: 'articles.delete', label: '删除文章', group: '通知管理' },
-  { key: 'ads.view', label: '查看广告', group: '广告管理' },
-  { key: 'ads.create', label: '新增广告', group: '广告管理' },
-  { key: 'ads.edit', label: '编辑广告', group: '广告管理' },
-  { key: 'ads.delete', label: '删除广告', group: '广告管理' },
+  { key: 'ads.view', label: '查看站内广告', group: '通知管理' },
+  { key: 'ads.create', label: '新增站内广告', group: '通知管理' },
+  { key: 'ads.edit', label: '编辑站内广告', group: '通知管理' },
+  { key: 'ads.delete', label: '删除站内广告', group: '通知管理' },
   { key: 'tasks.view', label: '查看任务', group: '活动管理' },
   { key: 'tasks.create', label: '新增任务', group: '活动管理' },
   { key: 'tasks.edit', label: '编辑任务', group: '活动管理' },
@@ -243,35 +121,171 @@ const ALL_PERMISSION_KEYS = ALL_PERMISSIONS.map(p => p.key);
 const SYSTEM_ROLES = [
   { name: 'super', displayName: '超级管理员', description: '拥有全部权限', permissions: ALL_PERMISSION_KEYS.join(','), isSystem: true },
   { name: 'admin', displayName: '管理员', description: '日常运营管理', permissions: ALL_PERMISSION_KEYS.filter(k => !k.startsWith('admins.') && !k.startsWith('roles.') && !k.startsWith('menus.') && !k.startsWith('languages.')).join(','), isSystem: true },
-  { name: 'operator', displayName: '运营专员', description: '管理卡牌、盲盒、活动等运营内容', permissions: ['users.view', 'groups.view', 'games.view', 'cards.view', 'cards.create', 'cards.edit', 'boxes.view', 'boxes.create', 'boxes.edit', 'boxes.probability', 'banners.view', 'banners.create', 'banners.edit', 'popups.view', 'popups.create', 'popups.edit', 'articles.view', 'articles.create', 'articles.edit', 'ads.view', 'ads.create', 'ads.edit', 'tasks.view', 'tasks.create', 'tasks.edit', 'redeem.view', 'redeem.create', 'notifications.view', 'notifications.create', 'orders.view'].join(','), isSystem: true },
+  { name: 'operator', displayName: '运营专员', description: '管理卡牌、盲盒、活动等运营内容', permissions: ['users.view', 'groups.view', 'games.view', 'cards.view', 'cards.create', 'cards.edit', 'boxes.view', 'boxes.create', 'boxes.edit', 'boxes.probability', 'banners.view', 'banners.create', 'banners.edit', 'popups.view', 'popups.create', 'popups.edit', 'articles.view', 'articles.create', 'articles.edit', 'adchannels.view', 'adcampaigns.view', 'adcampaigns.create', 'adcampaigns.edit', 'kols.view', 'kols.create', 'kols.edit', 'adreports.view', 'tasks.view', 'tasks.create', 'tasks.edit', 'redeem.view', 'redeem.create', 'notifications.view', 'notifications.create', 'orders.view'].join(','), isSystem: true },
   { name: 'support', displayName: '客服专员', description: '处理用户问题和工单', permissions: ['users.view', 'tickets.view', 'tickets.reply', 'tickets.close', 'cardorders.view', 'cardorders.process', 'notifications.view', 'notifications.create', 'orders.view'].join(','), isSystem: true },
 ];
+
+// ================= 临时：初始化多语言数据 =================
+app.get('/api/setup-i18n', async (req, res) => {
+  try {
+    const languages = [
+      { code: 'zh-CN', name: '简体中文', flag: '🇨🇳', isDefault: true, sortOrder: 1 },
+      { code: 'en-US', name: 'English', flag: '🇺🇸', isDefault: false, sortOrder: 2 },
+      { code: 'es-ES', name: 'Español', flag: '🇪🇸', isDefault: false, sortOrder: 3 },
+    ];
+    for (const l of languages) {
+      await prisma.language.upsert({
+        where: { code: l.code },
+        update: { name: l.name, flag: l.flag, sortOrder: l.sortOrder },
+        create: { code: l.code, name: l.name, flag: l.flag, isDefault: l.isDefault, sortOrder: l.sortOrder },
+      });
+    }
+
+    const translations = [
+      { key: 'nav.home', namespace: 'nav', t: { 'zh-CN': '首页', 'en-US': 'Home', 'es-ES': 'Inicio' } },
+      { key: 'nav.activity', namespace: 'nav', t: { 'zh-CN': '活动', 'en-US': 'Activity', 'es-ES': 'Actividad' } },
+      { key: 'nav.recharge', namespace: 'nav', t: { 'zh-CN': '充值', 'en-US': 'Recharge', 'es-ES': 'Recargar' } },
+      { key: 'nav.inventory', namespace: 'nav', t: { 'zh-CN': '存货', 'en-US': 'Inventory', 'es-ES': 'Inventario' } },
+      { key: 'nav.profile', namespace: 'nav', t: { 'zh-CN': '我的', 'en-US': 'Profile', 'es-ES': 'Cuenta' } },
+      { key: 'common.submit', namespace: 'common', t: { 'zh-CN': '提交', 'en-US': 'Submit', 'es-ES': 'Enviar' } },
+      { key: 'common.cancel', namespace: 'common', t: { 'zh-CN': '取消', 'en-US': 'Cancel', 'es-ES': 'Cancelar' } },
+      { key: 'common.confirm', namespace: 'common', t: { 'zh-CN': '确认', 'en-US': 'Confirm', 'es-ES': 'Confirmar' } },
+      { key: 'common.close', namespace: 'common', t: { 'zh-CN': '关闭', 'en-US': 'Close', 'es-ES': 'Cerrar' } },
+      { key: 'auth.login', namespace: 'auth', t: { 'zh-CN': '登录', 'en-US': 'Sign In', 'es-ES': 'Iniciar sesión' } },
+      { key: 'auth.register', namespace: 'auth', t: { 'zh-CN': '注册', 'en-US': 'Sign Up', 'es-ES': 'Registrarse' } },
+      { key: 'auth.logout', namespace: 'auth', t: { 'zh-CN': '退出登录', 'en-US': 'Logout', 'es-ES': 'Cerrar sesión' } },
+      { key: 'auth.username', namespace: 'auth', t: { 'zh-CN': '用户名', 'en-US': 'Username', 'es-ES': 'Usuario' } },
+      { key: 'auth.password', namespace: 'auth', t: { 'zh-CN': '密码', 'en-US': 'Password', 'es-ES': 'Contraseña' } },
+      { key: 'home.games', namespace: 'home', t: { 'zh-CN': '游戏专区', 'en-US': 'Game Zone', 'es-ES': 'Zona de juegos' } },
+      { key: 'home.featured', namespace: 'home', t: { 'zh-CN': '推荐盲盒', 'en-US': 'Featured Packs', 'es-ES': 'Paquetes destacados' } },
+      { key: 'home.leaderboard', namespace: 'home', t: { 'zh-CN': '一周消费排行榜', 'en-US': 'Weekly Leaderboard', 'es-ES': 'Ranking semanal' } },
+      { key: 'home.open_box', namespace: 'home', t: { 'zh-CN': '开箱', 'en-US': 'Open', 'es-ES': 'Abrir' } },
+      { key: 'home.enter', namespace: 'home', t: { 'zh-CN': '进入抽奖', 'en-US': 'Enter', 'es-ES': 'Entrar' } },
+      { key: 'draw.title', namespace: 'draw', t: { 'zh-CN': '抽奖', 'en-US': 'Draw', 'es-ES': 'Sortear' } },
+      { key: 'draw.price', namespace: 'draw', t: { 'zh-CN': '单价', 'en-US': 'Price', 'es-ES': 'Precio' } },
+      { key: 'draw.count', namespace: 'draw', t: { 'zh-CN': '抽奖次数', 'en-US': 'Draw Count', 'es-ES': 'Cantidad' } },
+      { key: 'draw.total', namespace: 'draw', t: { 'zh-CN': '总计', 'en-US': 'Total', 'es-ES': 'Total' } },
+      { key: 'draw.result', namespace: 'draw', t: { 'zh-CN': '抽卡结果', 'en-US': 'Draw Results', 'es-ES': 'Resultados' } },
+      { key: 'profile.orders', namespace: 'profile', t: { 'zh-CN': '我的订单', 'en-US': 'My Orders', 'es-ES': 'Mis pedidos' } },
+      { key: 'profile.inventory', namespace: 'profile', t: { 'zh-CN': '我的库存', 'en-US': 'My Inventory', 'es-ES': 'Mi inventario' } },
+      { key: 'profile.notifications', namespace: 'profile', t: { 'zh-CN': '消息中心', 'en-US': 'Notifications', 'es-ES': 'Notificaciones' } },
+      { key: 'profile.redeem', namespace: 'profile', t: { 'zh-CN': '兑换码', 'en-US': 'Redeem Code', 'es-ES': 'Código de canje' } },
+      { key: 'profile.support', namespace: 'profile', t: { 'zh-CN': '联系客服', 'en-US': 'Contact Support', 'es-ES': 'Contactar soporte' } },
+      { key: 'profile.articles', namespace: 'profile', t: { 'zh-CN': '新闻资讯', 'en-US': 'News', 'es-ES': 'Noticias' } },
+      { key: 'profile.about', namespace: 'profile', t: { 'zh-CN': '关于我们', 'en-US': 'About Us', 'es-ES': 'Sobre nosotros' } },
+      { key: 'profile.terms', namespace: 'profile', t: { 'zh-CN': '用户协议', 'en-US': 'Terms', 'es-ES': 'Términos' } },
+      { key: 'profile.privacy', namespace: 'profile', t: { 'zh-CN': '隐私政策', 'en-US': 'Privacy Policy', 'es-ES': 'Privacidad' } },
+      { key: 'profile.contact', namespace: 'profile', t: { 'zh-CN': '联系我们', 'en-US': 'Contact Us', 'es-ES': 'Contáctenos' } },
+      { key: 'profile.vip', namespace: 'profile', t: { 'zh-CN': 'VIP 等级', 'en-US': 'VIP Level', 'es-ES': 'Nivel VIP' } },
+      { key: 'profile.vipBenefits', namespace: 'profile', t: { 'zh-CN': 'VIP 特权', 'en-US': 'VIP Benefits', 'es-ES': 'Beneficios VIP' } },
+      { key: 'vip.currentLevel', namespace: 'vip', t: { 'zh-CN': '当前等级', 'en-US': 'Current Level', 'es-ES': 'Nivel actual' } },
+      { key: 'vip.nextLevel', namespace: 'vip', t: { 'zh-CN': '下一等级', 'en-US': 'Next Level', 'es-ES': 'Siguiente nivel' } },
+      { key: 'vip.progress', namespace: 'vip', t: { 'zh-CN': '升级进度', 'en-US': 'Progress', 'es-ES': 'Progreso' } },
+      { key: 'vip.rechargeRequired', namespace: 'vip', t: { 'zh-CN': '还需充值', 'en-US': 'Recharge required', 'es-ES': 'Recarga necesaria' } },
+      { key: 'vip.consumeRequired', namespace: 'vip', t: { 'zh-CN': '还需消费', 'en-US': 'Consume required', 'es-ES': 'Consumo necesario' } },
+      { key: 'vip.maxLevel', namespace: 'vip', t: { 'zh-CN': '已达最高等级', 'en-US': 'Max Level Reached', 'es-ES': 'Nivel máximo alcanzado' } },
+      { key: 'cardorder.title', namespace: 'cardorder', t: { 'zh-CN': '卡片发货', 'en-US': 'Card Shipping', 'es-ES': 'Envío de tarjetas' } },
+      { key: 'cardorder.submit', namespace: 'cardorder', t: { 'zh-CN': '申请发货', 'en-US': 'Request Shipping', 'es-ES': 'Solicitar envío' } },
+      { key: 'cardorder.receiver', namespace: 'cardorder', t: { 'zh-CN': '收货人姓名', 'en-US': 'Receiver Name', 'es-ES': 'Nombre del destinatario' } },
+      { key: 'cardorder.phone', namespace: 'cardorder', t: { 'zh-CN': '联系电话', 'en-US': 'Phone', 'es-ES': 'Teléfono' } },
+      { key: 'cardorder.address', namespace: 'cardorder', t: { 'zh-CN': '收货地址', 'en-US': 'Address', 'es-ES': 'Dirección' } },
+      { key: 'cardorder.detail', namespace: 'cardorder', t: { 'zh-CN': '订单详情', 'en-US': 'Order Detail', 'es-ES': 'Detalle del pedido' } },
+      { key: 'cardorder.logistics', namespace: 'cardorder', t: { 'zh-CN': '物流信息', 'en-US': 'Logistics', 'es-ES': 'Logística' } },
+      { key: 'status.pending', namespace: 'status', t: { 'zh-CN': '待处理', 'en-US': 'Pending', 'es-ES': 'Pendiente' } },
+      { key: 'status.processing', namespace: 'status', t: { 'zh-CN': '处理中', 'en-US': 'Processing', 'es-ES': 'Procesando' } },
+      { key: 'status.shipped', namespace: 'status', t: { 'zh-CN': '已发货', 'en-US': 'Shipped', 'es-ES': 'Enviado' } },
+      { key: 'status.done', namespace: 'status', t: { 'zh-CN': '已完成', 'en-US': 'Completed', 'es-ES': 'Completado' } },
+      { key: 'status.rejected', namespace: 'status', t: { 'zh-CN': '已拒绝', 'en-US': 'Rejected', 'es-ES': 'Rechazado' } },
+      { key: 'status.paid', namespace: 'status', t: { 'zh-CN': '已支付', 'en-US': 'Paid', 'es-ES': 'Pagado' } },
+      { key: 'activity.tasks', namespace: 'activity', t: { 'zh-CN': '每日任务', 'en-US': 'Daily Tasks', 'es-ES': 'Tareas diarias' } },
+      { key: 'activity.weekly', namespace: 'activity', t: { 'zh-CN': '周榜', 'en-US': 'Weekly', 'es-ES': 'Semanal' } },
+      { key: 'activity.monthly', namespace: 'activity', t: { 'zh-CN': '月榜', 'en-US': 'Monthly', 'es-ES': 'Mensual' } },
+      { key: 'activity.claim', namespace: 'activity', t: { 'zh-CN': '领取', 'en-US': 'Claim', 'es-ES': 'Reclamar' } },
+      { key: 'inventory.empty', namespace: 'inventory', t: { 'zh-CN': '您的库存为空，快去抽卡吧！', 'en-US': 'Your inventory is empty. Go draw!', 'es-ES': 'Inventario vacío. ¡Ve a sortear!' } },
+      { key: 'orders.empty', namespace: 'orders', t: { 'zh-CN': '暂无订单记录', 'en-US': 'No orders yet', 'es-ES': 'Sin pedidos' } },
+      { key: 'articles.all', namespace: 'articles', t: { 'zh-CN': '全部', 'en-US': 'All', 'es-ES': 'Todo' } },
+    ];
+
+    for (const item of translations) {
+      await prisma.translation.upsert({
+        where: { key: item.key },
+        update: { namespace: item.namespace, translations: JSON.stringify(item.t) },
+        create: { key: item.key, namespace: item.namespace, translations: JSON.stringify(item.t) },
+      });
+    }
+    res.json({ success: true, message: '多语言数据已写入', languages: languages.length, translations: translations.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+// ================= 临时接口结束 =================
 
 // ================= 用户端 API =================
 
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
-  const user = await prisma.user.findUnique({
-    where: { username },
-    include: { inventory: { include: { card: true } } }
-  });
+  const user = await prisma.user.findUnique({ where: { username }, include: { inventory: { include: { card: true } } } });
   if (!user || user.password !== password) return res.status(401).json({ error: '用户名或密码错误' });
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   res.json(user);
 });
 
 app.post('/api/register', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, utmSource, utmMedium, utmCampaign, ref } = req.body;
   if (!username || !password) return res.status(400).json({ error: '请输入用户名和密码' });
   try {
     const existing = await prisma.user.findUnique({ where: { username } });
     if (existing) return res.status(400).json({ error: '用户名已存在' });
-    const newUser = await prisma.user.create({ data: { username, password, coins: 10000 } });
+    const newUser = await prisma.user.create({
+      data: {
+        username, password, coins: 10000,
+        adSource: utmSource || '',
+        adMedium: utmMedium || '',
+        adCampaign: utmCampaign || '',
+        adRef: ref || '',
+      },
+    });
     res.json({ success: true, user: newUser });
   } catch (error) { res.status(500).json({ error: '注册失败' }); }
 });
 
-// 语言（用户端）
+// 用户端 VIP 信息
+app.get('/api/user/vip-info/:userId', async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.params.userId } });
+    if (!user) return res.status(404).json({ error: '用户不存在' });
+    const currentLevel = await prisma.vipLevel.findUnique({ where: { level: user.vipLevel } });
+    const nextLevel = await prisma.vipLevel.findFirst({ where: { level: user.vipLevel + 1, isActive: true } });
+    let rechargeProgress = 100, consumeProgress = 100;
+    let needRecharge = 0, needConsume = 0;
+    if (nextLevel) {
+      rechargeProgress = nextLevel.rechargeAmount > 0 ? Math.min(Math.round((user.totalRecharge / nextLevel.rechargeAmount) * 100), 100) : 100;
+      consumeProgress = nextLevel.consumeAmount > 0 ? Math.min(Math.round((user.totalConsume / nextLevel.consumeAmount) * 100), 100) : 100;
+      needRecharge = Math.max(nextLevel.rechargeAmount - user.totalRecharge, 0);
+      needConsume = Math.max(nextLevel.consumeAmount - user.totalConsume, 0);
+    }
+    let benefits = [];
+    try { if (currentLevel?.benefits) benefits = JSON.parse(currentLevel.benefits); } catch (e) { benefits = []; }
+    res.json({
+      currentLevel: currentLevel?.level || 0,
+      currentName: currentLevel?.name || 'VIP0',
+      currentIcon: currentLevel?.iconUrl || '',
+      nextLevel: nextLevel?.level || null,
+      nextName: nextLevel?.name || null,
+      nextIcon: nextLevel?.iconUrl || '',
+      totalRecharge: user.totalRecharge,
+      totalConsume: user.totalConsume,
+      rechargeProgress,
+      consumeProgress,
+      needRecharge,
+      needConsume,
+      benefits,
+      isMaxLevel: !nextLevel,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 语言
 app.get('/api/languages', async (req, res) => {
   res.json(await prisma.language.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
 });
@@ -280,12 +294,7 @@ app.get('/api/translations/:lang', async (req, res) => {
   const { lang } = req.params;
   const all = await prisma.translation.findMany();
   const result = {};
-  all.forEach(t => {
-    try {
-      const obj = JSON.parse(t.translations);
-      if (obj[lang]) result[t.key] = obj[lang];
-    } catch (e) {}
-  });
+  all.forEach(t => { try { const obj = JSON.parse(t.translations); if (obj[lang]) result[t.key] = obj[lang]; } catch (e) {} });
   res.json(result);
 });
 
@@ -375,13 +384,26 @@ async function updateTaskProgress(tx, userId, action, amount) {
   }
 }
 
+// VIP 升级：加奖励 + 发通知
 async function checkVipUpgrade(userId) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return;
   const levels = await prisma.vipLevel.findMany({ where: { isActive: true }, orderBy: { level: 'desc' } });
   for (const lv of levels) {
     if (user.totalRecharge >= lv.rechargeAmount && user.totalConsume >= lv.consumeAmount) {
-      if (user.vipLevel !== lv.level) await prisma.user.update({ where: { id: userId }, data: { vipLevel: lv.level } });
+      if (user.vipLevel !== lv.level) {
+        // VIP 升级奖励（每级送金币）
+        const reward = lv.level * 500;
+        await prisma.user.update({ where: { id: userId }, data: { vipLevel: lv.level, coins: { increment: reward } } });
+        // 写交易明细
+        await prisma.transaction.create({
+          data: { userId, type: 'VIP_BONUS', amount: reward, balance: user.coins + reward, refType: 'VIP', refId: String(lv.level), remark: `VIP${lv.level} 升级奖励` }
+        });
+        // 发通知
+        await prisma.notification.create({
+          data: { userId, title: `🎉 恭喜升级到 VIP${lv.level}！`, content: `您已成功升级到 ${lv.name}，获得 ${reward} 金币奖励。继续充值或消费可解锁更多特权！` }
+        });
+      }
       break;
     }
   }
@@ -418,7 +440,6 @@ app.post('/api/tasks/claim', async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// 充值
 app.get('/api/recharge-options', async (req, res) => {
   res.json(await prisma.rechargeOption.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
 });
@@ -449,7 +470,6 @@ app.get('/api/orders/:userId', async (req, res) => {
   res.json(await prisma.order.findMany({ where: { userId: req.params.userId }, include: { option: true }, orderBy: { createdAt: 'desc' }, take: 100 }));
 });
 
-// 排行榜
 app.get('/api/leaderboard/weekly', async (req, res) => {
   const since = new Date(); since.setDate(since.getDate() - 7);
   const result = await prisma.drawLog.groupBy({ by: ['userId'], where: { createdAt: { gte: since } }, _sum: { cost: true }, orderBy: { _sum: { cost: 'desc' } }, take: 10 });
@@ -472,7 +492,6 @@ app.get('/api/leaderboard/monthly', async (req, res) => {
   res.json(data);
 });
 
-// 兑换码
 app.post('/api/redeem', async (req, res) => {
   const { userId, code } = req.body;
   if (!code) return res.status(400).json({ error: '请输入兑换码' });
@@ -492,7 +511,6 @@ app.post('/api/redeem', async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// 工单
 app.post('/api/tickets', async (req, res) => {
   const { userId, title, content } = req.body;
   if (!title || !content) return res.status(400).json({ error: '请填写标题和内容' });
@@ -504,7 +522,6 @@ app.get('/api/tickets/:userId', async (req, res) => {
   res.json(await prisma.ticket.findMany({ where: { userId: req.params.userId }, include: { replies: { orderBy: { createdAt: 'asc' } } }, orderBy: { createdAt: 'desc' } }));
 });
 
-// 通知
 app.get('/api/notifications/:userId', async (req, res) => {
   const { userId } = req.params;
   const notifications = await prisma.notification.findMany({ where: { OR: [{ userId }, { userId: null }] }, orderBy: { createdAt: 'desc' }, take: 50 });
@@ -527,36 +544,19 @@ app.put('/api/notifications/:id/read', async (req, res) => {
   res.json({ success: true });
 });
 
-// 弹窗（用户端拉取）
 app.get('/api/popups', async (req, res) => {
   const now = new Date();
   const popups = await prisma.popup.findMany({
-    where: {
-      isActive: true,
-      OR: [{ startAt: null }, { startAt: { lte: now } }],
-      AND: [{ OR: [{ endAt: null }, { endAt: { gte: now } }] }],
-    },
+    where: { isActive: true, OR: [{ startAt: null }, { startAt: { lte: now } }], AND: [{ OR: [{ endAt: null }, { endAt: { gte: now } }] }] },
     orderBy: { sortOrder: 'asc' },
   });
   res.json(popups);
 });
 
-app.post('/api/popups/:id/view', async (req, res) => {
-  try { await prisma.popup.update({ where: { id: req.params.id }, data: { viewCount: { increment: 1 } } }); } catch (e) {}
-  res.json({ success: true });
-});
+app.post('/api/popups/:id/view', async (req, res) => { try { await prisma.popup.update({ where: { id: req.params.id }, data: { viewCount: { increment: 1 } } }); } catch (e) {} res.json({ success: true }); });
+app.post('/api/popups/:id/click', async (req, res) => { try { await prisma.popup.update({ where: { id: req.params.id }, data: { clickCount: { increment: 1 } } }); } catch (e) {} res.json({ success: true }); });
+app.post('/api/popups/:id/close', async (req, res) => { try { await prisma.popup.update({ where: { id: req.params.id }, data: { closeCount: { increment: 1 } } }); } catch (e) {} res.json({ success: true }); });
 
-app.post('/api/popups/:id/click', async (req, res) => {
-  try { await prisma.popup.update({ where: { id: req.params.id }, data: { clickCount: { increment: 1 } } }); } catch (e) {}
-  res.json({ success: true });
-});
-
-app.post('/api/popups/:id/close', async (req, res) => {
-  try { await prisma.popup.update({ where: { id: req.params.id }, data: { closeCount: { increment: 1 } } }); } catch (e) {}
-  res.json({ success: true });
-});
-
-// 文章（用户端）
 app.get('/api/articles', async (req, res) => {
   const { category } = req.query;
   const where = { isPublished: true };
@@ -571,7 +571,6 @@ app.get('/api/articles/:slug', async (req, res) => {
   res.json(article);
 });
 
-// 卡片订单（用户端）
 app.post('/api/card-orders', async (req, res) => {
   const { userId, items, receiverName, receiverPhone, receiverAddress, remark } = req.body;
   if (!userId || !items || !items.length) return res.status(400).json({ error: '请选择要发货的卡牌' });
@@ -579,9 +578,7 @@ app.post('/api/card-orders', async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(400).json({ error: '用户不存在' });
-    const order = await prisma.cardOrder.create({
-      data: { userId, userName: user.username, items: JSON.stringify(items), receiverName, receiverPhone, receiverAddress, remark: remark || '', status: 'PENDING' },
-    });
+    const order = await prisma.cardOrder.create({ data: { userId, userName: user.username, items: JSON.stringify(items), receiverName, receiverPhone, receiverAddress, remark: remark || '', status: 'PENDING' } });
     res.json({ success: true, order });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -590,7 +587,6 @@ app.get('/api/card-orders/:userId', async (req, res) => {
   res.json(await prisma.cardOrder.findMany({ where: { userId: req.params.userId }, orderBy: { createdAt: 'desc' }, take: 100 }));
 });
 
-// ============ 用户端：账变明细 ============
 app.get('/api/user/transactions/:userId', async (req, res) => {
   const { userId } = req.params;
   const { type, page = 1, pageSize = 20 } = req.query;
@@ -598,16 +594,9 @@ app.get('/api/user/transactions/:userId', async (req, res) => {
   if (type) where.type = type;
   try {
     const total = await prisma.transaction.count({ where });
-    const list = await prisma.transaction.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip: (parseInt(page) - 1) * parseInt(pageSize),
-      take: parseInt(pageSize),
-    });
+    const list = await prisma.transaction.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (parseInt(page) - 1) * parseInt(pageSize), take: parseInt(pageSize) });
     res.json({ list, total, page: parseInt(page), pageSize: parseInt(pageSize) });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ================= 管理后台 API =================
@@ -658,21 +647,13 @@ function requirePermission(perm) {
 }
 
 async function writeAuditLog(admin, action, targetType, targetId, detail) {
-  try {
-    await prisma.auditLog.create({ data: { adminId: admin.id, adminName: admin.username, action, targetType: targetType || '', targetId: targetId || '', detail: typeof detail === 'string' ? detail : JSON.stringify(detail || {}) } });
-  } catch (e) {}
+  try { await prisma.auditLog.create({ data: { adminId: admin.id, adminName: admin.username, action, targetType: targetType || '', targetId: targetId || '', detail: typeof detail === 'string' ? detail : JSON.stringify(detail || {}) } }); } catch (e) {}
 }
 
-app.get('/api/admin/me', async (req, res) => {
-  res.json({ id: req.admin.id, username: req.admin.username, roleId: req.admin.roleId, role: req.admin.roleRef?.name, roleDisplayName: req.admin.roleRef?.displayName, permissions: req.permissions });
-});
+app.get('/api/admin/me', async (req, res) => { res.json({ id: req.admin.id, username: req.admin.username, roleId: req.admin.roleId, role: req.admin.roleRef?.name, roleDisplayName: req.admin.roleRef?.displayName, permissions: req.permissions }); });
 
 app.get('/api/admin/stats', async (req, res) => {
-  res.json({
-    userCount: await prisma.user.count(), cardCount: await prisma.card.count(), boxCount: await prisma.box.count(), gameCount: await prisma.game.count(), orderCount: await prisma.order.count(),
-    openTicketCount: await prisma.ticket.count({ where: { status: { not: 'CLOSED' } } }),
-    totalRevenue: (await prisma.order.aggregate({ where: { status: 'PAID' }, _sum: { amount: true } }))._sum.amount || 0,
-  });
+  res.json({ userCount: await prisma.user.count(), cardCount: await prisma.card.count(), boxCount: await prisma.box.count(), gameCount: await prisma.game.count(), orderCount: await prisma.order.count(), openTicketCount: await prisma.ticket.count({ where: { status: { not: 'CLOSED' } } }), totalRevenue: (await prisma.order.aggregate({ where: { status: 'PAID' }, _sum: { amount: true } }))._sum.amount || 0 });
 });
 
 app.post('/api/admin/verify-password', async (req, res) => {
@@ -682,22 +663,215 @@ app.post('/api/admin/verify-password', async (req, res) => {
   res.json({ success: true });
 });
 
+// ============ 投流广告管理 ============
+app.get('/api/admin/ad-channels', requirePermission('adchannels.view'), async (req, res) => {
+  const channels = await prisma.adChannel.findMany({ orderBy: { sortOrder: 'asc' } });
+  const result = [];
+  for (const c of channels) {
+    const campaignCount = await prisma.adCampaign.count({ where: { channelId: c.id } });
+    const kolCount = await prisma.kol.count({ where: { channelId: c.id } });
+    result.push({ ...c, campaignCount, kolCount });
+  }
+  res.json(result);
+});
+
+app.post('/api/admin/ad-channels', requirePermission('adchannels.create'), async (req, res) => {
+  const { name, displayName, type, icon, description, sortOrder } = req.body;
+  if (!name || !displayName) return res.status(400).json({ error: '请填写标识和名称' });
+  try {
+    const c = await prisma.adChannel.create({ data: { name: name.toLowerCase().replace(/[^a-z0-9_]/g, '_'), displayName, type: type || 'PAID', icon: icon || '', description: description || '', sortOrder: parseInt(sortOrder || 0) } });
+    await writeAuditLog(req.admin, 'adchannel.create', 'adchannel', c.id, { name });
+    res.json({ success: true, channel: c });
+  } catch (e) { res.status(400).json({ error: '标识可能已存在' }); }
+});
+
+app.put('/api/admin/ad-channels/:id', requirePermission('adchannels.edit'), async (req, res) => {
+  const { displayName, type, icon, description, isActive, sortOrder } = req.body;
+  const data = {};
+  if (displayName) data.displayName = displayName;
+  if (type) data.type = type;
+  if (icon !== undefined) data.icon = icon;
+  if (description !== undefined) data.description = description;
+  if (isActive !== undefined) data.isActive = isActive;
+  if (sortOrder !== undefined) data.sortOrder = parseInt(sortOrder);
+  try { res.json({ success: true, channel: await prisma.adChannel.update({ where: { id: req.params.id }, data }) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/ad-channels/:id', requirePermission('adchannels.delete'), async (req, res) => {
+  try { await prisma.adChannel.delete({ where: { id: req.params.id } }); res.json({ success: true }); }
+  catch (e) { res.status(400).json({ error: '删除失败，可能有关联活动' }); }
+});
+
+app.get('/api/admin/ad-campaigns', requirePermission('adcampaigns.view'), async (req, res) => {
+  res.json(await prisma.adCampaign.findMany({ include: { channel: true }, orderBy: { createdAt: 'desc' } }));
+});
+
+app.post('/api/admin/ad-campaigns', requirePermission('adcampaigns.create'), async (req, res) => {
+  const { channelId, name, utmSource, utmMedium, utmCampaign, budget, actualCost, startAt, endAt, status, remark } = req.body;
+  if (!channelId || !name) return res.status(400).json({ error: '请填写渠道和活动名' });
+  try {
+    const c = await prisma.adCampaign.create({
+      data: { channelId, name, utmSource: utmSource || '', utmMedium: utmMedium || '', utmCampaign: utmCampaign || '', budget: parseInt(budget || 0), actualCost: parseInt(actualCost || 0), startAt: startAt ? new Date(startAt) : null, endAt: endAt ? new Date(endAt) : null, status: status || 'ACTIVE', remark: remark || '' }
+    });
+    res.json({ success: true, campaign: c });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.put('/api/admin/ad-campaigns/:id', requirePermission('adcampaigns.edit'), async (req, res) => {
+  const { channelId, name, utmSource, utmMedium, utmCampaign, budget, actualCost, startAt, endAt, status, remark } = req.body;
+  const data = {};
+  if (channelId) data.channelId = channelId;
+  if (name) data.name = name;
+  if (utmSource !== undefined) data.utmSource = utmSource;
+  if (utmMedium !== undefined) data.utmMedium = utmMedium;
+  if (utmCampaign !== undefined) data.utmCampaign = utmCampaign;
+  if (budget !== undefined) data.budget = parseInt(budget);
+  if (actualCost !== undefined) data.actualCost = parseInt(actualCost);
+  if (startAt !== undefined) data.startAt = startAt ? new Date(startAt) : null;
+  if (endAt !== undefined) data.endAt = endAt ? new Date(endAt) : null;
+  if (status) data.status = status;
+  if (remark !== undefined) data.remark = remark;
+  try { res.json({ success: true, campaign: await prisma.adCampaign.update({ where: { id: req.params.id }, data }) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/ad-campaigns/:id', requirePermission('adcampaigns.delete'), async (req, res) => {
+  try { await prisma.adCampaign.delete({ where: { id: req.params.id } }); res.json({ success: true }); }
+  catch (e) { res.status(400).json({ error: '删除失败' }); }
+});
+
+app.get('/api/admin/kols', requirePermission('kols.view'), async (req, res) => {
+  res.json(await prisma.kol.findMany({ include: { channel: true }, orderBy: { createdAt: 'desc' } }));
+});
+
+app.post('/api/admin/kols', requirePermission('kols.create'), async (req, res) => {
+  const { channelId, name, platform, contact, followers, cost, promoCode, promoLink, remark } = req.body;
+  if (!name) return res.status(400).json({ error: '请填写博主名' });
+  try {
+    const k = await prisma.kol.create({
+      data: { channelId: channelId || null, name, platform: platform || '', contact: contact || '', followers: parseInt(followers || 0), cost: parseInt(cost || 0), promoCode: promoCode || '', promoLink: promoLink || '', remark: remark || '' }
+    });
+    res.json({ success: true, kol: k });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.put('/api/admin/kols/:id', requirePermission('kols.edit'), async (req, res) => {
+  const { channelId, name, platform, contact, followers, cost, promoCode, promoLink, isActive, remark } = req.body;
+  const data = {};
+  if (channelId !== undefined) data.channelId = channelId || null;
+  if (name) data.name = name;
+  if (platform !== undefined) data.platform = platform;
+  if (contact !== undefined) data.contact = contact;
+  if (followers !== undefined) data.followers = parseInt(followers);
+  if (cost !== undefined) data.cost = parseInt(cost);
+  if (promoCode !== undefined) data.promoCode = promoCode;
+  if (promoLink !== undefined) data.promoLink = promoLink;
+  if (isActive !== undefined) data.isActive = isActive;
+  if (remark !== undefined) data.remark = remark;
+  try { res.json({ success: true, kol: await prisma.kol.update({ where: { id: req.params.id }, data }) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/kols/:id', requirePermission('kols.delete'), async (req, res) => {
+  try { await prisma.kol.delete({ where: { id: req.params.id } }); res.json({ success: true }); }
+  catch (e) { res.status(400).json({ error: '删除失败' }); }
+});
+
+// 广告报表
+app.get('/api/admin/reports/ad', requirePermission('adreports.view'), async (req, res) => {
+  const days = parseInt(req.query.days || '30');
+  const since = new Date(); since.setDate(since.getDate() - days);
+
+  const channels = await prisma.adChannel.findMany({ orderBy: { sortOrder: 'asc' } });
+  const result = [];
+
+  for (const c of channels) {
+    // 该渠道带来的用户
+    const users = await prisma.user.findMany({
+      where: { adSource: c.name, createdAt: { gte: since } },
+      select: { id: true, createdAt: true },
+    });
+    const userIds = users.map(u => u.id);
+    const registerCount = userIds.length;
+
+    // 付费用户
+    const paidOrders = userIds.length > 0 ? await prisma.order.findMany({
+      where: { userId: { in: userIds }, status: 'PAID' },
+      select: { userId: true, amount: true },
+    }) : [];
+    const paidUserIds = [...new Set(paidOrders.map(o => o.userId))];
+    const totalRevenue = paidOrders.reduce((s, o) => s + o.amount, 0);
+
+    // 活动花费（该渠道所有活动的实际花费）
+    const totalCost = await prisma.adCampaign.aggregate({
+      where: { channelId: c.id },
+      _sum: { actualCost: true },
+    });
+    const cost = totalCost._sum.actualCost || 0;
+
+    result.push({
+      channelId: c.id,
+      channelName: c.displayName,
+      channelIcon: c.icon,
+      channelType: c.type,
+      registerCount,
+      paidUserCount: paidUserIds.length,
+      payRate: registerCount > 0 ? ((paidUserIds.length / registerCount) * 100).toFixed(2) : '0.00',
+      totalRevenue,
+      cost,
+      roi: cost > 0 ? ((totalRevenue / cost) * 100).toFixed(2) : '0.00',
+    });
+  }
+
+  // 按渠道/活动汇总
+  const campaigns = await prisma.adCampaign.findMany({ include: { channel: true } });
+  const campaignResult = [];
+  for (const cp of campaigns) {
+    const users = await prisma.user.findMany({
+      where: { adCampaign: cp.utmCampaign, createdAt: { gte: since } },
+      select: { id: true },
+    });
+    const userIds = users.map(u => u.id);
+    const registerCount = userIds.length;
+
+    const paidOrders = userIds.length > 0 ? await prisma.order.findMany({
+      where: { userId: { in: userIds }, status: 'PAID' },
+      select: { userId: true, amount: true },
+    }) : [];
+    const paidUserIds = [...new Set(paidOrders.map(o => o.userId))];
+    const totalRevenue = paidOrders.reduce((s, o) => s + o.amount, 0);
+
+    campaignResult.push({
+      campaignId: cp.id,
+      campaignName: cp.name,
+      channelName: cp.channel?.displayName || '',
+      utmCampaign: cp.utmCampaign,
+      registerCount,
+      paidUserCount: paidUserIds.length,
+      payRate: registerCount > 0 ? ((paidUserIds.length / registerCount) * 100).toFixed(2) : '0.00',
+      totalRevenue,
+      cost: cp.actualCost,
+      roi: cp.actualCost > 0 ? ((totalRevenue / cp.actualCost) * 100).toFixed(2) : '0.00',
+    });
+  }
+
+  res.json({ channels: result, campaigns: campaignResult });
+});
+
 // ============ 语言管理 ============
 app.get('/api/admin/languages', async (req, res) => {
   res.json(await prisma.language.findMany({ orderBy: { sortOrder: 'asc' } }));
 });
-
 app.post('/api/admin/languages', requirePermission('languages.edit'), async (req, res) => {
   const { code, name, flag, isDefault, sortOrder } = req.body;
-  if (!code || !name) return res.status(400).json({ error: '请填写语言代码和名称' });
+  if (!code || !name) return res.status(400).json({ error: '请填写代码和名称' });
   try {
     if (isDefault) await prisma.language.updateMany({ data: { isDefault: false } });
     const lang = await prisma.language.create({ data: { code, name, flag: flag || '', isDefault: !!isDefault, sortOrder: parseInt(sortOrder || 0) } });
-    await writeAuditLog(req.admin, 'language.create', 'language', lang.id, { code, name });
     res.json({ success: true, language: lang });
   } catch (e) { res.status(400).json({ error: '语言代码可能已存在' }); }
 });
-
 app.put('/api/admin/languages/:id', requirePermission('languages.edit'), async (req, res) => {
   const { name, flag, isDefault, isActive, sortOrder } = req.body;
   const data = {};
@@ -706,12 +880,9 @@ app.put('/api/admin/languages/:id', requirePermission('languages.edit'), async (
   if (isDefault !== undefined) { if (isDefault) await prisma.language.updateMany({ data: { isDefault: false } }); data.isDefault = isDefault; }
   if (isActive !== undefined) data.isActive = isActive;
   if (sortOrder !== undefined) data.sortOrder = parseInt(sortOrder);
-  try {
-    const lang = await prisma.language.update({ where: { id: req.params.id }, data });
-    res.json({ success: true, language: lang });
-  } catch (e) { res.status(400).json({ error: e.message }); }
+  try { res.json({ success: true, language: await prisma.language.update({ where: { id: req.params.id }, data }) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
 });
-
 app.delete('/api/admin/languages/:id', requirePermission('languages.edit'), async (req, res) => {
   try {
     const lang = await prisma.language.findUnique({ where: { id: req.params.id } });
@@ -721,7 +892,6 @@ app.delete('/api/admin/languages/:id', requirePermission('languages.edit'), asyn
   } catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ 翻译词条 ============
 app.get('/api/admin/translations', requirePermission('languages.view'), async (req, res) => {
   const { namespace, search } = req.query;
   const where = {};
@@ -729,27 +899,20 @@ app.get('/api/admin/translations', requirePermission('languages.view'), async (r
   if (search) where.OR = [{ key: { contains: search } }, { translations: { contains: search } }];
   res.json(await prisma.translation.findMany({ where, orderBy: { key: 'asc' }, take: 2000 }));
 });
-
 app.post('/api/admin/translations', requirePermission('languages.edit'), async (req, res) => {
   const { key, namespace, translations } = req.body;
-  if (!key) return res.status(400).json({ error: '请填写词条 key' });
-  try {
-    const t = await prisma.translation.create({ data: { key, namespace: namespace || 'common', translations: typeof translations === 'string' ? translations : JSON.stringify(translations || {}) } });
-    res.json({ success: true, translation: t });
-  } catch (e) { res.status(400).json({ error: '词条 key 可能已存在' }); }
+  if (!key) return res.status(400).json({ error: '请填写 key' });
+  try { res.json({ success: true, translation: await prisma.translation.create({ data: { key, namespace: namespace || 'common', translations: typeof translations === 'string' ? translations : JSON.stringify(translations || {}) } }) }); }
+  catch (e) { res.status(400).json({ error: '词条可能已存在' }); }
 });
-
 app.put('/api/admin/translations/:id', requirePermission('languages.edit'), async (req, res) => {
   const { namespace, translations } = req.body;
   const data = {};
   if (namespace) data.namespace = namespace;
   if (translations !== undefined) data.translations = typeof translations === 'string' ? translations : JSON.stringify(translations);
-  try {
-    const t = await prisma.translation.update({ where: { id: req.params.id }, data });
-    res.json({ success: true, translation: t });
-  } catch (e) { res.status(400).json({ error: e.message }); }
+  try { res.json({ success: true, translation: await prisma.translation.update({ where: { id: req.params.id }, data }) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
 });
-
 app.delete('/api/admin/translations/:id', requirePermission('languages.edit'), async (req, res) => {
   try { await prisma.translation.delete({ where: { id: req.params.id } }); res.json({ success: true }); }
   catch (e) { res.status(400).json({ error: '删除失败' }); }
@@ -763,7 +926,6 @@ app.get('/api/admin/card-orders', requirePermission('cardorders.view'), async (r
   if (userId) where.userId = userId;
   res.json(await prisma.cardOrder.findMany({ where, orderBy: { createdAt: 'desc' }, take: 500 }));
 });
-
 app.put('/api/admin/card-orders/:id', requirePermission('cardorders.process'), async (req, res) => {
   const { status, trackingNo, expressCompany, adminRemark } = req.body;
   const data = {};
@@ -773,13 +935,9 @@ app.put('/api/admin/card-orders/:id', requirePermission('cardorders.process'), a
   if (adminRemark !== undefined) data.adminRemark = adminRemark;
   if (status === 'SHIPPED') data.shippedAt = new Date();
   if (status && status !== 'PENDING') data.processedAt = new Date();
-  try {
-    const order = await prisma.cardOrder.update({ where: { id: req.params.id }, data });
-    await writeAuditLog(req.admin, 'cardorder.update', 'cardorder', order.id, { status });
-    res.json({ success: true, order });
-  } catch (e) { res.status(400).json({ error: e.message }); }
+  try { res.json({ success: true, order: await prisma.cardOrder.update({ where: { id: req.params.id }, data }) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
 });
-
 app.delete('/api/admin/card-orders/:id', requirePermission('cardorders.process'), async (req, res) => {
   try { await prisma.cardOrder.delete({ where: { id: req.params.id } }); res.json({ success: true }); }
   catch (e) { res.status(400).json({ error: '删除失败' }); }
@@ -789,7 +947,6 @@ app.delete('/api/admin/card-orders/:id', requirePermission('cardorders.process')
 app.get('/api/admin/popups', requirePermission('popups.view'), async (req, res) => {
   res.json(await prisma.popup.findMany({ orderBy: { sortOrder: 'asc' } }));
 });
-
 app.post('/api/admin/popups', requirePermission('popups.create'), async (req, res) => {
   const b = req.body;
   try {
@@ -807,11 +964,9 @@ app.post('/api/admin/popups', requirePermission('popups.create'), async (req, re
         sortOrder: parseInt(b.sortOrder || 0),
       },
     });
-    await writeAuditLog(req.admin, 'popup.create', 'popup', popup.id, { title: b.title });
     res.json({ success: true, popup });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
-
 app.put('/api/admin/popups/:id', requirePermission('popups.edit'), async (req, res) => {
   const b = req.body;
   const data = {};
@@ -822,12 +977,9 @@ app.put('/api/admin/popups/:id', requirePermission('popups.edit'), async (req, r
   if (b.isActive !== undefined) data.isActive = b.isActive;
   if (b.startAt !== undefined) data.startAt = b.startAt ? new Date(b.startAt) : null;
   if (b.endAt !== undefined) data.endAt = b.endAt ? new Date(b.endAt) : null;
-  try {
-    const popup = await prisma.popup.update({ where: { id: req.params.id }, data });
-    res.json({ success: true, popup });
-  } catch (e) { res.status(400).json({ error: e.message }); }
+  try { res.json({ success: true, popup: await prisma.popup.update({ where: { id: req.params.id }, data }) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
 });
-
 app.delete('/api/admin/popups/:id', requirePermission('popups.delete'), async (req, res) => {
   try { await prisma.popup.delete({ where: { id: req.params.id } }); res.json({ success: true }); }
   catch (e) { res.status(400).json({ error: '删除失败' }); }
@@ -837,57 +989,42 @@ app.delete('/api/admin/popups/:id', requirePermission('popups.delete'), async (r
 app.get('/api/admin/articles', requirePermission('articles.view'), async (req, res) => {
   res.json(await prisma.article.findMany({ orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }] }));
 });
-
 app.post('/api/admin/articles', requirePermission('articles.create'), async (req, res) => {
   const b = req.body;
   try {
-    const a = await prisma.article.create({
-      data: {
-        slug: b.slug, category: b.category || 'NEWS', title: b.title,
-        titleI18n: b.titleI18n || '{}', coverUrl: b.coverUrl || '',
-        summary: b.summary || '', content: b.content || '', contentI18n: b.contentI18n || '{}',
-        isPublished: !!b.isPublished, sortOrder: parseInt(b.sortOrder || 0),
-      },
-    });
-    await writeAuditLog(req.admin, 'article.create', 'article', a.id, { slug: b.slug });
+    const a = await prisma.article.create({ data: { slug: b.slug, category: b.category || 'NEWS', title: b.title, titleI18n: b.titleI18n || '{}', coverUrl: b.coverUrl || '', summary: b.summary || '', content: b.content || '', contentI18n: b.contentI18n || '{}', isPublished: !!b.isPublished, sortOrder: parseInt(b.sortOrder || 0) } });
     res.json({ success: true, article: a });
   } catch (e) { res.status(400).json({ error: 'slug 可能已存在' }); }
 });
-
 app.put('/api/admin/articles/:id', requirePermission('articles.edit'), async (req, res) => {
   const b = req.body;
   const data = {};
   ['slug', 'category', 'title', 'titleI18n', 'coverUrl', 'summary', 'content', 'contentI18n'].forEach(f => { if (b[f] !== undefined) data[f] = b[f]; });
   if (b.isPublished !== undefined) data.isPublished = b.isPublished;
   if (b.sortOrder !== undefined) data.sortOrder = parseInt(b.sortOrder);
-  try {
-    const a = await prisma.article.update({ where: { id: req.params.id }, data });
-    res.json({ success: true, article: a });
-  } catch (e) { res.status(400).json({ error: e.message }); }
+  try { res.json({ success: true, article: await prisma.article.update({ where: { id: req.params.id }, data }) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
 });
-
 app.delete('/api/admin/articles/:id', requirePermission('articles.delete'), async (req, res) => {
   try { await prisma.article.delete({ where: { id: req.params.id } }); res.json({ success: true }); }
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ 会话管理 ============
+// ============ 会话 / 导出 / 用户 / VIP / 分组 / 绑卡 ============
 app.get('/api/admin/sessions', requirePermission('audit.view'), async (req, res) => {
   const since = new Date(); since.setDate(since.getDate() - 7);
   res.json(await prisma.adminSession.findMany({ where: { createdAt: { gte: since } }, orderBy: { lastActiveAt: 'desc' }, take: 200 }));
 });
-
 app.delete('/api/admin/sessions/cleanup', requirePermission('audit.view'), async (req, res) => {
   const before = new Date(); before.setDate(before.getDate() - 30);
   const result = await prisma.adminSession.deleteMany({ where: { createdAt: { lt: before } } });
   res.json({ success: true, deleted: result.count });
 });
 
-// ============ 数据导出 ============
 app.get('/api/admin/export/users', requirePermission('users.view'), async (req, res) => {
   const users = await prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
-  const header = 'ID,用户名,金币,VIP,累计充值,累计消耗,注册时间,最近登录\n';
-  const rows = users.map(u => [u.id, u.username, u.coins, u.vipLevel, u.totalRecharge, u.totalConsume, u.createdAt.toISOString(), u.lastLoginAt.toISOString()].join(',')).join('\n');
+  const header = 'ID,用户名,金币,VIP,累计充值,累计消耗,来源,注册时间,最近登录\n';
+  const rows = users.map(u => [u.id, u.username, u.coins, u.vipLevel, u.totalRecharge, u.totalConsume, u.adSource || '-', u.createdAt.toISOString(), u.lastLoginAt.toISOString()].join(',')).join('\n');
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="users_${Date.now()}.csv"`);
   res.send('\uFEFF' + header + rows);
@@ -902,10 +1039,9 @@ app.get('/api/admin/export/orders', requirePermission('orders.view'), async (req
   res.send('\uFEFF' + header + rows);
 });
 
-// ============ 用户管理 ============
 app.get('/api/admin/users', requirePermission('users.view'), async (req, res) => {
   res.json(await prisma.user.findMany({
-    select: { id: true, username: true, coins: true, vipLevel: true, totalRecharge: true, totalConsume: true, createdAt: true, lastLoginAt: true, tags: true, remark: true, groupId: true, rechargeCount: true, withdrawalCount: true, withdrawalAmount: true, group: { select: { id: true, name: true, displayName: true, color: true } } },
+    select: { id: true, username: true, coins: true, vipLevel: true, totalRecharge: true, totalConsume: true, createdAt: true, lastLoginAt: true, tags: true, remark: true, groupId: true, rechargeCount: true, withdrawalCount: true, withdrawalAmount: true, adSource: true, adCampaign: true, adRef: true, group: { select: { id: true, name: true, displayName: true, color: true } } },
     orderBy: { createdAt: 'desc' }
   }));
 });
@@ -929,7 +1065,6 @@ app.delete('/api/admin/users/:id', requirePermission('users.delete'), async (req
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ VIP 等级 ============
 app.get('/api/admin/vip-levels', requirePermission('users.vip'), async (req, res) => { res.json(await prisma.vipLevel.findMany({ orderBy: { level: 'asc' } })); });
 app.post('/api/admin/vip-levels', requirePermission('users.vip'), async (req, res) => {
   const { level, name, sortOrder, iconUrl, rechargeAmount, consumeAmount, benefits } = req.body;
@@ -958,7 +1093,6 @@ app.delete('/api/admin/vip-levels/:id', requirePermission('users.vip'), async (r
   } catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ 用户分组 ============
 app.get('/api/admin/user-groups', requirePermission('groups.view'), async (req, res) => {
   const groups = await prisma.userGroup.findMany({ orderBy: { sortOrder: 'asc' } });
   const result = [];
@@ -985,7 +1119,6 @@ app.delete('/api/admin/user-groups/:id', requirePermission('groups.edit'), async
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ 绑卡管理 ============
 app.get('/api/admin/bankcards', requirePermission('bankcards.view'), async (req, res) => {
   res.json(await prisma.bankCard.findMany({ include: { user: { select: { username: true } } }, orderBy: { createdAt: 'desc' }, take: 200 }));
 });
@@ -994,7 +1127,7 @@ app.delete('/api/admin/bankcards/:id', requirePermission('bankcards.edit'), asyn
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ 游戏管理 ============
+// ============ 游戏 / 卡牌 / 盲盒 ============
 app.get('/api/admin/games', requirePermission('games.view'), async (req, res) => {
   const games = await prisma.game.findMany({ orderBy: { sortOrder: 'asc' } });
   const result = [];
@@ -1031,7 +1164,6 @@ app.delete('/api/admin/games/:id', requirePermission('games.delete'), async (req
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ 卡牌管理 ============
 app.get('/api/admin/cards', requirePermission('cards.view'), async (req, res) => { res.json(await prisma.card.findMany({ orderBy: { createdAt: 'desc' } })); });
 app.post('/api/admin/cards', requirePermission('cards.create'), async (req, res) => {
   const { name, rarity, imageUrl, value } = req.body;
@@ -1048,7 +1180,6 @@ app.delete('/api/admin/cards/:id', requirePermission('cards.delete'), async (req
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ 盲盒管理 ============
 app.get('/api/admin/boxes', requirePermission('boxes.view'), async (req, res) => {
   res.json(await prisma.box.findMany({ include: { items: { include: { card: true } }, game: { select: { id: true, displayName: true } } }, orderBy: { createdAt: 'desc' } }));
 });
@@ -1086,7 +1217,7 @@ app.delete('/api/admin/boxes/:boxId/items/:itemId', requirePermission('boxes.pro
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// ============ 充值套餐 ============
+// ============ 充值套餐 / 订单 / 支付 / 提现 / 交易 ============
 app.get('/api/admin/recharge-options', requirePermission('recharge.view'), async (req, res) => { res.json(await prisma.rechargeOption.findMany({ orderBy: { sortOrder: 'asc' } })); });
 app.post('/api/admin/recharge-options', requirePermission('recharge.create'), async (req, res) => {
   const { coins, bonus, price, sortOrder } = req.body;
@@ -1106,10 +1237,9 @@ app.put('/api/admin/recharge-options/:id', requirePermission('recharge.edit'), a
 });
 app.delete('/api/admin/recharge-options/:id', requirePermission('recharge.delete'), async (req, res) => {
   try { await prisma.rechargeOption.delete({ where: { id: req.params.id } }); res.json({ success: true }); }
-  catch (e) { res.status(400).json({ error: '删除失败，可能有订单引用' }); }
+  catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ 订单管理 ============
 app.get('/api/admin/orders', requirePermission('orders.view'), async (req, res) => {
   res.json(await prisma.order.findMany({ include: { user: { select: { username: true } }, option: true }, orderBy: { createdAt: 'desc' }, take: 200 }));
 });
@@ -1126,7 +1256,6 @@ app.put('/api/admin/orders/:id/paid', requirePermission('orders.refund'), async 
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// ============ 支付渠道 ============
 app.get('/api/admin/payment-channels', requirePermission('payments.view'), async (req, res) => { res.json(await prisma.paymentChannel.findMany({ orderBy: { sortOrder: 'asc' } })); });
 app.put('/api/admin/payment-channels/:id', requirePermission('payments.edit'), async (req, res) => {
   const { displayName, config, isActive, sortOrder } = req.body;
@@ -1139,7 +1268,6 @@ app.put('/api/admin/payment-channels/:id', requirePermission('payments.edit'), a
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// ============ 提现 ============
 app.get('/api/admin/withdrawals', requirePermission('withdrawals.view'), async (req, res) => { res.json(await prisma.withdrawal.findMany({ orderBy: { createdAt: 'desc' }, take: 200 })); });
 app.put('/api/admin/withdrawals/:id/approve', requirePermission('withdrawals.approve'), async (req, res) => {
   const { approve, remark } = req.body;
@@ -1147,7 +1275,6 @@ app.put('/api/admin/withdrawals/:id/approve', requirePermission('withdrawals.app
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// ============ 交易明细 ============
 app.get('/api/admin/transactions', requirePermission('transactions.view'), async (req, res) => {
   const { type, userId } = req.query;
   const where = {};
@@ -1156,7 +1283,6 @@ app.get('/api/admin/transactions', requirePermission('transactions.view'), async
   res.json(await prisma.transaction.findMany({ where, orderBy: { createdAt: 'desc' }, take: 500 }));
 });
 
-// ============ 抽奖记录 ============
 app.get('/api/admin/drawlogs', requirePermission('drawlogs.view'), async (req, res) => {
   const { userId, boxId } = req.query;
   const where = {};
@@ -1173,7 +1299,7 @@ app.get('/api/admin/export/drawlogs', requirePermission('drawlogs.export'), asyn
   res.send('\uFEFF' + header + rows);
 });
 
-// ============ 轮播图 ============
+// ============ 轮播图 / 站内广告 / 任务 / 兑换码 / 工单 / 通知 ============
 app.get('/api/admin/banners', requirePermission('banners.view'), async (req, res) => { res.json(await prisma.banner.findMany({ orderBy: { sortOrder: 'asc' } })); });
 app.post('/api/admin/banners', requirePermission('banners.create'), async (req, res) => {
   const { imageUrl, link, title, sortOrder } = req.body;
@@ -1196,14 +1322,11 @@ app.delete('/api/admin/banners/:id', requirePermission('banners.delete'), async 
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// ============ 广告 ============
 app.get('/api/admin/ads', requirePermission('ads.view'), async (req, res) => { res.json(await prisma.ad.findMany({ orderBy: { sortOrder: 'asc' } })); });
 app.post('/api/admin/ads', requirePermission('ads.create'), async (req, res) => {
   const { title, imageUrl, linkType, linkValue, position, sortOrder, startAt, endAt } = req.body;
-  try {
-    const ad = await prisma.ad.create({ data: { title, imageUrl, linkType: linkType || 'URL', linkValue: linkValue || '', position: position || 'HOME_BANNER', sortOrder: parseInt(sortOrder || 0), startAt: startAt ? new Date(startAt) : null, endAt: endAt ? new Date(endAt) : null } });
-    res.json({ success: true, ad });
-  } catch (e) { res.status(400).json({ error: e.message }); }
+  try { res.json({ success: true, ad: await prisma.ad.create({ data: { title, imageUrl, linkType: linkType || 'URL', linkValue: linkValue || '', position: position || 'HOME_BANNER', sortOrder: parseInt(sortOrder || 0), startAt: startAt ? new Date(startAt) : null, endAt: endAt ? new Date(endAt) : null } }) }); }
+  catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.put('/api/admin/ads/:id', requirePermission('ads.edit'), async (req, res) => {
   const { title, imageUrl, linkType, linkValue, position, isActive, sortOrder, startAt, endAt } = req.body;
@@ -1225,7 +1348,6 @@ app.delete('/api/admin/ads/:id', requirePermission('ads.delete'), async (req, re
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// ============ 任务 ============
 app.get('/api/admin/tasks', requirePermission('tasks.view'), async (req, res) => { res.json(await prisma.task.findMany({ orderBy: { sortOrder: 'asc' } })); });
 app.post('/api/admin/tasks', requirePermission('tasks.create'), async (req, res) => {
   const { title, description, action, targetCount, rewardCoins, sortOrder } = req.body;
@@ -1250,7 +1372,6 @@ app.delete('/api/admin/tasks/:id', requirePermission('tasks.delete'), async (req
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ 兑换码 ============
 app.get('/api/admin/redeem-codes', requirePermission('redeem.view'), async (req, res) => { res.json(await prisma.redeemCode.findMany({ orderBy: { createdAt: 'desc' }, take: 200 })); });
 app.post('/api/admin/redeem-codes', requirePermission('redeem.create'), async (req, res) => {
   const { code, coins, maxUses } = req.body;
@@ -1276,7 +1397,6 @@ app.delete('/api/admin/redeem-codes/:id', requirePermission('redeem.delete'), as
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ 工单 ============
 app.get('/api/admin/tickets', requirePermission('tickets.view'), async (req, res) => {
   res.json(await prisma.ticket.findMany({ include: { user: { select: { username: true } }, replies: { orderBy: { createdAt: 'asc' } } }, orderBy: { updatedAt: 'desc' } }));
 });
@@ -1300,7 +1420,6 @@ app.delete('/api/admin/tickets/:id', requirePermission('tickets.delete'), async 
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ 通知 ============
 app.get('/api/admin/notifications', requirePermission('notifications.view'), async (req, res) => {
   res.json(await prisma.notification.findMany({ include: { reads: true }, orderBy: { createdAt: 'desc' }, take: 100 }));
 });
@@ -1315,7 +1434,7 @@ app.delete('/api/admin/notifications/:id', requirePermission('notifications.dele
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ 管理员 ============
+// ============ 管理员 / 角色 / 权限 / 菜单 / 审计 ============
 app.get('/api/admin/admins', requirePermission('admins.view'), async (req, res) => {
   const admins = await prisma.admin.findMany({ include: { roleRef: true }, orderBy: { createdAt: 'asc' } });
   res.json(admins.map(a => ({ id: a.id, username: a.username, roleId: a.roleId, role: a.roleRef?.name, roleDisplayName: a.roleRef?.displayName, rolePermissions: a.roleRef?.permissions, isActive: a.isActive, createdAt: a.createdAt, lastLoginAt: a.lastLoginAt })));
@@ -1352,7 +1471,6 @@ app.delete('/api/admin/admins/:id', requirePermission('admins.delete'), async (r
   } catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ 角色 ============
 app.get('/api/admin/roles', requirePermission('roles.view'), async (req, res) => {
   const roles = await prisma.role.findMany({ orderBy: { createdAt: 'asc' } });
   const result = [];
@@ -1383,10 +1501,8 @@ app.delete('/api/admin/roles/:id', requirePermission('roles.delete'), async (req
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// ============ 权限元数据 ============
 app.get('/api/admin/permissions', async (req, res) => { res.json(ALL_PERMISSIONS); });
 
-// ============ 菜单管理 ============
 app.get('/api/admin/menus', async (req, res) => {
   const menus = await prisma.adminMenu.findMany({ orderBy: { sortOrder: 'asc' } });
   const tree = [];
@@ -1419,7 +1535,6 @@ app.delete('/api/admin/menus/:id', requirePermission('menus.edit'), async (req, 
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
-// ============ 审计日志 ============
 app.get('/api/admin/audit-logs', requirePermission('audit.view'), async (req, res) => {
   const { action, adminName } = req.query;
   const where = {};
@@ -1428,7 +1543,7 @@ app.get('/api/admin/audit-logs', requirePermission('audit.view'), async (req, re
   res.json(await prisma.auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, take: 500 }));
 });
 
-// ============ 报表：汇总 ============
+// ============ 报表：汇总 / 资金 / 抽奖 / 用户抽奖 / 用户资金 / VIP 分布 ============
 app.get('/api/admin/reports/summary', requirePermission('reports.view'), async (req, res) => {
   const days = parseInt(req.query.days || '7');
   const since = new Date(); since.setDate(since.getDate() - days);
@@ -1448,7 +1563,6 @@ app.get('/api/admin/reports/summary', requirePermission('reports.view'), async (
   res.json({ summary: { newUsers, activeUsers, totalRevenue, totalConsume, totalDrawCount, orderCount: orders.length, avgOrderAmount: orders.length ? Math.round(totalRevenue / orders.length) : 0 }, daily: Object.values(dailyData).reverse() });
 });
 
-// ============ 报表：资金 ============
 app.get('/api/admin/reports/finance', requirePermission('reports.view'), async (req, res) => {
   const days = parseInt(req.query.days || '7');
   const since = new Date(); since.setDate(since.getDate() - days);
@@ -1461,7 +1575,6 @@ app.get('/api/admin/reports/finance', requirePermission('reports.view'), async (
   res.json({ summary: { totalRecharge: orders.reduce((s, o) => s + o.amount, 0), totalConsume: draws.reduce((s, d) => s + d.cost, 0), totalOutput: draws.reduce((s, d) => s + d.outputValue, 0) }, daily: Object.values(dailyData).reverse() });
 });
 
-// ============ 报表：抽奖 ============
 app.get('/api/admin/reports/draw', requirePermission('reports.view'), async (req, res) => {
   const days = parseInt(req.query.days || '7');
   const since = new Date(); since.setDate(since.getDate() - days);
@@ -1473,7 +1586,6 @@ app.get('/api/admin/reports/draw', requirePermission('reports.view'), async (req
   res.json({ summary: { totalCount: logs.reduce((s, l) => s + l.count, 0), totalCost: logs.reduce((s, l) => s + l.cost, 0), totalOutput: logs.reduce((s, l) => s + l.outputValue, 0) }, daily: result });
 });
 
-// ============ 报表：用户抽奖 ============
 app.get('/api/admin/reports/user-draw', requirePermission('reports.view'), async (req, res) => {
   const days = parseInt(req.query.days || '7');
   const since = new Date(); since.setDate(since.getDate() - days);
@@ -1488,12 +1600,10 @@ app.get('/api/admin/reports/user-draw', requirePermission('reports.view'), async
   res.json({ list: Object.values(userMap).sort((a, b) => b.cost - a.cost).slice(0, 100) });
 });
 
-// ============ 报表：用户资金 ============
 app.get('/api/admin/reports/user-finance', requirePermission('reports.view'), async (req, res) => {
-  res.json({ list: await prisma.user.findMany({ select: { id: true, username: true, coins: true, vipLevel: true, totalRecharge: true, totalConsume: true, rechargeCount: true, createdAt: true }, orderBy: { totalRecharge: 'desc' }, take: 200 }) });
+  res.json({ list: await prisma.user.findMany({ select: { id: true, username: true, coins: true, vipLevel: true, totalRecharge: true, totalConsume: true, rechargeCount: true, createdAt: true, adSource: true }, orderBy: { totalRecharge: 'desc' }, take: 200 }) });
 });
 
-// ============ 报表：VIP 分布 ============
 app.get('/api/admin/reports/vip-distribution', requirePermission('reports.view'), async (req, res) => {
   const levels = await prisma.vipLevel.findMany({ orderBy: { level: 'asc' } });
   const result = [];
@@ -1534,47 +1644,6 @@ async function syncMenus() {
     { id: 'menu-report-user-draw', parentId: 'menu-report-group', title: '用户抽奖报表', type: 'MENU', icon: '👤', path: '/reports/user-draw', component: 'ReportUserDraw', permission: 'reports.view', sortOrder: 4 },
     { id: 'menu-report-user-finance', parentId: 'menu-report-group', title: '用户资金报表', type: 'MENU', icon: '💵', path: '/reports/user-finance', component: 'ReportUserFinance', permission: 'reports.view', sortOrder: 5 },
     { id: 'menu-report-vip', parentId: 'menu-report-group', title: 'VIP分布报表', type: 'MENU', icon: '👑', path: '/reports/vip-distribution', component: 'ReportVipDistribution', permission: 'reports.view', sortOrder: 6 },
-    { id: 'menu-notification-group', parentId: null, title: '通知管理', type: 'DIRECTORY', icon: '🔔', path: '', component: '', permission: '', sortOrder: 6 },
-    { id: 'menu-notifications', parentId: 'menu-notification-group', title: '通知列表', type: 'MENU', icon: '🔔', path: '/notifications', component: 'NotificationList', permission: 'notifications.view', sortOrder: 1 },
-    { id: 'menu-banners', parentId: 'menu-notification-group', title: '轮播图', type: 'MENU', icon: '🖼️', path: '/banners', component: 'BannerList', permission: 'banners.view', sortOrder: 2 },
-    { id: 'menu-popups', parentId: 'menu-notification-group', title: '弹窗管理', type: 'MENU', icon: '💬', path: '/popups', component: 'PopupList', permission: 'popups.view', sortOrder: 3 },
-    { id: 'menu-articles', parentId: 'menu-notification-group', title: '文章管理', type: 'MENU', icon: '📄', path: '/articles', component: 'ArticleList', permission: 'articles.view', sortOrder: 4 },
-    { id: 'menu-ad-group', parentId: null, title: '广告管理', type: 'DIRECTORY', icon: '📣', path: '', component: '', permission: '', sortOrder: 7 },
-    { id: 'menu-ads', parentId: 'menu-ad-group', title: '广告列表', type: 'MENU', icon: '📺', path: '/ads', component: 'AdList', permission: 'ads.view', sortOrder: 1 },
-    { id: 'menu-tasks', parentId: null, title: '任务管理', type: 'MENU', icon: '🎯', path: '/tasks', component: 'TaskList', permission: 'tasks.view', sortOrder: 8 },
-    { id: 'menu-redeem', parentId: null, title: '兑换码', type: 'MENU', icon: '🎁', path: '/redeem-codes', component: 'RedeemCodeList', permission: 'redeem.view', sortOrder: 9 },
-    { id: 'menu-tickets', parentId: null, title: '客服工单', type: 'MENU', icon: '🎧', path: '/tickets', component: 'TicketList', permission: 'tickets.view', sortOrder: 10 },
-    { id: 'menu-system-group', parentId: null, title: '系统管理', type: 'DIRECTORY', icon: '⚙️', path: '', component: '', permission: '', sortOrder: 99 },
-    { id: 'menu-admins', parentId: 'menu-system-group', title: '管理员列表', type: 'MENU', icon: '👤', path: '/admins', component: 'AdminList', permission: 'admins.view', sortOrder: 1 },
-    { id: 'menu-roles', parentId: 'menu-system-group', title: '角色管理', type: 'MENU', icon: '🎭', path: '/admins/roles', component: 'RoleList', permission: 'roles.view', sortOrder: 2 },
-    { id: 'menu-permissions', parentId: 'menu-system-group', title: '权限说明', type: 'MENU', icon: '📖', path: '/admins/permissions', component: 'PermissionList', permission: '', sortOrder: 3 },
-    { id: 'menu-menus', parentId: 'menu-system-group', title: '菜单管理', type: 'MENU', icon: '🧩', path: '/admins/menus', component: 'MenuManage', permission: 'menus.edit', sortOrder: 4 },
-    { id: 'menu-languages', parentId: 'menu-system-group', title: '语言列表', type: 'MENU', icon: '🌐', path: '/system/languages', component: 'LanguageList', permission: 'languages.view', sortOrder: 5 },
-    { id: 'menu-translations', parentId: 'menu-system-group', title: '翻译词条', type: 'MENU', icon: '📝', path: '/system/translations', component: 'TranslationList', permission: 'languages.view', sortOrder: 6 },
-    { id: 'menu-audit-logs', parentId: 'menu-system-group', title: '操作日志', type: 'MENU', icon: '📝', path: '/admins/audit-logs', component: 'AuditLogList', permission: 'audit.view', sortOrder: 7 },
-    { id: 'menu-sessions', parentId: 'menu-system-group', title: '会话管理', type: 'MENU', icon: '💻', path: '/admins/sessions', component: 'SessionList', permission: 'audit.view', sortOrder: 8 },
-  ];
-
-  let created = 0, updated = 0;
-  for (const m of menus) {
-    const existing = await prisma.adminMenu.findUnique({ where: { id: m.id } });
-    await prisma.adminMenu.upsert({
-      where: { id: m.id },
-      update: { title: m.title, icon: m.icon, path: m.path, component: m.component, permission: m.permission, sortOrder: m.sortOrder, parentId: m.parentId },
-      create: m,
-    });
-    if (existing) updated++; else created++;
-  }
-  console.log(`✅ 菜单同步完成：新增 ${created} 条，更新 ${updated} 条`);
-}
-
-// ================= 服务启动 =================
-const PORT = process.env.PORT || 3001;
-
-async function bootstrap() {
-  await migrateRoles();
-  await syncMenus();
-  app.listen(PORT, '0.0.0.0', () => console.log(`🚀 后端服务器运行在 http://localhost:${PORT}`));
-}
-
-bootstrap().catch(e => { console.error('启动失败:', e); process.exit(1); });
+    { id: 'menu-ad-group', parentId: null, title: '广告管理', type: 'DIRECTORY', icon: '📣', path: '', component: '', permission: '', sortOrder: 6 },
+    { id: 'menu-ad-channels', parentId: 'menu-ad-group', title: '投放渠道', type: 'MENU', icon: '📡', path: '/ad-channels', component: 'AdChannelList', permission: 'adchannels.view', sortOrder: 1 },
+    { id: 'menu-ad-campaigns', parentId: 'menu-ad-group', title: '投放活动', type: 'MENU', icon: '📢', path: '/ad-campaign
