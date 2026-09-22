@@ -41,40 +41,20 @@ import ReportDraw from './pages/reports/draw';
 import ReportUserDraw from './pages/reports/user-draw';
 import ReportUserFinance from './pages/reports/user-finance';
 import ReportVipDistribution from './pages/reports/vip-distribution';
+import LanguageList from './pages/languages';
+import TranslationList from './pages/translations';
+import CardOrderList from './pages/card-orders';
+import PopupList from './pages/popups';
+import ArticleList from './pages/articles';
 
 const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
-  DashboardPage,
-  UserList,
-  UserGroupList,
-  BankCardList,
-  CardList,
-  BoxList,
-  RechargeList,
-  OrderList,
-  BannerList,
-  TaskList,
-  RedeemCodeList,
-  NotificationList,
-  TicketList,
-  AdminList,
-  RoleList,
-  PermissionList,
-  AuditLogList,
-  SessionList,
-  VipLevels,
-  MenuManage,
-  GameList,
-  AdList,
-  PaymentChannelList,
-  WithdrawalList,
-  TransactionList,
-  DrawLogList,
-  ReportSummary,
-  ReportFinance,
-  ReportDraw,
-  ReportUserDraw,
-  ReportUserFinance,
-  ReportVipDistribution,
+  DashboardPage, UserList, UserGroupList, BankCardList, CardList, BoxList,
+  RechargeList, OrderList, BannerList, TaskList, RedeemCodeList, NotificationList,
+  TicketList, AdminList, RoleList, PermissionList, AuditLogList, SessionList,
+  VipLevels, MenuManage, GameList, AdList, PaymentChannelList, WithdrawalList,
+  TransactionList, DrawLogList, ReportSummary, ReportFinance, ReportDraw,
+  ReportUserDraw, ReportUserFinance, ReportVipDistribution,
+  LanguageList, TranslationList, CardOrderList, PopupList, ArticleList,
 };
 
 function buildRoutes(menus: AdminMenu[]): React.ReactElement[] {
@@ -83,9 +63,7 @@ function buildRoutes(menus: AdminMenu[]): React.ReactElement[] {
     list.forEach((m) => {
       if (m.type === 'MENU' && m.path && m.component) {
         const Comp = COMPONENT_REGISTRY[m.component];
-        if (Comp) {
-          routes.push(<Route key={m.id} path={m.path} element={<Comp />} />);
-        }
+        if (Comp) routes.push(<Route key={m.id} path={m.path} element={<Comp />} />);
       }
       if (m.children?.length) walk(m.children);
     });
@@ -95,18 +73,14 @@ function buildRoutes(menus: AdminMenu[]): React.ReactElement[] {
 }
 
 const ProtectedLayout = ({ menus }: { menus: AdminMenu[] }) => (
-  <AppLayout menus={menus}>
-    <Outlet />
-  </AppLayout>
+  <AppLayout menus={menus}><Outlet /></AppLayout>
 );
 
 function AppContent() {
   const { data: auth, isLoading: authLoading } = useIsAuthenticated();
   const { menus, loading: menuLoading } = useMenuTree();
 
-  if (authLoading) {
-    return <div className="flex items-center justify-center h-screen bg-[#0d0d0d] text-gray-400">验证登录状态...</div>;
-  }
+  if (authLoading) return <div className="flex items-center justify-center h-screen bg-[#0d0d0d] text-gray-400">验证登录状态...</div>;
 
   if (!auth?.authenticated) {
     return (
@@ -117,9 +91,7 @@ function AppContent() {
     );
   }
 
-  if (menuLoading || !menus) {
-    return <div className="flex items-center justify-center h-screen bg-[#0d0d0d] text-gray-400">加载菜单中...</div>;
-  }
+  if (menuLoading || !menus) return <div className="flex items-center justify-center h-screen bg-[#0d0d0d] text-gray-400">加载菜单中...</div>;
 
   const dynamicRoutes = buildRoutes(menus);
 
@@ -139,12 +111,7 @@ export default function App() {
   return (
     <SensitiveConfirmProvider>
       <BrowserRouter>
-        <Refine
-          dataProvider={dataProvider}
-          authProvider={authProvider}
-          routerProvider={routerProvider}
-          options={{ disableTelemetry: true }}
-        >
+        <Refine dataProvider={dataProvider} authProvider={authProvider} routerProvider={routerProvider} options={{ disableTelemetry: true }}>
           <AppContent />
         </Refine>
       </BrowserRouter>
