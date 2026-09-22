@@ -9,6 +9,139 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
 
+
+// ================= 临时：初始化多语言数据 =================
+app.get('/api/setup-i18n', async (req, res) => {
+  try {
+    // 1. 语言列表
+    const languages = [
+      { code: 'zh-CN', name: '简体中文', flag: '🇨🇳', isDefault: true, sortOrder: 1 },
+      { code: 'en-US', name: 'English', flag: '🇺🇸', isDefault: false, sortOrder: 2 },
+      { code: 'es-ES', name: 'Español', flag: '🇪🇸', isDefault: false, sortOrder: 3 },
+    ];
+    for (const l of languages) {
+      await prisma.language.upsert({
+        where: { code: l.code },
+        update: { name: l.name, flag: l.flag, sortOrder: l.sortOrder },
+        create: { code: l.code, name: l.name, flag: l.flag, isDefault: l.isDefault, sortOrder: l.sortOrder },
+      });
+    }
+
+    // 2. 翻译词条
+    const translations = [
+      // 底部导航
+      { key: 'nav.home',      namespace: 'nav', t: { 'zh-CN': '首页',   'en-US': 'Home',      'es-ES': 'Inicio' } },
+      { key: 'nav.activity',  namespace: 'nav', t: { 'zh-CN': '活动',   'en-US': 'Activity',  'es-ES': 'Actividad' } },
+      { key: 'nav.recharge',  namespace: 'nav', t: { 'zh-CN': '充值',   'en-US': 'Recharge',  'es-ES': 'Recargar' } },
+      { key: 'nav.inventory', namespace: 'nav', t: { 'zh-CN': '存货',   'en-US': 'Inventory', 'es-ES': 'Inventario' } },
+      { key: 'nav.profile',   namespace: 'nav', t: { 'zh-CN': '我的',   'en-US': 'Profile',   'es-ES': 'Cuenta' } },
+
+      // 通用
+      { key: 'common.submit',  namespace: 'common', t: { 'zh-CN': '提交', 'en-US': 'Submit',  'es-ES': 'Enviar' } },
+      { key: 'common.cancel',  namespace: 'common', t: { 'zh-CN': '取消', 'en-US': 'Cancel',  'es-ES': 'Cancelar' } },
+      { key: 'common.confirm', namespace: 'common', t: { 'zh-CN': '确认', 'en-US': 'Confirm', 'es-ES': 'Confirmar' } },
+      { key: 'common.close',   namespace: 'common', t: { 'zh-CN': '关闭', 'en-US': 'Close',   'es-ES': 'Cerrar' } },
+
+      // 认证
+      { key: 'auth.login',    namespace: 'auth', t: { 'zh-CN': '登录',     'en-US': 'Sign In',  'es-ES': 'Iniciar sesión' } },
+      { key: 'auth.register', namespace: 'auth', t: { 'zh-CN': '注册',     'en-US': 'Sign Up',  'es-ES': 'Registrarse' } },
+      { key: 'auth.logout',   namespace: 'auth', t: { 'zh-CN': '退出登录', 'en-US': 'Logout',   'es-ES': 'Cerrar sesión' } },
+      { key: 'auth.username', namespace: 'auth', t: { 'zh-CN': '用户名',   'en-US': 'Username', 'es-ES': 'Usuario' } },
+      { key: 'auth.password', namespace: 'auth', t: { 'zh-CN': '密码',     'en-US': 'Password', 'es-ES': 'Contraseña' } },
+
+      // 首页
+      { key: 'home.games',       namespace: 'home', t: { 'zh-CN': '游戏专区',       'en-US': 'Game Zone',          'es-ES': 'Zona de juegos' } },
+      { key: 'home.featured',    namespace: 'home', t: { 'zh-CN': '推荐盲盒',       'en-US': 'Featured Packs',     'es-ES': 'Paquetes destacados' } },
+      { key: 'home.leaderboard', namespace: 'home', t: { 'zh-CN': '一周消费排行榜', 'en-US': 'Weekly Leaderboard', 'es-ES': 'Ranking semanal' } },
+      { key: 'home.open_box',    namespace: 'home', t: { 'zh-CN': '开箱',           'en-US': 'Open',               'es-ES': 'Abrir' } },
+      { key: 'home.enter',       namespace: 'home', t: { 'zh-CN': '进入抽奖',       'en-US': 'Enter',              'es-ES': 'Entrar' } },
+
+      // 抽奖
+      { key: 'draw.title',  namespace: 'draw', t: { 'zh-CN': '抽奖',     'en-US': 'Draw',         'es-ES': 'Sortear' } },
+      { key: 'draw.price',  namespace: 'draw', t: { 'zh-CN': '单价',     'en-US': 'Price',        'es-ES': 'Precio' } },
+      { key: 'draw.count',  namespace: 'draw', t: { 'zh-CN': '抽奖次数', 'en-US': 'Draw Count',   'es-ES': 'Cantidad' } },
+      { key: 'draw.total',  namespace: 'draw', t: { 'zh-CN': '总计',     'en-US': 'Total',        'es-ES': 'Total' } },
+      { key: 'draw.result', namespace: 'draw', t: { 'zh-CN': '抽卡结果', 'en-US': 'Draw Results', 'es-ES': 'Resultados' } },
+
+      // 个人中心
+      { key: 'profile.orders',        namespace: 'profile', t: { 'zh-CN': '我的订单', 'en-US': 'My Orders',       'es-ES': 'Mis pedidos' } },
+      { key: 'profile.inventory',     namespace: 'profile', t: { 'zh-CN': '我的库存', 'en-US': 'My Inventory',    'es-ES': 'Mi inventario' } },
+      { key: 'profile.notifications', namespace: 'profile', t: { 'zh-CN': '消息中心', 'en-US': 'Notifications',   'es-ES': 'Notificaciones' } },
+      { key: 'profile.redeem',        namespace: 'profile', t: { 'zh-CN': '兑换码',   'en-US': 'Redeem Code',     'es-ES': 'Código de canje' } },
+      { key: 'profile.support',       namespace: 'profile', t: { 'zh-CN': '联系客服', 'en-US': 'Contact Support', 'es-ES': 'Contactar soporte' } },
+      { key: 'profile.articles',      namespace: 'profile', t: { 'zh-CN': '新闻资讯', 'en-US': 'News',            'es-ES': 'Noticias' } },
+      { key: 'profile.about',         namespace: 'profile', t: { 'zh-CN': '关于我们', 'en-US': 'About Us',        'es-ES': 'Sobre nosotros' } },
+      { key: 'profile.terms',         namespace: 'profile', t: { 'zh-CN': '用户协议', 'en-US': 'Terms',           'es-ES': 'Términos' } },
+      { key: 'profile.privacy',       namespace: 'profile', t: { 'zh-CN': '隐私政策', 'en-US': 'Privacy Policy',  'es-ES': 'Privacidad' } },
+      { key: 'profile.contact',       namespace: 'profile', t: { 'zh-CN': '联系我们', 'en-US': 'Contact Us',      'es-ES': 'Contáctenos' } },
+
+      // 卡片订单
+      { key: 'cardorder.title',         namespace: 'cardorder', t: { 'zh-CN': '卡片发货',       'en-US': 'Card Shipping',    'es-ES': 'Envío de tarjetas' } },
+      { key: 'cardorder.submit',        namespace: 'cardorder', t: { 'zh-CN': '申请发货',       'en-US': 'Request Shipping', 'es-ES': 'Solicitar envío' } },
+      { key: 'cardorder.receiver',      namespace: 'cardorder', t: { 'zh-CN': '收货人姓名',     'en-US': 'Receiver Name',    'es-ES': 'Nombre del destinatario' } },
+      { key: 'cardorder.phone',         namespace: 'cardorder', t: { 'zh-CN': '联系电话',       'en-US': 'Phone',            'es-ES': 'Teléfono' } },
+      { key: 'cardorder.address',       namespace: 'cardorder', t: { 'zh-CN': '收货地址',       'en-US': 'Address',          'es-ES': 'Dirección' } },
+      { key: 'cardorder.cards',         namespace: 'cardorder', t: { 'zh-CN': '张',             'en-US': 'cards',            'es-ES': 'tarjetas' } },
+      { key: 'cardorder.detail',        namespace: 'cardorder', t: { 'zh-CN': '订单详情',       'en-US': 'Order Detail',     'es-ES': 'Detalle del pedido' } },
+      { key: 'cardorder.items',         namespace: 'cardorder', t: { 'zh-CN': '卡牌明细',       'en-US': 'Card Items',       'es-ES': 'Detalles de tarjetas' } },
+      { key: 'cardorder.receiver_info', namespace: 'cardorder', t: { 'zh-CN': '收货信息',       'en-US': 'Shipping Info',    'es-ES': 'Información de envío' } },
+      { key: 'cardorder.logistics',     namespace: 'cardorder', t: { 'zh-CN': '物流信息',       'en-US': 'Logistics',        'es-ES': 'Logística' } },
+      { key: 'cardorder.express',       namespace: 'cardorder', t: { 'zh-CN': '快递公司',       'en-US': 'Courier',          'es-ES': 'Mensajería' } },
+      { key: 'cardorder.tracking_no',   namespace: 'cardorder', t: { 'zh-CN': '快递单号',       'en-US': 'Tracking No.',     'es-ES': 'Nº de seguimiento' } },
+      { key: 'cardorder.copy',          namespace: 'cardorder', t: { 'zh-CN': '复制单号',       'en-US': 'Copy No.',         'es-ES': 'Copiar Nº' } },
+      { key: 'cardorder.select_cards',  namespace: 'cardorder', t: { 'zh-CN': '选择要发货的卡牌', 'en-US': 'Select Cards',   'es-ES': 'Seleccionar tarjetas' } },
+      { key: 'cardorder.selected',      namespace: 'cardorder', t: { 'zh-CN': '已选卡牌',       'en-US': 'Selected',         'es-ES': 'Seleccionadas' } },
+      { key: 'cardorder.remark',        namespace: 'cardorder', t: { 'zh-CN': '备注（可选）',   'en-US': 'Remark (optional)','es-ES': 'Comentario' } },
+      { key: 'cardorder.submit_btn',    namespace: 'cardorder', t: { 'zh-CN': '提交发货申请',   'en-US': 'Submit Shipping',  'es-ES': 'Enviar solicitud' } },
+      { key: 'cardorder.confirm_submit',namespace: 'cardorder', t: { 'zh-CN': '确认提交发货申请？', 'en-US': 'Confirm submitting?', 'es-ES': '¿Confirmar envío?' } },
+      { key: 'cardorder.submitted',     namespace: 'cardorder', t: { 'zh-CN': '提交成功！管理员会尽快处理', 'en-US': 'Submitted!', 'es-ES': '¡Enviado!' } },
+      { key: 'cardorder.input_name',    namespace: 'cardorder', t: { 'zh-CN': '请填写收货人姓名', 'en-US': 'Please input receiver name', 'es-ES': 'Introduce el nombre' } },
+      { key: 'cardorder.input_phone',   namespace: 'cardorder', t: { 'zh-CN': '请填写联系电话', 'en-US': 'Please input phone',  'es-ES': 'Introduce el teléfono' } },
+      { key: 'cardorder.input_address', namespace: 'cardorder', t: { 'zh-CN': '请填写收货地址', 'en-US': 'Please input address','es-ES': 'Introduce la dirección' } },
+
+      // 状态
+      { key: 'status.pending',    namespace: 'status', t: { 'zh-CN': '待处理', 'en-US': 'Pending',    'es-ES': 'Pendiente' } },
+      { key: 'status.processing', namespace: 'status', t: { 'zh-CN': '处理中', 'en-US': 'Processing', 'es-ES': 'Procesando' } },
+      { key: 'status.shipped',    namespace: 'status', t: { 'zh-CN': '已发货', 'en-US': 'Shipped',    'es-ES': 'Enviado' } },
+      { key: 'status.done',       namespace: 'status', t: { 'zh-CN': '已完成', 'en-US': 'Completed',  'es-ES': 'Completado' } },
+      { key: 'status.rejected',   namespace: 'status', t: { 'zh-CN': '已拒绝', 'en-US': 'Rejected',   'es-ES': 'Rechazado' } },
+      { key: 'status.paid',       namespace: 'status', t: { 'zh-CN': '已支付', 'en-US': 'Paid',       'es-ES': 'Pagado' } },
+
+      // 活动
+      { key: 'activity.tasks',    namespace: 'activity', t: { 'zh-CN': '每日任务', 'en-US': 'Daily Tasks', 'es-ES': 'Tareas diarias' } },
+      { key: 'activity.weekly',   namespace: 'activity', t: { 'zh-CN': '周榜',     'en-US': 'Weekly',      'es-ES': 'Semanal' } },
+      { key: 'activity.monthly',  namespace: 'activity', t: { 'zh-CN': '月榜',     'en-US': 'Monthly',     'es-ES': 'Mensual' } },
+      { key: 'activity.claim',    namespace: 'activity', t: { 'zh-CN': '领取',     'en-US': 'Claim',       'es-ES': 'Reclamar' } },
+      { key: 'activity.claimed',  namespace: 'activity', t: { 'zh-CN': '已领取',   'en-US': 'Claimed',     'es-ES': 'Reclamado' } },
+      { key: 'activity.progress', namespace: 'activity', t: { 'zh-CN': '进行中',   'en-US': 'In Progress', 'es-ES': 'En curso' } },
+
+      // 其他
+      { key: 'inventory.empty', namespace: 'inventory', t: { 'zh-CN': '您的库存为空，快去抽卡吧！', 'en-US': 'Your inventory is empty. Go draw!', 'es-ES': 'Inventario vacío. ¡Ve a sortear!' } },
+      { key: 'orders.empty',    namespace: 'orders',    t: { 'zh-CN': '暂无订单记录', 'en-US': 'No orders yet', 'es-ES': 'Sin pedidos' } },
+      { key: 'articles.all',    namespace: 'articles',  t: { 'zh-CN': '全部', 'en-US': 'All', 'es-ES': 'Todo' } },
+    ];
+
+    for (const item of translations) {
+      await prisma.translation.upsert({
+        where: { key: item.key },
+        update: { namespace: item.namespace, translations: JSON.stringify(item.t) },
+        create: { key: item.key, namespace: item.namespace, translations: JSON.stringify(item.t) },
+      });
+    }
+
+    res.json({ success: true, message: '多语言数据已写入', languages: languages.length, translations: translations.length });
+  } catch (e) {
+    console.error('初始化失败:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+// ================= 临时接口结束 =================
+
+
+
+
+
+
 // ================= 辅助函数 =================
 function getClientIp(req) {
   return (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
