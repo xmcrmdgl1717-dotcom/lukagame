@@ -5,7 +5,7 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications, onGoArticles, onGoStatic, onGoVip }) {
+export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications, onGoArticles, onGoStatic, onGoVip, onGoWithdraw }) {
   const { user, setUser } = useStore();
   const { t } = useI18n();
   const [redeemCode, setRedeemCode] = useState('');
@@ -67,6 +67,15 @@ export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications,
         </button>
         <button onClick={onGoArticles} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:bg-[#2a1414] transition">
           <span className="text-2xl">📰</span><span className="text-sm text-white font-bold">{t('profile.articles', '新闻资讯')}</span>
+        </button>
+        {/* 新增：提现入口 */}
+        <button onClick={onGoWithdraw} className="col-span-2 bg-gradient-to-r from-[#2d1410] to-[#4a1c12] border border-[#6b2a1e] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:border-orange-500 transition">
+          <span className="text-2xl">💸</span>
+          <div className="text-left flex-1">
+            <div className="text-sm text-white font-bold">提现中心</div>
+            <div className="text-[10px] text-gray-400 mt-0.5">将金币兑换为现金</div>
+          </div>
+          <span className="text-gray-600 text-2xl">›</span>
         </button>
       </div>
 
