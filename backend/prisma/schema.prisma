@@ -7,12 +7,61 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ================= 投流广告 =================
+
+model AdChannel {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  displayName String
+  type        String       @default("PAID")   // PAID / KOL / ORGANIC
+  icon        String       @default("")
+  description String       @default("")
+  isActive    Boolean      @default(true)
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  campaigns   AdCampaign[]
+  kols        Kol[]
+}
+
+model AdCampaign {
+  id          String    @id @default(uuid())
+  channelId   String
+  name        String
+  utmSource   String    @default("")
+  utmMedium   String    @default("")
+  utmCampaign String    @default("")
+  budget      Int       @default(0)
+  actualCost  Int       @default(0)
+  startAt     DateTime?
+  endAt       DateTime?
+  status      String    @default("ACTIVE")
+  remark      String    @default("")
+  createdAt   DateTime  @default(now())
+  channel     AdChannel @relation(fields: [channelId], references: [id])
+}
+
+model Kol {
+  id        String     @id @default(uuid())
+  channelId String?
+  name      String
+  platform  String     @default("")
+  contact   String     @default("")
+  followers Int        @default(0)
+  cost      Int        @default(0)
+  promoCode String     @default("")
+  promoLink String     @default("")
+  isActive  Boolean    @default(true)
+  remark    String     @default("")
+  createdAt DateTime   @default(now())
+  channel   AdChannel? @relation(fields: [channelId], references: [id])
+}
+
 // ================= 语言 / 翻译 =================
 
 model Language {
   id        String   @id @default(uuid())
-  code      String   @unique   // zh-CN, en-US, es-ES
-  name      String              // 中文、English、Español
+  code      String   @unique
+  name      String
   flag      String   @default("")
   isDefault Boolean  @default(false)
   isActive  Boolean  @default(true)
@@ -24,7 +73,7 @@ model Translation {
   id           String   @id @default(uuid())
   key          String   @unique
   namespace    String   @default("common")
-  translations String   @default("{}")  // JSON: {"zh-CN": "首页", "en-US": "Home"}
+  translations String   @default("{}")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -35,11 +84,11 @@ model CardOrder {
   id              String    @id @default(uuid())
   userId          String
   userName        String    @default("")
-  items           String    @default("[]")  // JSON: [{cardId, cardName, quantity}]
+  items           String    @default("[]")
   receiverName    String
   receiverPhone   String
   receiverAddress String
-  status          String    @default("PENDING") // PENDING/PROCESSING/SHIPPED/DONE/REJECTED
+  status          String    @default("PENDING")
   trackingNo      String    @default("")
   expressCompany  String    @default("")
   remark          String    @default("")
@@ -58,11 +107,11 @@ model Popup {
   content         String    @default("")
   buttonText      String    @default("")
   buttonLink      String    @default("")
-  position        String    @default("HOME")  // HOME / ALL / PATH
+  position        String    @default("HOME")
   positionPath    String    @default("")
-  delay           Int       @default(0)       // 延迟秒数
-  frequency       String    @default("ONCE")  // ONCE / DAILY / SESSION / ALWAYS
-  dailyLimit      Int       @default(1)       // 每天最多弹多少次
+  delay           Int       @default(0)
+  frequency       String    @default("ONCE")
+  dailyLimit      Int       @default(1)
   targetVipMin    Int       @default(0)
   targetVipMax    Int       @default(99)
   targetTags      String    @default("")
@@ -85,7 +134,7 @@ model Popup {
 model Article {
   id          String   @id @default(uuid())
   slug        String   @unique
-  category    String   @default("NEWS")  // SYSTEM / NEWS / HELP / ACTIVITY
+  category    String   @default("NEWS")
   title       String
   titleI18n   String   @default("{}")
   coverUrl    String   @default("")
@@ -99,7 +148,7 @@ model Article {
   updatedAt   DateTime @updatedAt
 }
 
-// ================= 原有表（保持不变） =================
+// ================= 用户 =================
 
 model User {
   id               String   @id @default(uuid())
@@ -117,6 +166,13 @@ model User {
   withdrawalCount  Int      @default(0)
   withdrawalAmount Int      @default(0)
   createdAt        DateTime @default(now())
+
+  // 广告来源追踪
+  adSource         String   @default("")
+  adMedium         String   @default("")
+  adCampaign       String   @default("")
+  adRef            String   @default("")
+
   group            UserGroup?      @relation(fields: [groupId], references: [id])
   inventory        Inventory[]
   orders           Order[]
