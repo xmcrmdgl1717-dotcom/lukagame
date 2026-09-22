@@ -4,16 +4,23 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+const TABS = [
+  { key: 'daily',   label: '日榜', range: '今日 00:00 起' },
+  { key: 'weekly',  label: '周榜', range: '近 7 天' },
+  { key: 'monthly', label: '月榜', range: '近 30 天' },
+];
+
 export default function Leaderboard({ onBack }) {
   const { t } = useI18n();
-  const [tab, setTab] = useState('weekly');
+  const [tab, setTab] = useState('daily');
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
+    setList([]);
     axios.get(`${API_URL}/api/leaderboard/${tab}`)
-      .then(res => setList(res.data))
+      .then(res => setList(res.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [tab]);
@@ -25,6 +32,8 @@ export default function Leaderboard({ onBack }) {
     return 'bg-[#1a0f0c] text-gray-500 border border-[#2a1414]';
   };
 
+  const currentTab = TABS.find(x => x.key === tab);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-2">
@@ -32,14 +41,24 @@ export default function Leaderboard({ onBack }) {
         <div className="text-lg font-bold text-orange-400">{t('home.leaderboard', '消费排行榜')}</div>
       </div>
 
-      {/* 切换 tabs */}
-      <div className="flex justify-around bg-[#1c0e0e] rounded-lg p-1 mb-4">
-        <button onClick={() => setTab('weekly')} className={`flex-1 py-2 text-xs font-bold rounded ${tab === 'weekly' ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>
-          周榜
-        </button>
-        <button onClick={() => setTab('monthly')} className={`flex-1 py-2 text-xs font-bold rounded ${tab === 'monthly' ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>
-          月榜
-        </button>
+      {/* Tab 切换 */}
+      <div className="flex justify-around bg-[#1c0e0e] rounded-lg p-1 mb-2">
+        {TABS.map(item => (
+          <button
+            key={item.key}
+            onClick={() => setTab(item.key)}
+            className={`flex-1 py-2 text-xs font-bold rounded transition ${
+              tab === item.key ? 'bg-orange-600 text-white shadow' : 'text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 时间范围说明 */}
+      <div className="text-center text-[10px] text-gray-500 mb-2">
+        📅 {currentTab?.range} 的消费统计
       </div>
 
       {loading ? (
