@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
+import { useI18n } from '../i18n/index.jsx';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function Home({ onShowLogin, onGoGame }) {
   const { user, updateCoins, setUser } = useStore();
+  const { t } = useI18n();
   const [drawing, setDrawing] = useState(false);
   const [drawnResult, setDrawnResult] = useState([]);
   const [banners, setBanners] = useState([]);
@@ -72,7 +74,7 @@ export default function Home({ onShowLogin, onGoGame }) {
       {/* 排行榜 */}
       <div className="bg-gradient-to-br from-[#2d1410] to-[#4a1c12] border border-[#6b2a1e] rounded-2xl p-5 shadow-lg">
         <div className="text-center mb-3">
-          <div className="text-orange-400 font-bold text-sm tracking-widest mb-1">1 Week Spending Leaderboard</div>
+          <div className="text-orange-400 font-bold text-sm tracking-widest mb-1">{t('home.leaderboard', '一周消费排行榜')}</div>
           <div className="text-gray-300 text-[10px]">The more you open, the higher your rank!</div>
         </div>
         {leaderboard.length === 0 ? (
@@ -96,7 +98,7 @@ export default function Home({ onShowLogin, onGoGame }) {
       {/* 游戏专区 */}
       {games.length > 0 && (
         <div>
-          <div className="text-center text-xs font-bold text-gray-400 tracking-widest mb-3">游戏专区</div>
+          <div className="text-center text-xs font-bold text-gray-400 tracking-widest mb-3">{t('home.games', '游戏专区')}</div>
           <div className="grid grid-cols-2 gap-3">
             {games.map((g) => (
               <div
@@ -116,7 +118,7 @@ export default function Home({ onShowLogin, onGoGame }) {
                 </div>
                 <div className="p-2 text-center">
                   <div className="text-sm font-bold text-white truncate">{g.displayName}</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5 truncate">{g.description || '进入抽奖'}</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5 truncate">{g.description || t('home.enter', '进入抽奖')}</div>
                 </div>
               </div>
             ))}
@@ -124,10 +126,10 @@ export default function Home({ onShowLogin, onGoGame }) {
         </div>
       )}
 
-      {/* 推荐盲盒（从后台读取） */}
+      {/* 推荐盲盒 */}
       {featuredBoxes.length > 0 && (
         <div>
-          <div className="text-center text-xs font-bold text-gray-400 tracking-widest my-3">推荐盲盒</div>
+          <div className="text-center text-xs font-bold text-gray-400 tracking-widest my-3">{t('home.featured', '推荐盲盒')}</div>
           <div className="space-y-3">
             {featuredBoxes.map((box) => (
               <div key={box.id} className="bg-[#1a0f0c] border border-[#3d1a1a] rounded-2xl p-4 relative overflow-hidden shadow-lg">
@@ -151,7 +153,7 @@ export default function Home({ onShowLogin, onGoGame }) {
                       onClick={() => handleDraw(box, 1)}
                       className="bg-orange-600 text-white text-xs px-5 py-2 rounded-lg font-bold hover:bg-orange-700 transition"
                     >
-                      开箱
+                      {t('home.open_box', '开箱')}
                     </button>
                   </div>
                 </div>
@@ -169,7 +171,7 @@ export default function Home({ onShowLogin, onGoGame }) {
       {/* 抽卡结果 */}
       {drawing && drawnResult.length > 0 && (
         <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-4">
-          <div className="text-2xl font-bold text-red-500 mb-8 animate-pulse">抽卡结果</div>
+          <div className="text-2xl font-bold text-red-500 mb-8 animate-pulse">{t('draw.result', '抽卡结果')}</div>
           <div className="flex flex-wrap justify-center gap-4">
             {drawnResult.map((card, idx) => (
               <div key={idx} className="w-24 h-32 bg-[#1c0e0e] rounded-lg border border-red-500 flex flex-col items-center justify-center shadow-lg">
@@ -179,7 +181,7 @@ export default function Home({ onShowLogin, onGoGame }) {
               </div>
             ))}
           </div>
-          <button onClick={() => { setDrawing(false); setDrawnResult([]); }} className="mt-8 bg-red-600 px-8 py-3 rounded-full font-bold text-sm">确认</button>
+          <button onClick={() => { setDrawing(false); setDrawnResult([]); }} className="mt-8 bg-red-600 px-8 py-3 rounded-full font-bold text-sm">{t('common.confirm', '确认')}</button>
         </div>
       )}
     </div>
