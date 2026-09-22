@@ -13,7 +13,7 @@ model AdChannel {
   id          String       @id @default(uuid())
   name        String       @unique
   displayName String
-  type        String       @default("PAID")   // PAID / KOL / ORGANIC
+  type        String       @default("PAID")
   icon        String       @default("")
   description String       @default("")
   isActive    Boolean      @default(true)
@@ -167,7 +167,6 @@ model User {
   withdrawalAmount Int      @default(0)
   createdAt        DateTime @default(now())
 
-  // 广告来源追踪
   adSource         String   @default("")
   adMedium         String   @default("")
   adCampaign       String   @default("")
@@ -181,6 +180,8 @@ model User {
   tickets          Ticket[]
   drawLogs         DrawLog[]
   bankCards        BankCard[]
+  transfersFrom    TransferLog[]   @relation("TransfersFrom")
+  transfersTo      TransferLog[]   @relation("TransfersTo")
 }
 
 model UserGroup {
@@ -238,28 +239,33 @@ model Game {
 }
 
 model Card {
-  id        String      @id @default(uuid())
-  name      String
-  rarity    String
-  imageUrl  String      @default("")
-  value     Int         @default(0)
-  createdAt DateTime    @default(now())
-  boxItems  BoxItem[]
-  inventory Inventory[]
+  id            String        @id @default(uuid())
+  name          String
+  rarity        String
+  imageUrl      String        @default("")
+  description   String        @default("")
+  value         Int           @default(0)
+  allowTransfer Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  boxItems      BoxItem[]
+  inventory     Inventory[]
+  transfers     TransferLog[]
 }
 
 model Box {
-  id         String   @id @default(uuid())
-  name       String
-  price      Int
-  coverUrl   String   @default("")
-  isActive   Boolean  @default(true)
-  isFeatured Boolean  @default(false)
-  gameId     String?
-  game       Game?    @relation(fields: [gameId], references: [id])
-  createdAt  DateTime @default(now())
-  items      BoxItem[]
-  drawLogs   DrawLog[]
+  id            String   @id @default(uuid())
+  name          String
+  price         Int
+  coverUrl      String   @default("")
+  description   String   @default("")
+  allowTransfer Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  isFeatured    Boolean  @default(false)
+  gameId        String?
+  game          Game?    @relation(fields: [gameId], references: [id])
+  createdAt     DateTime @default(now())
+  items         BoxItem[]
+  drawLogs      DrawLog[]
 }
 
 model BoxItem {
@@ -279,6 +285,21 @@ model Inventory {
   user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   card     Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
   @@unique([userId, cardId])
+}
+
+// ================= 赠送/转让记录 =================
+
+model TransferLog {
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  cardId     String
+  quantity   Int      @default(1)
+  remark     String   @default("")
+  createdAt  DateTime @default(now())
+  fromUser   User     @relation("TransfersFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("TransfersTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  card       Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
 }
 
 model RechargeOption {
