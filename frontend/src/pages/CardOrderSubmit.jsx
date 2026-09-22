@@ -1,136 +1,125 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useStore } from '../store';
 import { useI18n } from '../i18n/index.jsx';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-const STATUS_MAP = {
-  PENDING: { key: 'status.pending', text: '待处理', cls: 'bg-yellow-900/60 text-yellow-200' },
-  PROCESSING: { key: 'status.processing', text: '处理中', cls: 'bg-blue-900/60 text-blue-200' },
-  SHIPPED: { key: 'status.shipped', text: '已发货', cls: 'bg-green-900/60 text-green-200' },
-  DONE: { key: 'status.done', text: '已完成', cls: 'bg-gray-700 text-gray-300' },
-  REJECTED: { key: 'status.rejected', text: '已拒绝', cls: 'bg-red-900/60 text-red-200' },
-};
-
-const fmt = (d) => {
-  if (!d) return '-';
-  const t = new Date(d);
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')} ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
-};
-
-export default function CardOrders({ onGoSubmit }) {
-  const { user } = useStore();
+export default function CardOrderSubmit({ onBack }) {
+  const { user, setUser } = useStore();
   const { t } = useI18n();
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [detail, setDetail] = useState(null);
+  const [selected, setSelected] = useState([]);
+  const [receiverName, setReceiverName] = useState('');
+  const [receiverPhone, setReceiverPhone] = useState('');
+  const [receiverAddress, setReceiverAddress] = useState('');
+  const [remark, setRemark] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!user) { setLoading(false); return; }
-    axios.get(`${API_URL}/api/card-orders/${user.id}`)
-      .then(res => setOrders(res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [user]);
+  const inventory = user?.inventory || [];
 
-  const parseItems = (s) => { try { return JSON.parse(s); } catch { return []; } };
+  const toggleCard = (item) => {
+    const idx = selected.findIndex(s => s.cardId === item.card.id);
+    if (idx >= 0) {
+      const next = [...selected]; next.splice(idx, 1); setSelected(next);
+    } else {
+      setSelected([...selected, { cardId: item.card.id, cardName: item.card.name, quantity: 1, maxQty: item.quantity }]);
+    }
+  };
+
+  const setQty = (cardId, qty) => {
+    setSelected(prev => prev.map(s => s.cardId === cardId ? { ...s, quantity: Math.min(Math.max(1, qty), s.maxQty) } : s));
+  };
+
+  const handleSubmit = async () => {
+    if (selected.length === 0) return alert(t('cardorder.select_cards', '请选择要发货的卡牌'));
+    if (!receiverName.trim()) return alert(t('cardorder.input_name', '请填写收货人姓名'));
+    if (!receiverPhone.trim()) return alert(t('cardorder.input_phone', '请填写联系电话'));
+    if (!receiverAddress.trim()) return alert(t('cardorder.input_address', '请填写收货地址'));
+    if (!confirm(t('cardorder.confirm_submit', '确认提交发货申请？'))) return;
+
+    setSubmitting(true);
+    try {
+      await axios.post(`${API_URL}/api/card-orders`, {
+        userId: user.id,
+        items: selected.map(s => ({ cardId: s.cardId, cardName: s.cardName, quantity: s.quantity })),
+        receiverName: receiverName.trim(),
+        receiverPhone: receiverPhone.trim(),
+        receiverAddress: receiverAddress.trim(),
+        remark: remark.trim(),
+      });
+      const updated = await axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' });
+      setUser(updated.data);
+      alert(t('cardorder.submitted', '提交成功！管理员会尽快处理'));
+      setSelected([]); setReceiverName(''); setReceiverPhone(''); setReceiverAddress(''); setRemark('');
+      onBack();
+    } catch (e) { alert('提交失败: ' + (e.response?.data?.error || e.message)); }
+    finally { setSubmitting(false); }
+  };
 
   if (!user) return <div className="text-center text-gray-500 py-20 text-sm">请先登录</div>;
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold text-orange-400">{t('cardorder.title', '我的卡片订单')}</h2>
-        <button onClick={onGoSubmit} className="bg-orange-600 hover:bg-orange-700 text-white text-xs px-4 py-1.5 rounded-full font-bold">
-          + {t('cardorder.submit', '申请发货')}
-        </button>
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <button onClick={onBack} className="text-gray-400 text-sm hover:text-white">← {t('common.cancel', '返回')}</button>
+        <div className="text-lg font-bold text-orange-400">{t('cardorder.title', '申请卡片发货')}</div>
       </div>
 
-      {loading ? (
-        <div className="text-center text-gray-500 py-20 text-sm">加载中...</div>
-      ) : orders.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-gray-500">
-          <div className="text-5xl mb-4 opacity-30">📦</div>
-          <div className="text-sm">暂无订单</div>
-          <button onClick={onGoSubmit} className="mt-4 text-orange-400 text-sm underline">{t('cardorder.submit', '去申请发货')} →</button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {orders.map(o => {
-            const items = parseItems(o.items);
-            const st = STATUS_MAP[o.status] || { text: o.status, cls: 'bg-gray-700' };
-            return (
-              <div key={o.id} onClick={() => setDetail(o)} className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4 cursor-pointer hover:border-orange-600/50 transition">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="text-xs text-gray-500 font-mono">#{o.id.slice(0, 8)}</div>
-                  <span className={`text-xs px-2 py-0.5 rounded ${st.cls}`}>{t(st.key, st.text)}</span>
-                </div>
-                <div className="flex gap-2 mb-2">
-                  {items.slice(0, 3).map((it, i) => (
-                    <div key={i} className="w-12 h-16 bg-[#0d0d0d] rounded border border-[#2a2a2a] flex items-center justify-center text-xl">🃏</div>
-                  ))}
-                  {items.length > 3 && (
-                    <div className="w-12 h-16 bg-[#0d0d0d] rounded border border-[#2a2a2a] flex items-center justify-center text-xs text-gray-500">+{items.length - 3}</div>
-                  )}
-                </div>
-                <div className="flex justify-between items-center text-xs text-gray-500">
-                  <div>{items.length} {t('cardorder.cards', '张')} · {o.receiverName}</div>
-                  <div>{fmt(o.createdAt)}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {detail && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
-          <div className="bg-[#1a0f0c] border border-[#3d1a1a] rounded-2xl w-full max-w-sm max-h-[85vh] overflow-y-auto">
-            <div className="flex justify-between items-center p-4 border-b border-[#2a1414]">
-              <div className="text-sm font-bold text-orange-400">{t('cardorder.detail', '订单详情')}</div>
-              <button onClick={() => setDetail(null)} className="text-gray-400 text-2xl">×</button>
-            </div>
-
-            <div className="p-4 space-y-4">
-              <div>
-                <div className="text-xs text-gray-500 mb-2">{t('cardorder.items', '卡牌明细')}</div>
-                <div className="space-y-1">
-                  {parseItems(detail.items).map((it, i) => (
-                    <div key={i} className="flex justify-between bg-[#0d0d0d] rounded p-2 text-xs">
-                      <span>{it.cardName}</span>
-                      <span className="text-gray-400">x{it.quantity || 1}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-gray-500 mb-2">{t('cardorder.receiver_info', '收货信息')}</div>
-                <div className="bg-[#0d0d0d] rounded p-3 space-y-1 text-xs">
-                  <div className="flex justify-between"><span className="text-gray-500">{t('cardorder.receiver', '收货人')}：</span><span>{detail.receiverName}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-500">{t('cardorder.phone', '电话')}：</span><span className="font-mono">{detail.receiverPhone}</span></div>
-                  <div className="flex justify-between gap-3"><span className="text-gray-500 flex-shrink-0">{t('cardorder.address', '地址')}：</span><span className="text-right">{detail.receiverAddress}</span></div>
-                </div>
-              </div>
-
-              {detail.trackingNo && (
-                <div>
-                  <div className="text-xs text-gray-500 mb-2">{t('cardorder.logistics', '物流信息')}</div>
-                  <div className="bg-[#0d0d0d] rounded p-3 space-y-1 text-xs">
-                    <div className="flex justify-between"><span className="text-gray-500">{t('cardorder.express', '快递公司')}：</span><span>{detail.expressCompany || '-'}</span></div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-500">{t('cardorder.tracking_no', '快递单号')}：</span>
-                      <span className="font-mono text-orange-400">{detail.trackingNo}</span>
-                    </div>
-                    <button onClick={() => { navigator.clipboard.writeText(detail.trackingNo); alert('已复制'); }} className="w-full mt-2 bg-[#2a1414] text-orange-400 text-xs py-1.5 rounded">{t('cardorder.copy', '复制单号')}</button>
+      <div>
+        <div className="text-sm font-bold mb-2">{t('cardorder.select_cards', '选择要发货的卡牌')}</div>
+        {inventory.length === 0 ? (
+          <div className="text-center text-gray-500 py-8 text-sm">库存为空</div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2">
+            {inventory.map((item) => {
+              const isSelected = selected.some(s => s.cardId === item.card.id);
+              return (
+                <div key={item.id} onClick={() => toggleCard(item)} className={`relative bg-[#161616] border rounded-xl p-2 cursor-pointer transition ${isSelected ? 'border-orange-500 ring-2 ring-orange-500/30' : 'border-[#2a2a2a]'}`}>
+                  <div className="w-full h-20 bg-[#0d0d0d] rounded mb-1 flex items-center justify-center text-2xl">
+                    {item.card.imageUrl ? <img src={item.card.imageUrl} className="w-full h-full object-cover rounded" /> : '🃏'}
                   </div>
+                  <div className="text-xs text-center truncate">{item.card.name}</div>
+                  <div className="text-[10px] text-center text-yellow-500">x{item.quantity}</div>
+                  {isSelected && <div className="absolute top-1 right-1 w-5 h-5 bg-orange-600 rounded-full flex items-center justify-center text-white text-xs font-bold">✓</div>}
                 </div>
-              )}
-            </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {selected.length > 0 && (
+        <div>
+          <div className="text-sm font-bold mb-2">{t('cardorder.selected', '已选卡牌')}</div>
+          <div className="space-y-2">
+            {selected.map(s => (
+              <div key={s.cardId} className="flex items-center gap-3 bg-[#161616] border border-[#2a2a2a] rounded-lg p-2">
+                <div className="flex-1 text-sm">{s.cardName}</div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setQty(s.cardId, s.quantity - 1)} className="w-6 h-6 bg-[#2a2a2a] rounded text-xs">-</button>
+                  <span className="w-8 text-center text-sm">{s.quantity}</span>
+                  <button onClick={() => setQty(s.cardId, s.quantity + 1)} className="w-6 h-6 bg-[#2a2a2a] rounded text-xs">+</button>
+                  <span className="text-[10px] text-gray-500 ml-1">/ {s.maxQty}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
+
+      <div>
+        <div className="text-sm font-bold mb-2">{t('cardorder.receiver_info', '收货信息')}</div>
+        <div className="space-y-2">
+          <input value={receiverName} onChange={(e) => setReceiverName(e.target.value)} placeholder={t('cardorder.receiver', '收货人姓名')} className="w-full bg-[#161616] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500" />
+          <input value={receiverPhone} onChange={(e) => setReceiverPhone(e.target.value)} placeholder={t('cardorder.phone', '联系电话')} className="w-full bg-[#161616] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500" />
+          <textarea value={receiverAddress} onChange={(e) => setReceiverAddress(e.target.value)} rows={3} placeholder={t('cardorder.address', '详细收货地址')} className="w-full bg-[#161616] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500" />
+          <input value={remark} onChange={(e) => setRemark(e.target.value)} placeholder={t('cardorder.remark', '备注（可选）')} className="w-full bg-[#161616] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-orange-500" />
+        </div>
+      </div>
+
+      <button onClick={handleSubmit} disabled={submitting || selected.length === 0} className="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white font-bold py-3 rounded-xl shadow-lg disabled:opacity-50">
+        {submitting ? '...' : `${t('cardorder.submit_btn', '提交发货申请')} (${selected.length})`}
+      </button>
     </div>
   );
 }
