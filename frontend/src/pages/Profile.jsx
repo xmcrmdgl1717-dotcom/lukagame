@@ -4,7 +4,7 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export default function Profile({ onGoOrders, onGoNotifications }) {
+export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications, onGoArticles, onGoStatic }) {
   const { user, setUser } = useStore();
   const [redeemCode, setRedeemCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
@@ -34,38 +34,47 @@ export default function Profile({ onGoOrders, onGoNotifications }) {
     try {
       await axios.post(`${API_URL}/api/tickets`, { userId: user.id, title: ticketTitle, content: ticketContent });
       alert('提交成功，客服会尽快回复您！');
-      setTicketTitle('');
-      setTicketContent('');
-    } catch (e) {
-      alert('提交失败');
-    } finally { setSubmitting(false); }
+      setTicketTitle(''); setTicketContent('');
+    } catch (e) { alert('提交失败'); }
+    finally { setSubmitting(false); }
   };
 
   return (
     <div className="p-4">
-      <div className="bg-gradient-to-br from-[#1c0e0e] to-[#2a1414] border border-[#3d1a1a] rounded-xl p-5 flex gap-4 items-center mb-8 shadow-lg">
+      {/* 用户卡片 */}
+      <div className="bg-gradient-to-br from-[#1c0e0e] to-[#2a1414] border border-[#3d1a1a] rounded-xl p-5 flex gap-4 items-center mb-6 shadow-lg">
         <div className="w-16 h-16 bg-gradient-to-br from-orange-600 to-red-600 rounded-xl flex items-center justify-center text-3xl shadow-inner">👤</div>
-        <div>
+        <div className="flex-1">
           <div className="text-xs text-orange-400 font-bold mb-1">LUKA LICENSE</div>
-          <div className="text-xl font-black text-white mb-1">LV.1</div>
-          <div className="text-xs text-gray-500">ID: {user?.id.slice(0, 8)}</div>
+          <div className="text-xl font-black text-white mb-1">
+            VIP{user?.vipLevel || 0}
+          </div>
+          <div className="text-xs text-gray-500">ID: {user?.id?.slice(0, 8)}</div>
         </div>
       </div>
 
-      {/* 快捷入口：订单、消息 */}
+      {/* 快捷入口 */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         <button onClick={onGoOrders} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:bg-[#2a1414] transition">
           <span className="text-2xl">📄</span>
           <span className="text-sm text-white font-bold">我的订单</span>
         </button>
+        <button onClick={onGoCardOrders} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:bg-[#2a1414] transition">
+          <span className="text-2xl">📦</span>
+          <span className="text-sm text-white font-bold">卡片发货</span>
+        </button>
         <button onClick={onGoNotifications} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:bg-[#2a1414] transition">
           <span className="text-2xl">🔔</span>
           <span className="text-sm text-white font-bold">消息中心</span>
         </button>
+        <button onClick={onGoArticles} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:bg-[#2a1414] transition">
+          <span className="text-2xl">📰</span>
+          <span className="text-sm text-white font-bold">新闻资讯</span>
+        </button>
       </div>
 
       {/* 兑换码 */}
-      <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 mb-6 shadow-lg">
+      <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 mb-4 shadow-lg">
         <div className="text-sm font-bold text-white mb-3">🎁 兑换码</div>
         <div className="flex gap-2">
           <input value={redeemCode} onChange={(e) => setRedeemCode(e.target.value)} placeholder="请输入兑换码"
@@ -77,8 +86,8 @@ export default function Profile({ onGoOrders, onGoNotifications }) {
         </div>
       </div>
 
-      {/* 工单 */}
-      <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 mb-6 shadow-lg">
+      {/* 客服工单 */}
+      <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 mb-4 shadow-lg">
         <div className="text-sm font-bold text-white mb-3">🎧 联系客服</div>
         <div className="space-y-2">
           <input value={ticketTitle} onChange={(e) => setTicketTitle(e.target.value)} placeholder="问题标题"
@@ -92,14 +101,19 @@ export default function Profile({ onGoOrders, onGoNotifications }) {
         </div>
       </div>
 
-      <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl overflow-hidden shadow-lg">
+      {/* 静态页面入口 */}
+      <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl overflow-hidden shadow-lg mb-4">
         {[
-          { label: '等级特权', icon: '⭐' },
-          { label: '代金券', icon: '🎫' },
-          { label: '转诊推荐', icon: '🔗' },
-          { label: '常见问题', icon: '❓' },
-        ].map((item, index) => (
-          <div key={index} className="flex justify-between items-center p-4 border-b border-[#2a1414] last:border-0 hover:bg-[#2a1414] cursor-pointer">
+          { label: '关于我们', icon: 'ℹ️', slug: 'about' },
+          { label: '用户协议', icon: '📜', slug: 'terms' },
+          { label: '隐私政策', icon: '🔒', slug: 'privacy' },
+          { label: '联系我们', icon: '📞', slug: 'contact' },
+        ].map((item, i) => (
+          <div
+            key={i}
+            onClick={() => onGoStatic(item.slug)}
+            className="flex justify-between items-center p-4 border-b border-[#2a1414] last:border-0 hover:bg-[#2a1414] cursor-pointer transition"
+          >
             <div className="flex items-center gap-3 text-sm text-gray-300">
               <span className="text-lg">{item.icon}</span>
               <span>{item.label}</span>
@@ -109,7 +123,7 @@ export default function Profile({ onGoOrders, onGoNotifications }) {
         ))}
       </div>
 
-      <button className="w-full mt-8 bg-[#2a1414] border border-[#4d2a2a] text-red-400 py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#3d1a1a] transition-colors">
+      <button className="w-full bg-[#2a1414] border border-[#4d2a2a] text-red-400 py-3 rounded-xl text-sm font-bold shadow-lg hover:bg-[#3d1a1a] transition">
         退出登录
       </button>
     </div>
