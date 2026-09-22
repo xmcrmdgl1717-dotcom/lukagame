@@ -15,6 +15,9 @@ async function main() {
     'withdrawals.view','withdrawals.approve',
     'transactions.view',
     'drawlogs.view','drawlogs.export',
+    'cardorders.view','cardorders.process',
+    'popups.view','popups.create','popups.edit','popups.delete',
+    'articles.view','articles.create','articles.edit','articles.delete',
     'banners.view','banners.create','banners.edit','banners.delete',
     'ads.view','ads.create','ads.edit','ads.delete',
     'tasks.view','tasks.create','tasks.edit','tasks.delete',
@@ -25,6 +28,7 @@ async function main() {
     'admins.view','admins.create','admins.edit','admins.delete',
     'roles.view','roles.create','roles.edit','roles.delete',
     'menus.view','menus.edit',
+    'languages.view','languages.edit',
     'audit.view',
   ].join(',');
 
@@ -41,7 +45,34 @@ async function main() {
     create: { username: 'admin', password: 'admin123', roleId: superRole.id, role: 'super' },
   });
 
-  // VIP 等级
+  // ================= 语言 =================
+  const languages = [
+    { code: 'zh-CN', name: '简体中文', flag: '🇨🇳', isDefault: true, sortOrder: 1 },
+    { code: 'en-US', name: 'English', flag: '🇺🇸', isDefault: false, sortOrder: 2 },
+    { code: 'es-ES', name: 'Español', flag: '🇪🇸', isDefault: false, sortOrder: 3 },
+  ];
+  for (const l of languages) {
+    await prisma.language.upsert({ where: { code: l.code }, update: {}, create: l });
+  }
+
+  // ================= 翻译词条（示例） =================
+  const translations = [
+    { key: 'common.home', namespace: 'common', translations: JSON.stringify({ 'zh-CN': '首页', 'en-US': 'Home', 'es-ES': 'Inicio' }) },
+    { key: 'common.activity', namespace: 'common', translations: JSON.stringify({ 'zh-CN': '活动', 'en-US': 'Activity', 'es-ES': 'Actividad' }) },
+    { key: 'common.recharge', namespace: 'common', translations: JSON.stringify({ 'zh-CN': '充值', 'en-US': 'Recharge', 'es-ES': 'Recargar' }) },
+    { key: 'common.inventory', namespace: 'common', translations: JSON.stringify({ 'zh-CN': '存货', 'en-US': 'Inventory', 'es-ES': 'Inventario' }) },
+    { key: 'common.profile', namespace: 'common', translations: JSON.stringify({ 'zh-CN': '我的', 'en-US': 'Profile', 'es-ES': 'Mi cuenta' }) },
+    { key: 'common.login', namespace: 'common', translations: JSON.stringify({ 'zh-CN': '登录', 'en-US': 'Sign In', 'es-ES': 'Iniciar sesión' }) },
+    { key: 'common.register', namespace: 'common', translations: JSON.stringify({ 'zh-CN': '注册', 'en-US': 'Sign Up', 'es-ES': 'Registrarse' }) },
+    { key: 'common.submit', namespace: 'common', translations: JSON.stringify({ 'zh-CN': '提交', 'en-US': 'Submit', 'es-ES': 'Enviar' }) },
+    { key: 'common.cancel', namespace: 'common', translations: JSON.stringify({ 'zh-CN': '取消', 'en-US': 'Cancel', 'es-ES': 'Cancelar' }) },
+    { key: 'common.confirm', namespace: 'common', translations: JSON.stringify({ 'zh-CN': '确认', 'en-US': 'Confirm', 'es-ES': 'Confirmar' }) },
+  ];
+  for (const t of translations) {
+    await prisma.translation.upsert({ where: { key: t.key }, update: {}, create: t });
+  }
+
+  // ================= VIP 等级 =================
   const vipLevels = [
     { level: 0, name: 'VIP0', sortOrder: 1, rechargeAmount: 0, consumeAmount: 0 },
     { level: 1, name: 'VIP1', sortOrder: 2, rechargeAmount: 30000, consumeAmount: 100000 },
@@ -56,7 +87,7 @@ async function main() {
   ];
   for (const v of vipLevels) await prisma.vipLevel.upsert({ where: { level: v.level }, update: {}, create: v });
 
-  // 用户分组
+  // ================= 用户分组 =================
   const groups = [
     { name: 'normal', displayName: '普通用户', color: '#6b7280', sortOrder: 1 },
     { name: 'bigr', displayName: '大R用户', color: '#ef4444', sortOrder: 2 },
@@ -65,7 +96,7 @@ async function main() {
   ];
   for (const g of groups) await prisma.userGroup.upsert({ where: { name: g.name }, update: {}, create: g });
 
-  // 支付渠道
+  // ================= 支付渠道 =================
   const channels = [
     { name: 'alipay', displayName: '支付宝', sortOrder: 1 },
     { name: 'wechat', displayName: '微信支付', sortOrder: 2 },
@@ -73,19 +104,18 @@ async function main() {
   ];
   for (const c of channels) await prisma.paymentChannel.upsert({ where: { name: c.name }, update: {}, create: c });
 
-  // 测试用户
+  // ================= 测试用户 =================
   await prisma.user.upsert({
     where: { username: 'test' },
     update: {},
     create: { username: 'test', password: '123', coins: 100000, vipLevel: 2, totalRecharge: 100000, totalConsume: 300000 },
   });
 
-  // 卡牌
+  // ================= 卡牌 / 游戏 / 盲盒 =================
   const c1 = await prisma.card.upsert({ where: { id: 'card-1' }, update: {}, create: { id: 'card-1', name: '喷火龙', rarity: 'SSR', value: 50000 } });
   const c2 = await prisma.card.upsert({ where: { id: 'card-2' }, update: {}, create: { id: 'card-2', name: '皮卡丘', rarity: 'SR', value: 5000 } });
   const c3 = await prisma.card.upsert({ where: { id: 'card-3' }, update: {}, create: { id: 'card-3', name: '杰尼龟', rarity: 'R', value: 500 } });
 
-  // 游戏
   const game = await prisma.game.upsert({
     where: { name: 'heaven_hell' },
     update: {},
@@ -95,17 +125,16 @@ async function main() {
     },
   });
 
-  // 盲盒
   await prisma.box.upsert({
     where: { id: 'box-1' },
     update: { gameId: game.id },
     create: {
-      id: 'box-1', name: 'Heaven & Hell', price: 450, coverUrl: '', gameId: game.id,
+      id: 'box-1', name: 'Heaven & Hell', price: 450, coverUrl: '', gameId: game.id, isFeatured: true,
       items: { create: [{ cardId: c1.id, weight: 1 }, { cardId: c2.id, weight: 9 }, { cardId: c3.id, weight: 90 }] },
     },
   });
 
-  // 充值套餐
+  // ================= 充值套餐 =================
   const opts = [
     { id: 'rc-1', coins: 300, bonus: 0, price: 3000, sortOrder: 1 },
     { id: 'rc-2', coins: 1500, bonus: 100, price: 15000, sortOrder: 2 },
@@ -116,77 +145,28 @@ async function main() {
   ];
   for (const o of opts) await prisma.rechargeOption.upsert({ where: { id: o.id }, update: {}, create: o });
 
-  // 轮播图
+  // ================= 轮播图 =================
   const banners = [
     { id: 'bn-1', imageUrl: 'https://via.placeholder.com/800x400/2d1410/ff6600?text=Welcome', link: 'https://luka.game', title: 'Welcome', sortOrder: 1 },
   ];
   for (const b of banners) await prisma.banner.upsert({ where: { id: b.id }, update: {}, create: b });
 
-  // 任务
+  // ================= 任务 =================
   const tasks = [
     { id: 'task-1', title: '每日抽卡 1 次', action: 'DRAW', targetCount: 1, rewardCoins: 100, sortOrder: 1 },
     { id: 'task-2', title: '每日抽卡 10 次', action: 'DRAW', targetCount: 10, rewardCoins: 500, sortOrder: 2 },
   ];
   for (const t of tasks) await prisma.task.upsert({ where: { id: t.id }, update: {}, create: t });
 
-  // ================= 菜单（B 方案） =================
-  const menus = [
-    { id: 'menu-dashboard', parentId: null, title: '仪表盘', type: 'MENU', icon: '📊', path: '/', component: 'DashboardPage', permission: '', sortOrder: 1 },
-
-    { id: 'menu-user-group', parentId: null, title: '用户管理', type: 'DIRECTORY', icon: '👥', path: '', component: '', permission: '', sortOrder: 2 },
-    { id: 'menu-users', parentId: 'menu-user-group', title: '用户列表', type: 'MENU', icon: '👥', path: '/users', component: 'UserList', permission: 'users.view', sortOrder: 1 },
-    { id: 'menu-user-groups', parentId: 'menu-user-group', title: '用户分组', type: 'MENU', icon: '📁', path: '/user-groups', component: 'UserGroupList', permission: 'groups.view', sortOrder: 2 },
-    { id: 'menu-bankcards', parentId: 'menu-user-group', title: '绑卡管理', type: 'MENU', icon: '💳', path: '/bankcards', component: 'BankCardList', permission: 'bankcards.view', sortOrder: 3 },
-    { id: 'menu-vip-levels', parentId: 'menu-user-group', title: 'VIP等级设置', type: 'MENU', icon: '👑', path: '/vip-levels', component: 'VipLevels', permission: 'users.vip', sortOrder: 4 },
-
-    { id: 'menu-games', parentId: null, title: '游戏管理', type: 'MENU', icon: '🎮', path: '/games', component: 'GameList', permission: 'games.view', sortOrder: 3 },
-
-    { id: 'menu-fund-group', parentId: null, title: '资金管理', type: 'DIRECTORY', icon: '💰', path: '', component: '', permission: '', sortOrder: 4 },
-    { id: 'menu-payment-channels', parentId: 'menu-fund-group', title: '支付管理', type: 'MENU', icon: '💳', path: '/payment-channels', component: 'PaymentChannelList', permission: 'payments.view', sortOrder: 1 },
-    { id: 'menu-orders', parentId: 'menu-fund-group', title: '充值记录', type: 'MENU', icon: '📥', path: '/orders', component: 'OrderList', permission: 'orders.view', sortOrder: 2 },
-    { id: 'menu-withdrawals', parentId: 'menu-fund-group', title: '提现记录', type: 'MENU', icon: '📤', path: '/withdrawals', component: 'WithdrawalList', permission: 'withdrawals.view', sortOrder: 3 },
-    { id: 'menu-transactions', parentId: 'menu-fund-group', title: '交易明细', type: 'MENU', icon: '📊', path: '/transactions', component: 'TransactionList', permission: 'transactions.view', sortOrder: 4 },
-
-    { id: 'menu-drawlog-group', parentId: null, title: '抽奖管理', type: 'DIRECTORY', icon: '🎰', path: '', component: '', permission: '', sortOrder: 5 },
-    { id: 'menu-drawlogs', parentId: 'menu-drawlog-group', title: '抽奖记录', type: 'MENU', icon: '📝', path: '/drawlogs', component: 'DrawLogList', permission: 'drawlogs.view', sortOrder: 1 },
-
-    // ============ 报表管理（新增） ============
-    { id: 'menu-report-group', parentId: null, title: '报表管理', type: 'DIRECTORY', icon: '📈', path: '', component: '', permission: '', sortOrder: 6 },
-    { id: 'menu-report-summary', parentId: 'menu-report-group', title: '汇总报表', type: 'MENU', icon: '📊', path: '/reports/summary', component: 'ReportSummary', permission: 'reports.view', sortOrder: 1 },
-    { id: 'menu-report-finance', parentId: 'menu-report-group', title: '资金报表', type: 'MENU', icon: '💰', path: '/reports/finance', component: 'ReportFinance', permission: 'reports.view', sortOrder: 2 },
-    { id: 'menu-report-draw', parentId: 'menu-report-group', title: '抽奖报表', type: 'MENU', icon: '🎰', path: '/reports/draw', component: 'ReportDraw', permission: 'reports.view', sortOrder: 3 },
-    { id: 'menu-report-user-draw', parentId: 'menu-report-group', title: '用户抽奖报表', type: 'MENU', icon: '👤', path: '/reports/user-draw', component: 'ReportUserDraw', permission: 'reports.view', sortOrder: 4 },
-    { id: 'menu-report-user-finance', parentId: 'menu-report-group', title: '用户资金报表', type: 'MENU', icon: '💵', path: '/reports/user-finance', component: 'ReportUserFinance', permission: 'reports.view', sortOrder: 5 },
-    { id: 'menu-report-vip', parentId: 'menu-report-group', title: 'VIP分布报表', type: 'MENU', icon: '👑', path: '/reports/vip-distribution', component: 'ReportVipDistribution', permission: 'reports.view', sortOrder: 6 },
-
-    { id: 'menu-cards', parentId: null, title: '卡牌管理', type: 'MENU', icon: '🃏', path: '/cards', component: 'CardList', permission: 'cards.view', sortOrder: 7 },
-    { id: 'menu-boxes', parentId: null, title: '盲盒管理', type: 'MENU', icon: '📦', path: '/boxes', component: 'BoxList', permission: 'boxes.view', sortOrder: 8 },
-    { id: 'menu-recharge', parentId: null, title: '充值套餐', type: 'MENU', icon: '💰', path: '/recharge-options', component: 'RechargeList', permission: 'recharge.view', sortOrder: 9 },
-
-    { id: 'menu-ad-group', parentId: null, title: '广告管理', type: 'DIRECTORY', icon: '📣', path: '', component: '', permission: '', sortOrder: 10 },
-    { id: 'menu-ads', parentId: 'menu-ad-group', title: '广告列表', type: 'MENU', icon: '📺', path: '/ads', component: 'AdList', permission: 'ads.view', sortOrder: 1 },
-    { id: 'menu-banners', parentId: 'menu-ad-group', title: '轮播图', type: 'MENU', icon: '🖼️', path: '/banners', component: 'BannerList', permission: 'banners.view', sortOrder: 2 },
-
-    { id: 'menu-tasks', parentId: null, title: '任务管理', type: 'MENU', icon: '🎯', path: '/tasks', component: 'TaskList', permission: 'tasks.view', sortOrder: 11 },
-    { id: 'menu-redeem', parentId: null, title: '兑换码', type: 'MENU', icon: '🎁', path: '/redeem-codes', component: 'RedeemCodeList', permission: 'redeem.view', sortOrder: 12 },
-    { id: 'menu-notifications', parentId: null, title: '通知管理', type: 'MENU', icon: '🔔', path: '/notifications', component: 'NotificationList', permission: 'notifications.view', sortOrder: 13 },
-    { id: 'menu-tickets', parentId: null, title: '客服工单', type: 'MENU', icon: '🎧', path: '/tickets', component: 'TicketList', permission: 'tickets.view', sortOrder: 14 },
-
-    { id: 'menu-system-group', parentId: null, title: '系统管理', type: 'DIRECTORY', icon: '⚙️', path: '', component: '', permission: '', sortOrder: 99 },
-    { id: 'menu-admins', parentId: 'menu-system-group', title: '管理员列表', type: 'MENU', icon: '👤', path: '/admins', component: 'AdminList', permission: 'admins.view', sortOrder: 1 },
-    { id: 'menu-roles', parentId: 'menu-system-group', title: '角色管理', type: 'MENU', icon: '🎭', path: '/admins/roles', component: 'RoleList', permission: 'roles.view', sortOrder: 2 },
-    { id: 'menu-permissions', parentId: 'menu-system-group', title: '权限说明', type: 'MENU', icon: '📖', path: '/admins/permissions', component: 'PermissionList', permission: '', sortOrder: 3 },
-    { id: 'menu-menus', parentId: 'menu-system-group', title: '菜单管理', type: 'MENU', icon: '🧩', path: '/admins/menus', component: 'MenuManage', permission: 'menus.edit', sortOrder: 4 },
-    { id: 'menu-audit-logs', parentId: 'menu-system-group', title: '操作日志', type: 'MENU', icon: '📝', path: '/admins/audit-logs', component: 'AuditLogList', permission: 'audit.view', sortOrder: 5 },
-    { id: 'menu-sessions', parentId: 'menu-system-group', title: '会话管理', type: 'MENU', icon: '💻', path: '/admins/sessions', component: 'SessionList', permission: 'audit.view', sortOrder: 6 },
+  // ================= 预置文章 =================
+  const articles = [
+    { slug: 'about', category: 'SYSTEM', title: '关于我们', content: '<p>LUKA 是一家专注于宝可梦卡牌数字抽奖的平台...</p>', isPublished: true, sortOrder: 1 },
+    { slug: 'terms', category: 'SYSTEM', title: '用户协议', content: '<p>欢迎使用 LUKA 平台。在使用本平台前，请仔细阅读以下条款...</p>', isPublished: true, sortOrder: 2 },
+    { slug: 'privacy', category: 'SYSTEM', title: '隐私政策', content: '<p>LUKA 非常重视用户隐私。本政策说明我们如何收集、使用、保护您的信息...</p>', isPublished: true, sortOrder: 3 },
+    { slug: 'contact', category: 'SYSTEM', title: '联系我们', content: '<p>如需帮助，请通过以下方式联系我们：</p><p>邮箱：support@luka.game</p>', isPublished: true, sortOrder: 4 },
   ];
-
-  for (const m of menus) {
-    await prisma.adminMenu.upsert({
-      where: { id: m.id },
-      update: { title: m.title, icon: m.icon, path: m.path, component: m.component, permission: m.permission, sortOrder: m.sortOrder, parentId: m.parentId },
-      create: m,
-    });
+  for (const a of articles) {
+    await prisma.article.upsert({ where: { slug: a.slug }, update: {}, create: a });
   }
 
   console.log('✅ 数据初始化完成');
