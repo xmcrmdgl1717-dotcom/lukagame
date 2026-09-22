@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store';
+import { useI18n } from '../i18n/index.jsx';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function Notifications({ onRead }) {
   const { user } = useStore();
+  const { t } = useI18n();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -14,22 +16,20 @@ export default function Notifications({ onRead }) {
     axios.get(`${API_URL}/api/notifications/${user.id}`)
       .then(res => {
         setList(res.data);
-        // 进入页面时把所有未读标记为已读
         res.data.filter(n => !n.isRead).forEach(n => {
           axios.put(`${API_URL}/api/notifications/${n.id}/read`, { userId: user.id }).catch(() => {});
         });
-        // 通知父组件清空红点
         if (onRead) setTimeout(() => onRead(), 500);
       })
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [user]);
 
-  if (!user) return <div className="text-center text-gray-500 py-20">请先登录</div>;
+  if (!user) return <div className="text-center text-gray-500 py-20 text-sm">请先登录</div>;
 
   return (
     <div className="p-4">
-      <div className="text-center text-lg font-bold mb-6 text-orange-400">消息中心</div>
+      <div className="text-center text-lg font-bold mb-6 text-orange-400">{t('profile.notifications', '消息中心')}</div>
       {loading ? (
         <div className="text-center text-gray-500 text-sm py-8">加载中...</div>
       ) : list.length === 0 ? (
