@@ -502,19 +502,25 @@ model Role {
 }
 
 model Admin {
-  id          String         @id @default(uuid())
-  username    String         @unique
-  password    String
-  roleId      String?
-  roleRef     Role?          @relation(fields: [roleId], references: [id])
-  role        String         @default("admin")
-  permissions String         @default("")
-  isActive    Boolean        @default(true)
-  createdAt   DateTime       @default(now())
-  lastLoginAt DateTime       @default(now())
-  sessions    AdminSession[]
-}
+  id                String         @id @default(uuid())
+  username          String         @unique
+  password          String
+  roleId            String?
+  roleRef           Role?          @relation(fields: [roleId], references: [id])
+  role              String         @default("admin")
+  permissions       String         @default("")
+  isActive          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  lastLoginAt       DateTime       @default(now())
 
+  // 2FA 相关
+  totpSecret        String         @default("")   // TOTP 密钥（base32）
+  totpEnabled       Boolean        @default(false)
+  totpBackupCodes   String         @default("")   // JSON 数组，存储已 hash 的备份码
+  totpVerifiedAt    DateTime?      // 最后一次成功验证 2FA 的时间
+
+  sessions          AdminSession[]
+}
 model AdminSession {
   id           String   @id @default(uuid())
   adminId      String
