@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTable, useCreate, useUpdate, useDelete } from '@refinedev/core';
 import SearchBar from '../../components/SearchBar';
 import { useSearch } from '../../hooks/useSearch';
+import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 
 interface T { id: string; title: string; description: string; action: string; targetCount: number; rewardCoins: number; sortOrder: number; isActive: boolean; createdAt: string; }
 
@@ -19,6 +20,7 @@ export default function TaskList() {
   const { mutate: create_ } = useCreate();
   const { mutate: update_ } = useUpdate();
   const { mutate: delete_ } = useDelete();
+  const { confirm } = useSensitiveConfirm();
 
   const all = tableQueryResult.data?.data || [];
   const { filters, setFilters, filtered, reset } = useSearch(all, SEARCH_FIELDS);
@@ -43,7 +45,14 @@ export default function TaskList() {
   };
 
   const toggle = (t: T) => update_({ resource: 'tasks', id: t.id, values: { isActive: !t.isActive } }, { onSuccess: () => tableQueryResult.refetch() });
-  const del = (t: T) => { if (confirm(`删除任务「${t.title}」？`)) delete_({ resource: 'tasks', id: t.id }, { onSuccess: () => tableQueryResult.refetch() }); };
+
+  const del = async (t: T) => {
+    const ok = await confirm(
+      `即将删除任务「${t.title}」。\n\n任务类型：${lbl(t.action)} · 目标：${t.targetCount} · 奖励：${t.rewardCoins} 金币\n\n删除后所有用户在该任务的进度记录将一并消失。`
+    );
+    if (!ok) return;
+    delete_({ resource: 'tasks', id: t.id }, { onSuccess: () => tableQueryResult.refetch() });
+  };
 
   return (
     <div>
