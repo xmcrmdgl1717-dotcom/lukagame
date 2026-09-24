@@ -620,25 +620,57 @@ async function ensureCurrency() {
   if (!c) {
     c = await prisma.currencySetting.create({ data: { id: 'singleton' } });
   }
+
+  // 首次初始化默认法币（如果表为空）
+  const count = await prisma.fiatCurrency.count();
+  if (count === 0) {
+    const defaults = [
+      { code: 'USD', name: '美元',       symbol: '$',  flag: '🇺🇸', ratio: 100, isDefault: true,  sortOrder: 1 },
+      { code: 'CNY', name: '人民币',     symbol: '¥',  flag: '🇨🇳', ratio: 14,  isDefault: false, sortOrder: 2 },
+      { code: 'EUR', name: '欧元',       symbol: '€',  flag: '🇪🇺', ratio: 110, isDefault: false, sortOrder: 3 },
+      { code: 'JPY', name: '日元',       symbol: '¥',  flag: '🇯🇵', ratio: 1,   isDefault: false, sortOrder: 4 },
+      { code: 'HKD', name: '港币',       symbol: 'HK$', flag: '🇭🇰', ratio: 13, isDefault: false, sortOrder: 5 },
+    ];
+    for (const d of defaults) {
+      await prisma.fiatCurrency.create({ data: d }).catch(() => {});
+    }
+  }
+
   return c;
 }
 
-// 用户端公开接口
+// ================= 用户端：获取全部币种信息 =================
 app.get('/api/currency', async (req, res) => {
   res.set('Cache-Control', 'public, max-age=60');
   try {
     const c = await ensureCurrency();
+    const fiats = await prisma.fiatCurrency.findMany({
+      where: { isActive: true },
+      orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
+    });
+    const defaultFiat = fiats.find(f => f.isDefault) || fiats[0];
+
     res.json({
-      name: c.name,
-      symbol: c.symbol,
-      shortName: c.shortName,
-      ratio: c.ratio,
-      enabled: c.enabled,
+      platform: {
+        name: c.name,
+        symbol: c.symbol,
+        shortName: c.shortName,
+        enabled: c.enabled,
+      },
+      fiats: fiats.map(f => ({
+        code: f.code,
+        name: f.name,
+        symbol: f.symbol,
+        flag: f.flag,
+        ratio: f.ratio,
+        isDefault: f.isDefault,
+      })),
+      defaultCode: defaultFiat?.code || 'USD',
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 后台读取
+// ================= 后台：平台币设置 =================
 app.get('/api/admin/currency-setting', requirePermission('audit.view'), async (req, res) => {
   try {
     const c = await ensureCurrency();
@@ -646,18 +678,12 @@ app.get('/api/admin/currency-setting', requirePermission('audit.view'), async (r
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 后台更新
 app.put('/api/admin/currency-setting', requirePermission('audit.view'), async (req, res) => {
-  const { name, symbol, shortName, ratio, enabled } = req.body;
+  const { name, symbol, shortName, enabled } = req.body;
   const data = {};
   if (name !== undefined) data.name = String(name).trim() || '钻石';
   if (symbol !== undefined) data.symbol = String(symbol).trim() || '💎';
   if (shortName !== undefined) data.shortName = String(shortName).trim().toUpperCase() || 'DIAMOND';
-  if (ratio !== undefined) {
-    const r = parseInt(ratio);
-    if (!r || r <= 0) return res.status(400).json({ error: '比例必须是正整数' });
-    data.ratio = r;
-  }
   if (enabled !== undefined) data.enabled = !!enabled;
 
   try {
@@ -668,6 +694,90 @@ app.put('/api/admin/currency-setting', requirePermission('audit.view'), async (r
     });
     await writeAuditLog(req.admin, 'currency.update', 'currency', c.id, data);
     res.json({ success: true, setting: c });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// ================= 后台：法币列表管理 =================
+app.get('/api/admin/fiat-currencies', requirePermission('audit.view'), async (req, res) => {
+  try {
+    const list = await prisma.fiatCurrency.findMany({
+      orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }],
+    });
+    res.json(list);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/fiat-currencies', requirePermission('audit.view'), async (req, res) => {
+  const { code, name, symbol, flag, ratio, isDefault, isActive, sortOrder } = req.body;
+  if (!code || !name || !symbol) return res.status(400).json({ error: '请填写代码、名称、符号' });
+  const r = parseInt(ratio);
+  if (!r || r <= 0) return res.status(400).json({ error: '汇率必须是正整数' });
+
+  try {
+    const upper = String(code).trim().toUpperCase();
+    const existing = await prisma.fiatCurrency.findUnique({ where: { code: upper } });
+    if (existing) return res.status(400).json({ error: '该币种代码已存在' });
+
+    // 如果设为默认，取消其他默认
+    if (isDefault) {
+      await prisma.fiatCurrency.updateMany({ data: { isDefault: false } });
+    }
+
+    const created = await prisma.fiatCurrency.create({
+      data: {
+        code: upper,
+        name: String(name).trim(),
+        symbol: String(symbol).trim(),
+        flag: (flag || '').trim(),
+        ratio: r,
+        isDefault: !!isDefault,
+        isActive: isActive !== undefined ? !!isActive : true,
+        sortOrder: parseInt(sortOrder) || 0,
+      },
+    });
+    await writeAuditLog(req.admin, 'fiat.create', 'fiat', created.id, { code: upper });
+    res.json({ success: true, currency: created });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.put('/api/admin/fiat-currencies/:id', requirePermission('audit.view'), async (req, res) => {
+  const { name, symbol, flag, ratio, isDefault, isActive, sortOrder } = req.body;
+  const data = {};
+  if (name !== undefined) data.name = String(name).trim();
+  if (symbol !== undefined) data.symbol = String(symbol).trim();
+  if (flag !== undefined) data.flag = String(flag).trim();
+  if (ratio !== undefined) {
+    const r = parseInt(ratio);
+    if (!r || r <= 0) return res.status(400).json({ error: '汇率必须是正整数' });
+    data.ratio = r;
+  }
+  if (isDefault !== undefined) {
+    if (isDefault) await prisma.fiatCurrency.updateMany({ data: { isDefault: false } });
+    data.isDefault = !!isDefault;
+  }
+  if (isActive !== undefined) data.isActive = !!isActive;
+  if (sortOrder !== undefined) data.sortOrder = parseInt(sortOrder);
+
+  try {
+    const updated = await prisma.fiatCurrency.update({
+      where: { id: req.params.id },
+      data,
+    });
+    await writeAuditLog(req.admin, 'fiat.update', 'fiat', updated.id, data);
+    res.json({ success: true, currency: updated });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/fiat-currencies/:id', requirePermission('audit.view'), async (req, res) => {
+  try {
+    const cur = await prisma.fiatCurrency.findUnique({ where: { id: req.params.id } });
+    if (!cur) return res.status(404).json({ error: '币种不存在' });
+    if (cur.isDefault) return res.status(400).json({ error: '默认币种不可删除' });
+    if (cur.code === 'USD') return res.status(400).json({ error: 'USD 作为平台锚定币种不可删除' });
+
+    await prisma.fiatCurrency.delete({ where: { id: req.params.id } });
+    await writeAuditLog(req.admin, 'fiat.delete', 'fiat', cur.id, { code: cur.code });
+    res.json({ success: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
@@ -892,26 +1002,167 @@ app.post('/api/tasks/claim', async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+// 用户端拉充值套餐：附带每个套餐的"到账钻石数" + 各法币换算价格
 app.get('/api/recharge-options', async (req, res) => {
-  res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
-  res.json(await prisma.rechargeOption.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
+  res.set('Cache-Control', 'public, max-age=30');
+  try {
+    const options = await prisma.rechargeOption.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    const fiats = await prisma.fiatCurrency.findMany({ where: { isActive: true } });
+
+    const result = options.map(opt => {
+      const totalCoins = opt.coins + (opt.bonus || 0);
+      // 每个法币下的价格（浮点数，保留 2 位；前端再按币种小数位格式化）
+      const prices = {};
+      for (const f of fiats) {
+        if (f.ratio > 0) {
+          prices[f.code] = +(totalCoins / f.ratio).toFixed(2);
+        }
+      }
+      return {
+        id: opt.id,
+        coins: opt.coins,
+        bonus: opt.bonus || 0,
+        totalCoins,
+        sortOrder: opt.sortOrder,
+        prices,                     // { USD: 10.00, CNY: 71.43, ... }
+        // 兼容旧前端：默认美元价格 × 100（分）
+        price: Math.round((prices['USD'] || 0) * 100),
+      };
+    });
+    res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 用户端拉可用支付通道（含币种信息）
+app.get('/api/payment-channels', async (req, res) => {
+  res.set('Cache-Control', 'public, max-age=30');
+  try {
+    const channels = await prisma.paymentChannel.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    const fiats = await prisma.fiatCurrency.findMany({ where: { isActive: true } });
+    const fiatMap = Object.fromEntries(fiats.map(f => [f.code, f]));
+
+    const result = channels.map(c => {
+      const fiat = fiatMap[c.currencyCode];
+      return {
+        id: c.id,
+        name: c.name,
+        displayName: c.displayName,
+        iconUrl: c.iconUrl,
+        currencyCode: c.currencyCode,
+        currency: fiat ? {
+          code: fiat.code,
+          name: fiat.name,
+          symbol: fiat.symbol,
+          flag: fiat.flag,
+          ratio: fiat.ratio,
+        } : null,
+      };
+    });
+    // 过滤掉绑定了不存在/停用币种的通道
+    res.json(result.filter(x => x.currency));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 充值下单：支持多法币结算
+// 前端传 { userId, optionId, currencyCode }，currencyCode 来自用户选的支付通道绑定币种
 app.post('/api/recharge', async (req, res) => {
-  const { userId, optionId } = req.body;
+  const { userId, optionId, currencyCode } = req.body;
+
   try {
     const result = await prisma.$transaction(async (tx) => {
       const option = await tx.rechargeOption.findUnique({ where: { id: optionId } });
       if (!option || !option.isActive) throw new Error('套餐已下架');
-      const totalCoins = option.coins + option.bonus;
-      const order = await tx.order.create({ data: { userId, optionId, amount: option.price, coins: totalCoins, status: 'PAID', paidAt: new Date() } });
-      await tx.user.update({ where: { id: userId }, data: { coins: { increment: totalCoins }, rechargeCount: { increment: 1 }, totalRecharge: { increment: option.price } } });
-      await tx.transaction.create({ data: { userId, type: 'RECHARGE', amount: option.price, balance: 0, refType: 'ORDER', refId: order.id, remark: `充值 ¥${(option.price / 100).toFixed(2)}` } });
+
+      const fiatCode = (currencyCode || 'USD').toUpperCase();
+      const fiat = await tx.fiatCurrency.findUnique({ where: { code: fiatCode } });
+      if (!fiat || !fiat.isActive) throw new Error('该币种不可用');
+      if (fiat.ratio <= 0) throw new Error('汇率配置异常');
+
+      const totalCoins = option.coins + (option.bonus || 0);
+      // 实际收款金额（单位：分，法币的最小单位）
+      const actualAmount = Math.round((totalCoins / fiat.ratio) * 100);
+
+      const order = await tx.order.create({
+        data: {
+          userId,
+          optionId,
+          amount: actualAmount,           // 实际支付金额（分）
+          coins: totalCoins,
+          status: 'PAID',
+          paidAt: new Date(),
+          // 记账币种（如果 Order 表还没这个字段，稍后用备注代替）
+        },
+      });
+
+      // 累计消费统一按 USD 记（平台锚定币），保持 totalRecharge 语义一致
+      const usdAmountCents = Math.round((totalCoins / 100) * 100); // 钻石÷100 = 美元，×100 = 美分
+
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: {
+          coins: { increment: totalCoins },
+          rechargeCount: { increment: 1 },
+          totalRecharge: { increment: usdAmountCents },
+        },
+      });
+
+      await tx.transaction.create({
+        data: {
+          userId,
+          type: 'RECHARGE',
+          amount: totalCoins,             // 账变记录的是"钻石"
+          balance: updated.coins,
+          refType: 'ORDER',
+          refId: order.id,
+          remark: `充值 ${totalCoins.toLocaleString()} 💎（${fiat.symbol}${(actualAmount / 100).toFixed(2)} ${fiat.code}）`,
+        },
+      });
+
       await updateTaskProgress(tx, userId, 'RECHARGE', 1);
-      return { success: true, order, coinsAdded: totalCoins };
+
+      return {
+        success: true,
+        order,
+        coinsAdded: totalCoins,
+        newBalance: updated.coins,
+        user: updated,
+        fiat,
+        actualAmount,
+      };
     });
+
     checkVipUpgrade(userId).catch(() => {});
-    res.json(result);
+
+    const u = result.user;
+    if (userWantsEmail(u, 'RECHARGE')) {
+      sendEmail({
+        to: u.email,
+        type: 'RECHARGE',
+        userId: u.id,
+        data: {
+          username: u.username,
+          orderId: result.order.id.slice(0, 8),
+          amount: result.actualAmount,
+          coinsAdded: result.coinsAdded,
+          newBalance: result.newBalance,
+        },
+      }).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      order: result.order,
+      coinsAdded: result.coinsAdded,
+      actualAmount: result.actualAmount,
+      currencyCode: result.fiat.code,
+      currencySymbol: result.fiat.symbol,
+    });
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
@@ -2277,15 +2528,25 @@ app.put('/api/admin/orders/:id/paid', requirePermission('orders.refund'), async 
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-app.get('/api/admin/payment-channels', requirePermission('payments.view'), async (req, res) => { res.json(await prisma.paymentChannel.findMany({ orderBy: { sortOrder: 'asc' } })); });
+app.get('/api/admin/payment-channels', requirePermission('payments.view'), async (req, res) => {
+  res.json(await prisma.paymentChannel.findMany({ orderBy: { sortOrder: 'asc' } }));
+});
+
 app.put('/api/admin/payment-channels/:id', requirePermission('payments.edit'), async (req, res) => {
-  const { displayName, config, isActive, sortOrder, iconUrl } = req.body;
+  const { displayName, config, isActive, sortOrder, iconUrl, currencyCode } = req.body;
   const data = {};
   if (displayName) data.displayName = displayName;
   if (config !== undefined) data.config = config;
   if (isActive !== undefined) data.isActive = isActive;
   if (sortOrder !== undefined) data.sortOrder = parseInt(sortOrder);
   if (iconUrl !== undefined) data.iconUrl = iconUrl;
+  if (currencyCode !== undefined) {
+    const code = String(currencyCode).toUpperCase();
+    // 校验币种存在
+    const fiat = await prisma.fiatCurrency.findUnique({ where: { code } });
+    if (!fiat) return res.status(400).json({ error: `币种 ${code} 不存在，请先在「币种管理」中添加` });
+    data.currencyCode = code;
+  }
   try { res.json({ success: true, channel: await prisma.paymentChannel.update({ where: { id: req.params.id }, data }) }); }
   catch (e) { res.status(400).json({ error: e.message }); }
 });
