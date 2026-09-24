@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTable, useCreate, useUpdate, useDelete } from '@refinedev/core';
 import SearchBar from '../../components/SearchBar';
 import { useSearch } from '../../hooks/useSearch';
+import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 
 interface B { id: string; imageUrl: string; link: string; title: string; sortOrder: number; isActive: boolean; createdAt: string; }
 
@@ -19,6 +20,7 @@ export default function BannerList() {
   const { mutate: create_ } = useCreate();
   const { mutate: update_ } = useUpdate();
   const { mutate: delete_ } = useDelete();
+  const { confirm } = useSensitiveConfirm();
 
   const all = tableQueryResult.data?.data || [];
   const { filters, setFilters, filtered, reset } = useSearch(all, SEARCH_FIELDS);
@@ -29,7 +31,6 @@ export default function BannerList() {
   const [ed, setEd] = useState<any>({});
   const [saving, setSaving] = useState(false);
 
-  // ✅ 修复：先 await，再 setState
   const onNewImg = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -58,7 +59,14 @@ export default function BannerList() {
   };
 
   const toggle = (b: B) => update_({ resource: 'banners', id: b.id, values: { isActive: !b.isActive } }, { onSuccess: () => tableQueryResult.refetch() });
-  const del = (b: B) => { if (confirm('删除轮播图？')) delete_({ resource: 'banners', id: b.id }, { onSuccess: () => tableQueryResult.refetch() }); };
+
+  const del = async (b: B) => {
+    const ok = await confirm(
+      `即将删除轮播图「${b.title || '（无标题）'}」。\n\n排序：${b.sortOrder} · 状态：${b.isActive ? '上架' : '下架'}\n\n删除后用户端首页将不再展示。`
+    );
+    if (!ok) return;
+    delete_({ resource: 'banners', id: b.id }, { onSuccess: () => tableQueryResult.refetch() });
+  };
 
   return (
     <div>
