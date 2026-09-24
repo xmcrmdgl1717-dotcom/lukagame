@@ -5,11 +5,9 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export default function Home({ onShowLogin, onGoGame, onGoLeaderboard }) {
-  const { user, updateCoins, setUser } = useStore();
+export default function Home({ onShowLogin, onGoGame, onGoLeaderboard, onGoBoxDetail }) {
+  const { user } = useStore();
   const { t } = useI18n();
-  const [drawing, setDrawing] = useState(false);
-  const [drawnResult, setDrawnResult] = useState([]);
   const [banners, setBanners] = useState([]);
   const [currentBanner, setCurrentBanner] = useState(0);
   const [games, setGames] = useState([]);
@@ -33,17 +31,9 @@ export default function Home({ onShowLogin, onGoGame, onGoLeaderboard }) {
     if (link && link !== '#') window.open(link, '_blank');
   };
 
-  const handleDraw = async (box, count) => {
+  const handleBoxClick = (box) => {
     if (!user) return onShowLogin();
-    if (user.coins < box.price * count) return alert('金币不足，请先充值！');
-    try {
-      const res = await axios.post(`${API_URL}/api/draw`, { userId: user.id, boxId: box.id, count });
-      updateCoins(-(box.price * count));
-      const updatedUser = await axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' });
-      setUser(updatedUser.data);
-      setDrawnResult(res.data.drawnCards);
-      setDrawing(true);
-    } catch (e) { alert(e.response?.data?.error || '抽卡失败'); }
+    onGoBoxDetail(box.id);
   };
 
   return (
@@ -75,7 +65,6 @@ export default function Home({ onShowLogin, onGoGame, onGoLeaderboard }) {
       <div className="bg-gradient-to-br from-[#2d1410] to-[#4a1c12] border border-[#6b2a1e] rounded-2xl p-5 shadow-lg">
         <div className="flex justify-between items-center mb-3">
           <div className="text-orange-400 font-bold text-sm tracking-widest">{t('home.leaderboard', '一周消费排行榜')}</div>
-          {/* 👈 新增跳转按钮 */}
           <button onClick={onGoLeaderboard} className="text-[10px] text-orange-500 hover:text-orange-400 transition underline">
             查看完整榜单
           </button>
@@ -135,7 +124,11 @@ export default function Home({ onShowLogin, onGoGame, onGoLeaderboard }) {
           <div className="text-center text-xs font-bold text-gray-400 tracking-widest my-3">{t('home.featured', '推荐盲盒')}</div>
           <div className="space-y-3">
             {featuredBoxes.map((box) => (
-              <div key={box.id} className="bg-[#1a0f0c] border border-[#3d1a1a] rounded-2xl p-4 relative overflow-hidden shadow-lg">
+              <div
+                key={box.id}
+                onClick={() => handleBoxClick(box)}
+                className="bg-[#1a0f0c] border border-[#3d1a1a] rounded-2xl p-4 relative overflow-hidden shadow-lg cursor-pointer hover:border-orange-500/60 transition active:scale-[0.98]"
+              >
                 <div className="flex justify-between items-center mb-3">
                   <div className="text-orange-400 font-bold text-sm tracking-wide">{box.name}</div>
                   {box.game?.displayName && (
@@ -152,12 +145,9 @@ export default function Home({ onShowLogin, onGoGame, onGoLeaderboard }) {
                   </div>
                   <div className="flex-1 text-right">
                     <div className="text-white text-sm font-bold mb-2">{box.price.toLocaleString()} 🪙</div>
-                    <button
-                      onClick={() => handleDraw(box, 1)}
-                      className="bg-orange-600 text-white text-xs px-5 py-2 rounded-lg font-bold hover:bg-orange-700 transition"
-                    >
-                      {t('home.open_box', '开箱')}
-                    </button>
+                    <div className="bg-orange-600 text-white text-xs px-5 py-2 rounded-lg font-bold inline-block">
+                      立即开盒
+                    </div>
                   </div>
                 </div>
               </div>
@@ -170,23 +160,6 @@ export default function Home({ onShowLogin, onGoGame, onGoLeaderboard }) {
         POKEMON TRADING CARD GAME ONLINE<br/>
         Terms & Conditions · Privacy Policy · Blog
       </div>
-
-      {/* 抽卡结果 */}
-      {drawing && drawnResult.length > 0 && (
-        <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-4">
-          <div className="text-2xl font-bold text-red-500 mb-8 animate-pulse">{t('draw.result', '抽卡结果')}</div>
-          <div className="flex flex-wrap justify-center gap-4">
-            {drawnResult.map((card, idx) => (
-              <div key={idx} className="w-24 h-32 bg-[#1c0e0e] rounded-lg border border-red-500 flex flex-col items-center justify-center shadow-lg">
-                <span className="text-3xl mb-1">🃏</span>
-                <span className="text-xs text-white">{card.name}</span>
-                <span className="text-[10px] text-yellow-500 font-bold">{card.rarity}</span>
-              </div>
-            ))}
-          </div>
-          <button onClick={() => { setDrawing(false); setDrawnResult([]); }} className="mt-8 bg-red-600 px-8 py-3 rounded-full font-bold text-sm">{t('common.confirm', '确认')}</button>
-        </div>
-      )}
     </div>
   );
 }
