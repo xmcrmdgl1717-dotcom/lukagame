@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
@@ -16,6 +17,168 @@ function getClientIp(req) {
 }
 function getClientUA(req) {
   return (req.headers['user-agent'] || '').slice(0, 200);
+}
+// ================= 邮件模块 =================
+
+let _transporter = null;
+let _transporterConfig = '';
+
+async function getTransporter() {
+  const s = await prisma.emailSetting.findUnique({ where: { id: 'singleton' } });
+  if (!s || !s.enabled || !s.host || !s.user || !s.pass) return null;
+
+  const cfg = `${s.host}:${s.port}:${s.user}:${s.pass}:${s.secure}`;
+  if (_transporter && _transporterConfig === cfg) return _transporter;
+
+  _transporter = nodemailer.createTransport({
+    host: s.host,
+    port: s.port,
+    secure: s.secure,
+    auth: { user: s.user, pass: s.pass },
+    connectionTimeout: 10000,
+    greetingTimeout: 8000,
+    socketTimeout: 12000,
+  });
+  _transporterConfig = cfg;
+  return _transporter;
+}
+
+const EMAIL_TEMPLATES = {
+  WELCOME: (data) => ({
+    subject: `🎉 欢迎加入 LUKA，${data.username}！`,
+    html: `
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#0d0d0d;color:#fff;border-radius:12px;overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#b83d22,#9a2c18);padding:32px 24px;text-align:center;">
+          <div style="font-size:32px;font-weight:900;font-style:italic;color:#fff;letter-spacing:4px;">LUKA!</div>
+        </div>
+        <div style="padding:32px 24px;">
+          <h2 style="margin:0 0 16px;font-size:20px;">你好，${data.username} 👋</h2>
+          <p style="color:#aaa;line-height:1.7;margin:0 0 16px;">欢迎加入 LUKA 抽卡平台！我们已为你准备 <strong style="color:#fbbf24;">${data.initCoins || 10000}</strong> 金币作为新手礼包。</p>
+          <p style="color:#aaa;line-height:1.7;margin:0 0 24px;">现在就可以前往首页，开启你的抽卡之旅。如果遇到任何问题，随时在 App 内「联系客服」提交工单。</p>
+          <div style="text-align:center;margin:32px 0;">
+            <a href="${data.siteUrl || '#'}" style="display:inline-block;background:#dc2626;color:#fff;text-decoration:none;padding:14px 32px;border-radius:24px;font-weight:bold;">开始抽卡</a>
+          </div>
+        </div>
+        <div style="padding:20px;text-align:center;color:#555;font-size:12px;border-top:1px solid #222;">
+          LUKA 抽卡平台 · 本邮件由系统自动发出，请勿回复
+        </div>
+      </div>
+    `,
+  }),
+
+  RECHARGE: (data) => ({
+    subject: `💰 充值成功：${data.coinsAdded} 金币已到账`,
+    html: `
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#0d0d0d;color:#fff;border-radius:12px;overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#16a34a,#15803d);padding:32px 24px;text-align:center;">
+          <div style="font-size:28px;font-weight:900;color:#fff;">💰 充值成功</div>
+        </div>
+        <div style="padding:32px 24px;">
+          <h2 style="margin:0 0 20px;font-size:18px;">亲爱的 ${data.username}：</h2>
+          <p style="color:#aaa;line-height:1.7;">您的充值已到账，详情如下：</p>
+          <div style="background:#1a0f0c;border:1px solid #3d1a1a;border-radius:8px;padding:16px;margin:20px 0;">
+            <table style="width:100%;color:#fff;font-size:14px;">
+              <tr><td style="color:#888;padding:6px 0;">订单号</td><td style="text-align:right;font-family:monospace;font-size:12px;">${data.orderId}</td></tr>
+              <tr><td style="color:#888;padding:6px 0;">支付金额</td><td style="text-align:right;color:#4ade80;font-weight:bold;">¥${(data.amount/100).toFixed(2)}</td></tr>
+              <tr><td style="color:#888;padding:6px 0;">到账金币</td><td style="text-align:right;color:#fbbf24;font-weight:bold;">+${data.coinsAdded.toLocaleString()}</td></tr>
+              <tr><td style="color:#888;padding:6px 0;">当前余额</td><td style="text-align:right;color:#fbbf24;">${data.newBalance.toLocaleString()} 🪙</td></tr>
+            </table>
+          </div>
+          <p style="color:#aaa;line-height:1.7;">祝您抽到心仪的卡牌！</p>
+        </div>
+        <div style="padding:20px;text-align:center;color:#555;font-size:12px;border-top:1px solid #222;">
+          LUKA 抽卡平台 · 本邮件由系统自动发出
+        </div>
+      </div>
+    `,
+  }),
+
+  VIP_UPGRADE: (data) => ({
+    subject: `👑 恭喜升级到 VIP${data.level}！`,
+    html: `
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#0d0d0d;color:#fff;border-radius:12px;overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#d97706,#b45309);padding:32px 24px;text-align:center;">
+          <div style="font-size:48px;margin-bottom:8px;">👑</div>
+          <div style="font-size:24px;font-weight:900;color:#fff;">VIP${data.level} 达成！</div>
+        </div>
+        <div style="padding:32px 24px;">
+          <h2 style="margin:0 0 16px;font-size:18px;">亲爱的 ${data.username}：</h2>
+          <p style="color:#aaa;line-height:1.7;">恭喜您成功升级到 <strong style="color:#fbbf24;">${data.levelName}</strong>！</p>
+          <p style="color:#aaa;line-height:1.7;">作为升级奖励，我们已为您发放 <strong style="color:#fbbf24;">${data.reward.toLocaleString()}</strong> 金币。继续充值或消费，解锁更多 VIP 特权！</p>
+        </div>
+        <div style="padding:20px;text-align:center;color:#555;font-size:12px;border-top:1px solid #222;">
+          LUKA 抽卡平台 · 本邮件由系统自动发出
+        </div>
+      </div>
+    `,
+  }),
+
+  SHIP: (data) => ({
+    subject: `📦 您的卡片已发货：${data.trackingNo || '物流更新'}`,
+    html: `
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#0d0d0d;color:#fff;border-radius:12px;overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#0891b2,#0e7490);padding:32px 24px;text-align:center;">
+          <div style="font-size:48px;margin-bottom:8px;">📦</div>
+          <div style="font-size:22px;font-weight:900;color:#fff;">卡片已发货</div>
+        </div>
+        <div style="padding:32px 24px;">
+          <h2 style="margin:0 0 16px;font-size:18px;">亲爱的 ${data.username}：</h2>
+          <p style="color:#aaa;line-height:1.7;">您申请的卡片发货订单已处理，物流信息如下：</p>
+          <div style="background:#1a0f0c;border:1px solid #3d1a1a;border-radius:8px;padding:16px;margin:20px 0;">
+            <table style="width:100%;color:#fff;font-size:14px;">
+              <tr><td style="color:#888;padding:6px 0;">订单号</td><td style="text-align:right;font-family:monospace;font-size:12px;">${data.orderId}</td></tr>
+              <tr><td style="color:#888;padding:6px 0;">快递公司</td><td style="text-align:right;">${data.expressCompany || '-'}</td></tr>
+              <tr><td style="color:#888;padding:6px 0;">快递单号</td><td style="text-align:right;color:#22d3ee;font-family:monospace;font-weight:bold;">${data.trackingNo || '-'}</td></tr>
+            </table>
+          </div>
+          <p style="color:#aaa;line-height:1.7;">请留意物流信息，收到后请在 App 内确认收货。</p>
+        </div>
+        <div style="padding:20px;text-align:center;color:#555;font-size:12px;border-top:1px solid #222;">
+          LUKA 抽卡平台 · 本邮件由系统自动发出
+        </div>
+      </div>
+    `,
+  }),
+};
+
+// 统一发送入口（fire-and-forget，不阻塞业务）
+async function sendEmail({ to, type, userId, data }) {
+  if (!to || !to.includes('@')) return;
+  const tpl = EMAIL_TEMPLATES[type];
+  if (!tpl) return;
+
+  const { subject, html } = tpl(data);
+
+  // 先写日志
+  let logId = null;
+  try {
+    const log = await prisma.emailLog.create({
+      data: { userId: userId || null, toEmail: to, type, subject, status: 'PENDING' },
+    });
+    logId = log.id;
+  } catch (e) { console.error('emailLog create fail:', e.message); }
+
+  try {
+    const transporter = await getTransporter();
+    if (!transporter) throw new Error('SMTP 未配置或未启用');
+    const s = await prisma.emailSetting.findUnique({ where: { id: 'singleton' } });
+    const from = s.fromEmail ? `"${s.fromName}" <${s.fromEmail}>` : s.user;
+    await transporter.sendMail({ from, to, subject, html });
+    if (logId) await prisma.emailLog.update({ where: { id: logId }, data: { status: 'SENT', sentAt: new Date() } });
+  } catch (e) {
+    console.error(`[Email ${type}] to=${to} fail:`, e.message);
+    if (logId) await prisma.emailLog.update({ where: { id: logId }, data: { status: 'FAILED', error: e.message.slice(0, 500) } });
+  }
+}
+
+// 检查用户是否订阅某类邮件
+function userWantsEmail(user, type) {
+  if (!user || !user.email) return false;
+  if (type === 'WELCOME' && !user.emailWelcome) return false;
+  if (type === 'RECHARGE' && !user.emailRecharge) return false;
+  if (type === 'VIP_UPGRADE' && !user.emailVip) return false;
+  if (type === 'SHIP' && !user.emailShip) return false;
+  return true;
 }
 
 // ================= 权限定义 =================
@@ -142,7 +305,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.post('/api/register', async (req, res) => {
-  const { username, password, utmSource, utmMedium, utmCampaign, ref } = req.body;
+  const { username, password, email, utmSource, utmMedium, utmCampaign, ref } = req.body;
   if (!username || !password) return res.status(400).json({ error: '请输入用户名和密码' });
   try {
     const existing = await prisma.user.findUnique({ where: { username } });
@@ -150,12 +313,24 @@ app.post('/api/register', async (req, res) => {
     const newUser = await prisma.user.create({
       data: {
         username, password, coins: 10000,
+        email: (email || '').trim(),
         adSource: utmSource || '',
         adMedium: utmMedium || '',
         adCampaign: utmCampaign || '',
         adRef: ref || '',
       },
     });
+
+    // 异步发欢迎邮件（不阻塞响应）
+    if (newUser.email) {
+      sendEmail({
+        to: newUser.email,
+        type: 'WELCOME',
+        userId: newUser.id,
+        data: { username: newUser.username, initCoins: 10000, siteUrl: process.env.SITE_URL || '' },
+      }).catch(() => {});
+    }
+
     res.json({ success: true, user: newUser });
   } catch (error) { res.status(500).json({ error: '注册失败' }); }
 });
@@ -362,13 +537,23 @@ async function checkVipUpgrade(userId) {
     if (user.totalRecharge >= lv.rechargeAmount && user.totalConsume >= lv.consumeAmount) {
       if (user.vipLevel !== lv.level) {
         const reward = lv.level * 500;
-        await prisma.user.update({ where: { id: userId }, data: { vipLevel: lv.level, coins: { increment: reward } } });
+        const updated = await prisma.user.update({ where: { id: userId }, data: { vipLevel: lv.level, coins: { increment: reward } } });
         await prisma.transaction.create({
-          data: { userId, type: 'VIP_BONUS', amount: reward, balance: user.coins + reward, refType: 'VIP', refId: String(lv.level), remark: `VIP${lv.level} 升级奖励` }
+          data: { userId, type: 'VIP_BONUS', amount: reward, balance: updated.coins, refType: 'VIP', refId: String(lv.level), remark: `VIP${lv.level} 升级奖励` }
         });
         await prisma.notification.create({
           data: { userId, title: `🎉 恭喜升级到 VIP${lv.level}！`, content: `您已成功升级到 ${lv.name}，获得 ${reward} 金币奖励。继续充值或消费可解锁更多特权！` }
         });
+
+        // 异步发 VIP 升级邮件
+        if (userWantsEmail(updated, 'VIP_UPGRADE')) {
+          sendEmail({
+            to: updated.email,
+            type: 'VIP_UPGRADE',
+            userId: updated.id,
+            data: { username: updated.username, level: lv.level, levelName: lv.name, reward },
+          }).catch(() => {});
+        }
       }
       break;
     }
@@ -619,6 +804,155 @@ app.get('/api/user/transactions/:userId', async (req, res) => {
     const list = await prisma.transaction.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (parseInt(page) - 1) * parseInt(pageSize), take: parseInt(pageSize) });
     res.json({ list, total, page: parseInt(page), pageSize: parseInt(pageSize) });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// ================= 用户端：邮件设置 =================
+
+// 获取用户邮件设置
+app.get('/api/user/email-settings/:userId', async (req, res) => {
+  try {
+    const u = await prisma.user.findUnique({
+      where: { id: req.params.userId },
+      select: { email: true, emailWelcome: true, emailRecharge: true, emailVip: true, emailShip: true },
+    });
+    if (!u) return res.status(404).json({ error: '用户不存在' });
+    res.json(u);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 更新用户邮件设置
+app.put('/api/user/email-settings/:userId', async (req, res) => {
+  const { email, emailWelcome, emailRecharge, emailVip, emailShip } = req.body;
+  const data = {};
+  if (email !== undefined) {
+    const trimmed = (email || '').trim();
+    if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      return res.status(400).json({ error: '邮箱格式不正确' });
+    }
+    data.email = trimmed;
+  }
+  if (emailWelcome !== undefined) data.emailWelcome = !!emailWelcome;
+  if (emailRecharge !== undefined) data.emailRecharge = !!emailRecharge;
+  if (emailVip !== undefined) data.emailVip = !!emailVip;
+  if (emailShip !== undefined) data.emailShip = !!emailShip;
+  try {
+    const updated = await prisma.user.update({
+      where: { id: req.params.userId },
+      data,
+      select: { email: true, emailWelcome: true, emailRecharge: true, emailVip: true, emailShip: true },
+    });
+    res.json({ success: true, settings: updated });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// ================= 后台：邮件设置 & 日志 =================
+
+app.get('/api/admin/email-setting', requirePermission('audit.view'), async (req, res) => {
+  try {
+    let s = await prisma.emailSetting.findUnique({ where: { id: 'singleton' } });
+    if (!s) s = await prisma.emailSetting.create({ data: { id: 'singleton' } });
+    // 不返回密码原文，只告知是否已配置
+    res.json({ ...s, pass: s.pass ? '********' : '', passConfigured: !!s.pass });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/admin/email-setting', requirePermission('audit.view'), async (req, res) => {
+  const { enabled, host, port, secure, user, pass, fromName, fromEmail } = req.body;
+  const data = {};
+  if (enabled !== undefined) data.enabled = !!enabled;
+  if (host !== undefined) data.host = host;
+  if (port !== undefined) data.port = parseInt(port) || 587;
+  if (secure !== undefined) data.secure = !!secure;
+  if (user !== undefined) data.user = user;
+  // 密码字段：如果传了 "********" 表示不改
+  if (pass !== undefined && pass !== '********') data.pass = pass;
+  if (fromName !== undefined) data.fromName = fromName;
+  if (fromEmail !== undefined) data.fromEmail = fromEmail;
+
+  try {
+    const s = await prisma.emailSetting.upsert({
+      where: { id: 'singleton' },
+      update: data,
+      create: { id: 'singleton', ...data },
+    });
+    // 配置变了，清除 transporter 缓存
+    _transporter = null;
+    _transporterConfig = '';
+    res.json({ success: true, setting: { ...s, pass: s.pass ? '********' : '' } });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// 测试发信
+app.post('/api/admin/email-setting/test', requirePermission('audit.view'), async (req, res) => {
+  const { to } = req.body;
+  if (!to || !to.includes('@')) return res.status(400).json({ error: '请输入有效的收件邮箱' });
+  try {
+    const transporter = await getTransporter();
+    if (!transporter) return res.status(400).json({ error: 'SMTP 未配置或未启用，请先保存配置并启用' });
+    const s = await prisma.emailSetting.findUnique({ where: { id: 'singleton' } });
+    const from = s.fromEmail ? `"${s.fromName}" <${s.fromEmail}>` : s.user;
+    await transporter.sendMail({
+      from,
+      to,
+      subject: '✅ LUKA 邮件配置测试',
+      html: '<div style="font-family:sans-serif;padding:24px;background:#0d0d0d;color:#fff;border-radius:8px;"><h2>✅ 邮件配置成功</h2><p style="color:#aaa;">这是一封测试邮件。如果你收到了它，说明 SMTP 配置正确。</p></div>',
+    });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(400).json({ error: '发送失败: ' + e.message });
+  }
+});
+
+// 邮件日志列表
+app.get('/api/admin/email-logs', requirePermission('audit.view'), async (req, res) => {
+  const { type, status, search } = req.query;
+  const where = {};
+  if (type) where.type = type;
+  if (status) where.status = status;
+  if (search) where.OR = [{ toEmail: { contains: search } }, { subject: { contains: search } }];
+  try {
+    const list = await prisma.emailLog.findMany({
+      where,
+      include: { user: { select: { id: true, username: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
+    res.json(list);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/email-logs/:id', requirePermission('audit.view'), async (req, res) => {
+  try {
+    await prisma.emailLog.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: '删除失败' }); }
+});
+
+// 重发
+app.post('/api/admin/email-logs/:id/resend', requirePermission('audit.view'), async (req, res) => {
+  try {
+    const log = await prisma.emailLog.findUnique({ where: { id: req.params.id } });
+    if (!log) return res.status(404).json({ error: '记录不存在' });
+    const tpl = EMAIL_TEMPLATES[log.type];
+    if (!tpl) return res.status(400).json({ error: '模板不存在，无法重发' });
+
+    const transporter = await getTransporter();
+    if (!transporter) return res.status(400).json({ error: 'SMTP 未配置或未启用' });
+    const s = await prisma.emailSetting.findUnique({ where: { id: 'singleton' } });
+    const from = s.fromEmail ? `"${s.fromName}" <${s.fromEmail}>` : s.user;
+
+    // 用最近一次业务数据重发（如果有 user，从 user 拉上下文）
+    // 简化：直接用现有 subject 重发一个占位内容
+    await transporter.sendMail({
+      from,
+      to: log.toEmail,
+      subject: `[重发] ${log.subject}`,
+      html: `<div style="font-family:sans-serif;padding:24px;background:#0d0d0d;color:#fff;border-radius:8px;"><h2>${log.subject}</h2><p style="color:#aaa;">这是重发的通知邮件。</p></div>`,
+    });
+    await prisma.emailLog.update({ where: { id: log.id }, data: { status: 'SENT', sentAt: new Date(), error: '' } });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(400).json({ error: '重发失败: ' + e.message });
+  }
 });
 
 // ================= 用户间转让/赠与 =================
@@ -1083,12 +1417,29 @@ app.put('/api/admin/card-orders/:id', requirePermission('cardorders.process'), a
   if (adminRemark !== undefined) data.adminRemark = adminRemark;
   if (status === 'SHIPPED') data.shippedAt = new Date();
   if (status && status !== 'PENDING') data.processedAt = new Date();
-  try { res.json({ success: true, order: await prisma.cardOrder.update({ where: { id: req.params.id }, data }) }); }
-  catch (e) { res.status(400).json({ error: e.message }); }
-});
-app.delete('/api/admin/card-orders/:id', requirePermission('cardorders.process'), async (req, res) => {
-  try { await prisma.cardOrder.delete({ where: { id: req.params.id } }); res.json({ success: true }); }
-  catch (e) { res.status(400).json({ error: '删除失败' }); }
+  try {
+    const order = await prisma.cardOrder.update({ where: { id: req.params.id }, data });
+
+    // 发货时发邮件
+    if (status === 'SHIPPED' && order.userId) {
+      const user = await prisma.user.findUnique({ where: { id: order.userId } });
+      if (user && userWantsEmail(user, 'SHIP')) {
+        sendEmail({
+          to: user.email,
+          type: 'SHIP',
+          userId: user.id,
+          data: {
+            username: user.username,
+            orderId: order.id.slice(0, 8),
+            trackingNo: order.trackingNo,
+            expressCompany: order.expressCompany,
+          },
+        }).catch(() => {});
+      }
+    }
+
+    res.json({ success: true, order });
+  } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 // ============ 弹窗 ============
@@ -2133,6 +2484,8 @@ async function syncMenus() {
     { id: 'menu-redeem', parentId: null, title: '兑换码', type: 'MENU', icon: '🎁', path: '/redeem-codes', component: 'RedeemCodeList', permission: 'redeem.view', sortOrder: 9 },
     { id: 'menu-tickets', parentId: null, title: '客服工单', type: 'MENU', icon: '🎧', path: '/tickets', component: 'TicketList', permission: 'tickets.view', sortOrder: 10 },
     { id: 'menu-system-group', parentId: null, title: '系统管理', type: 'DIRECTORY', icon: '⚙️', path: '', component: '', permission: '', sortOrder: 99 },
+    { id: 'menu-email-setting', parentId: 'menu-system-group', title: '邮件配置', type: 'MENU', icon: '📧', path: '/system/email-setting', component: 'EmailSettingPage', permission: 'audit.view', sortOrder: 7 },
+    { id: 'menu-email-logs', parentId: 'menu-system-group', title: '邮件日志', type: 'MENU', icon: '📨', path: '/system/email-logs', component: 'EmailLogList', permission: 'audit.view', sortOrder: 8 },
     { id: 'menu-admins', parentId: 'menu-system-group', title: '管理员列表', type: 'MENU', icon: '👤', path: '/admins', component: 'AdminList', permission: 'admins.view', sortOrder: 1 },
     { id: 'menu-roles', parentId: 'menu-system-group', title: '角色管理', type: 'MENU', icon: '🎭', path: '/admins/roles', component: 'RoleList', permission: 'roles.view', sortOrder: 2 },
     { id: 'menu-permissions', parentId: 'menu-system-group', title: '权限说明', type: 'MENU', icon: '📖', path: '/admins/permissions', component: 'PermissionList', permission: '', sortOrder: 3 },
