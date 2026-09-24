@@ -25,7 +25,7 @@ const fmt = (d) => {
 };
 
 export default function TransactionLog({ onBack }) {
-  const { user } = useStore();
+  const { user, currency } = useStore();
   const [list, setList] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -62,7 +62,11 @@ export default function TransactionLog({ onBack }) {
       {/* 余额卡片 */}
       <div className="bg-gradient-to-br from-[#2d1410] to-[#4a1c12] border border-[#6b2a1e] rounded-2xl p-5 mb-4 text-center">
         <div className="text-xs text-gray-400 mb-1">当前余额</div>
-        <div className="text-3xl font-black text-yellow-400">{user.coins.toLocaleString()} 🪙</div>
+        <div className="text-3xl font-black text-yellow-400 flex items-center justify-center gap-2">
+          <span className="text-2xl">{currency.symbol}</span>
+          <span>{user.coins.toLocaleString()}</span>
+        </div>
+        <div className="text-[10px] text-gray-500 mt-1">{currency.name}</div>
       </div>
 
       {/* 类型筛选 */}
