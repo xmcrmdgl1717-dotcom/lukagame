@@ -4,6 +4,7 @@ import { useStore } from './store';
 import { I18nProvider } from './i18n/index.jsx';
 import BottomNav from './components/BottomNav';
 import LanguageSwitcher from './components/LanguageSwitcher';
+import CurrencySwitcher from './components/CurrencySwitcher';
 import Popup from './components/Popup';
 import ComplianceNotice from './components/ComplianceNotice';
 import Home from './pages/Home';
@@ -39,6 +40,7 @@ function AppInner() {
   const [refreshing, setRefreshing] = useState(false);
   const { setUser, setBoxes, user, currency, setCurrency } = useStore();
 
+  // 加载 boxes + currency
   useEffect(() => {
     axios.get(`${API_URL}/api/boxes`).then(res => setBoxes(res.data)).catch(() => {});
     axios.get(`${API_URL}/api/currency`).then(res => setCurrency(res.data)).catch(() => {});
@@ -140,6 +142,7 @@ function AppInner() {
       <div className="flex justify-between items-center px-3 py-3 bg-[#140a0a] border-b border-[#332222] gap-2">
         <div className="text-xl font-black italic text-red-500 tracking-wider flex-shrink-0">LUKA!</div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          <CurrencySwitcher />
           <LanguageSwitcher />
           {user && (
             <button onClick={() => setCurrentTab('notifications')} className="relative flex-shrink-0">
