@@ -3,6 +3,7 @@ import { useTable, useCreate, useUpdate, useDelete } from '@refinedev/core';
 import axios from 'axios';
 import SearchBar from '../../components/SearchBar';
 import { useSearch } from '../../hooks/useSearch';
+import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 
 interface A { id: string; username: string; roleId: string | null; role: string; roleDisplayName: string; isActive: boolean; createdAt: string; lastLoginAt: string; }
 interface R { id: string; name: string; displayName: string; isSystem: boolean; }
@@ -25,6 +26,7 @@ export default function AdminList() {
   const { mutate: create_ } = useCreate();
   const { mutate: update_ } = useUpdate();
   const { mutate: delete_ } = useDelete();
+  const { confirm } = useSensitiveConfirm();
 
   const all = tableQueryResult.data?.data || [];
   const { filters, setFilters, filtered, reset } = useSearch(all, SEARCH_FIELDS);
@@ -59,7 +61,19 @@ export default function AdminList() {
     update_({ resource: 'admins', id: ed.id, values: v }, { onSuccess: () => { setShowEdit(false); setSaving(false); tableQueryResult.refetch(); }, onError: (e: any) => { alert('失败: ' + (e?.message || '')); setSaving(false); } });
   };
 
-  const del = (a: A) => { if (confirm(`删除「${a.username}」？`)) delete_({ resource: 'admins', id: a.id }, { onSuccess: () => tableQueryResult.refetch() }); };
+  const del = async (a: A) => {
+    const ok = await confirm(
+      `即将删除管理员「${a.username}」（角色：${a.roleDisplayName || a.role}）。\n\n此操作不可恢复，该账号将立即无法登录后台。`
+    );
+    if (!ok) return;
+    delete_(
+      { resource: 'admins', id: a.id },
+      {
+        onSuccess: () => tableQueryResult.refetch(),
+        onError: (e: any) => alert('删除失败: ' + (e?.message || '')),
+      }
+    );
+  };
 
   return (
     <div>
