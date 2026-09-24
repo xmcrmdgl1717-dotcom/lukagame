@@ -27,13 +27,12 @@ const rarityBg = (r) =>
 
 export default function Leaderboard({ onBack }) {
   const { t } = useI18n();
-  const [mainTab, setMainTab] = useState('daily'); // 'daily' | 'weekly' | 'monthly' | 'cards'
+  const [mainTab, setMainTab] = useState('daily');
   const [cardRarity, setCardRarity] = useState('ALL');
   const [list, setList] = useState([]);
   const [cardList, setCardList] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 消费榜单
   useEffect(() => {
     if (mainTab === 'cards') return;
     setLoading(true);
@@ -44,7 +43,6 @@ export default function Leaderboard({ onBack }) {
       .finally(() => setLoading(false));
   }, [mainTab]);
 
-  // 卡牌排行榜
   useEffect(() => {
     if (mainTab !== 'cards') return;
     setLoading(true);
@@ -71,7 +69,6 @@ export default function Leaderboard({ onBack }) {
         <div className="text-lg font-bold text-orange-400">🏆 排行榜</div>
       </div>
 
-      {/* 主 Tab */}
       <div className="grid grid-cols-4 gap-1 bg-[#1c0e0e] rounded-lg p-1">
         {[
           { key: 'daily', label: '日榜' },
@@ -93,7 +90,6 @@ export default function Leaderboard({ onBack }) {
         ))}
       </div>
 
-      {/* 消费榜单 */}
       {mainTab !== 'cards' && (
         <>
           <div className="text-center text-[10px] text-gray-500 mb-2">
@@ -121,7 +117,7 @@ export default function Leaderboard({ onBack }) {
                     </span>
                   </div>
                   <span className="text-orange-400 font-bold text-sm">
-                    {row.totalCost.toLocaleString()} 🪙
+                    {row.totalCost.toLocaleString()}
                   </span>
                 </div>
               ))}
@@ -130,7 +126,6 @@ export default function Leaderboard({ onBack }) {
         </>
       )}
 
-      {/* 卡牌排行榜 */}
       {mainTab === 'cards' && (
         <>
           <div className="flex gap-2 justify-center mb-2">
