@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 
 interface Popup {
   id: string;
@@ -61,6 +62,7 @@ export default function PopupList() {
   const [ed, setEd] = useState<any>({ ...emptyForm });
   const [saving, setSaving] = useState(false);
   const [isNew, setIsNew] = useState(false);
+  const { confirm } = useSensitiveConfirm();
 
   const load = async () => {
     setLoading(true);
@@ -95,9 +97,12 @@ export default function PopupList() {
     finally { setSaving(false); }
   };
 
-  const del = async (id: string) => {
-    if (!confirm('确定删除该弹窗吗？')) return;
-    try { await axios.delete(`${API_URL}/api/admin/popups/${id}`, { headers: hdr() }); load(); }
+  const del = async (p: Popup) => {
+    const ok = await confirm(
+      `即将删除弹窗「${p.title}」。\n\n位置：${POS_LABELS[p.position] || p.position} · 频率：${FREQ_LABELS[p.frequency] || p.frequency}\n曝光 ${p.viewCount} 次 · 点击 ${p.clickCount} 次\n\n删除后用户端将不再展示此弹窗。`
+    );
+    if (!ok) return;
+    try { await axios.delete(`${API_URL}/api/admin/popups/${p.id}`, { headers: hdr() }); load(); }
     catch (e: any) { alert('删除失败'); }
   };
 
@@ -135,7 +140,7 @@ export default function PopupList() {
                 <div className="flex gap-2">
                   <button onClick={() => openEdit(p)} className="flex-1 bg-blue-600 text-white text-xs py-1.5 rounded">编辑</button>
                   <button onClick={() => toggleActive(p)} className="flex-1 bg-orange-600 text-white text-xs py-1.5 rounded">{p.isActive ? '停用' : '启用'}</button>
-                  <button onClick={() => del(p.id)} className="flex-1 bg-red-600 text-white text-xs py-1.5 rounded">删除</button>
+                  <button onClick={() => del(p)} className="flex-1 bg-red-600 text-white text-xs py-1.5 rounded">删除</button>
                 </div>
               </div>
             </div>
