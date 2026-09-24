@@ -55,6 +55,7 @@ import AdRetentionReport from './pages/ad-retention';
 import TransferLogList from './pages/transfer-logs';
 import EmailSettingPage from './pages/email-setting';
 import EmailLogList from './pages/email-logs';
+import SecurityPage from './pages/security';
 
 const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   DashboardPage, UserList, UserGroupList, BankCardList, CardList, BoxList,
@@ -65,7 +66,7 @@ const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   ReportUserDraw, ReportUserFinance, ReportVipDistribution, ReportCardRanking, ReportRetention,
   LanguageList, TranslationList, CardOrderList, PopupList, ArticleList,
   AdChannelList, AdCampaignList, KolList, AdReport, AdRetentionReport,
-  TransferLogList, EmailSettingPage, EmailLogList,
+  TransferLogList, EmailSettingPage, EmailLogList, SecurityPage,
 };
 
 function buildRoutes(menus: AdminMenu[]): React.ReactElement[] {
