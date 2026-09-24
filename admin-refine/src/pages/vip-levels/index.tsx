@@ -134,7 +134,7 @@ export default function VipLevels() {
                     )}
                   </td>
                   <td className="p-3 text-green-400">{fmtMoney(v.rechargeAmount)}</td>
-                  <td className="p-3 text-yellow-400">{v.consumeAmount.toLocaleString()} 🪙</td>
+                  <td className="p-3 text-yellow-400">{v.consumeAmount.toLocaleString()}</td>
                   <td className="p-3">
                     <span className={`text-xs px-2 py-0.5 rounded ${v.isActive ? 'bg-green-900/60 text-green-200' : 'bg-red-900/60 text-red-200'}`}>
                       {v.isActive ? '启用' : '停用'}
@@ -165,7 +165,6 @@ export default function VipLevels() {
         </div>
       )}
 
-      {/* 新建弹窗 */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-md">
@@ -191,7 +190,7 @@ export default function VipLevels() {
                   <input type="number" value={n.rechargeAmount} onChange={(e) => setN({ ...n, rechargeAmount: parseInt(e.target.value) || 0 })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" />
                 </div>
                 <div>
-                  <label className="block text-gray-400 mb-1 text-xs">消耗门槛（金币）</label>
+                  <label className="block text-gray-400 mb-1 text-xs">消耗门槛</label>
                   <input type="number" value={n.consumeAmount} onChange={(e) => setN({ ...n, consumeAmount: parseInt(e.target.value) || 0 })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" />
                 </div>
               </div>
@@ -210,7 +209,6 @@ export default function VipLevels() {
         </div>
       )}
 
-      {/* 编辑弹窗 */}
       {showEdit && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-md">
@@ -231,7 +229,7 @@ export default function VipLevels() {
                   <input type="number" value={ed.rechargeAmount ?? 0} onChange={(e) => setEd({ ...ed, rechargeAmount: parseInt(e.target.value) || 0 })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" />
                 </div>
                 <div>
-                  <label className="block text-gray-400 mb-1 text-xs">消耗门槛（金币）</label>
+                  <label className="block text-gray-400 mb-1 text-xs">消耗门槛</label>
                   <input type="number" value={ed.consumeAmount ?? 0} onChange={(e) => setEd({ ...ed, consumeAmount: parseInt(e.target.value) || 0 })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" />
                 </div>
               </div>
