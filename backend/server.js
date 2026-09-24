@@ -49,13 +49,13 @@ const ALL_PERMISSIONS = [
   { key: 'orders.refund', label: '手动补单', group: '资金管理' },
   { key: 'payments.view', label: '查看支付渠道', group: '资金管理' },
   { key: 'payments.edit', label: '编辑支付渠道', group: '资金管理' },
-  { key: 'withdrawals.view', label: '查看提现', group: '资金管理' },
-  { key: 'withdrawals.approve', label: '审批提现', group: '资金管理' },
   { key: 'transactions.view', label: '查看交易明细', group: '资金管理' },
   { key: 'drawlogs.view', label: '查看抽奖记录', group: '抽奖管理' },
   { key: 'drawlogs.export', label: '导出抽奖记录', group: '抽奖管理' },
   { key: 'cardorders.view', label: '查看卡片订单', group: '抽奖管理' },
   { key: 'cardorders.process', label: '处理卡片订单', group: '抽奖管理' },
+  { key: 'transfers.view', label: '查看赠送订单', group: '抽奖管理' },
+  { key: 'transfers.delete', label: '删除赠送记录', group: '抽奖管理' },
   { key: 'adchannels.view', label: '查看投放渠道', group: '广告管理' },
   { key: 'adchannels.create', label: '新增投放渠道', group: '广告管理' },
   { key: 'adchannels.edit', label: '编辑投放渠道', group: '广告管理' },
@@ -121,8 +121,8 @@ const ALL_PERMISSION_KEYS = ALL_PERMISSIONS.map(p => p.key);
 const SYSTEM_ROLES = [
   { name: 'super', displayName: '超级管理员', description: '拥有全部权限', permissions: ALL_PERMISSION_KEYS.join(','), isSystem: true },
   { name: 'admin', displayName: '管理员', description: '日常运营管理', permissions: ALL_PERMISSION_KEYS.filter(k => !k.startsWith('admins.') && !k.startsWith('roles.') && !k.startsWith('menus.') && !k.startsWith('languages.')).join(','), isSystem: true },
-  { name: 'operator', displayName: '运营专员', description: '管理卡牌、盲盒、活动等运营内容', permissions: ['users.view', 'groups.view', 'games.view', 'cards.view', 'cards.create', 'cards.edit', 'boxes.view', 'boxes.create', 'boxes.edit', 'boxes.probability', 'banners.view', 'banners.create', 'banners.edit', 'popups.view', 'popups.create', 'popups.edit', 'articles.view', 'articles.create', 'articles.edit', 'adchannels.view', 'adcampaigns.view', 'adcampaigns.create', 'adcampaigns.edit', 'kols.view', 'kols.create', 'kols.edit', 'adreports.view', 'tasks.view', 'tasks.create', 'tasks.edit', 'redeem.view', 'redeem.create', 'notifications.view', 'notifications.create', 'orders.view'].join(','), isSystem: true },
-  { name: 'support', displayName: '客服专员', description: '处理用户问题和工单', permissions: ['users.view', 'tickets.view', 'tickets.reply', 'tickets.close', 'cardorders.view', 'cardorders.process', 'notifications.view', 'notifications.create', 'orders.view'].join(','), isSystem: true },
+  { name: 'operator', displayName: '运营专员', description: '管理卡牌、盲盒、活动等运营内容', permissions: ['users.view', 'groups.view', 'games.view', 'cards.view', 'cards.create', 'cards.edit', 'boxes.view', 'boxes.create', 'boxes.edit', 'boxes.probability', 'banners.view', 'banners.create', 'banners.edit', 'popups.view', 'popups.create', 'popups.edit', 'articles.view', 'articles.create', 'articles.edit', 'adchannels.view', 'adcampaigns.view', 'adcampaigns.create', 'adcampaigns.edit', 'kols.view', 'kols.create', 'kols.edit', 'adreports.view', 'tasks.view', 'tasks.create', 'tasks.edit', 'redeem.view', 'redeem.create', 'notifications.view', 'notifications.create', 'orders.view', 'transfers.view'].join(','), isSystem: true },
+  { name: 'support', displayName: '客服专员', description: '处理用户问题和工单', permissions: ['users.view', 'tickets.view', 'tickets.reply', 'tickets.close', 'cardorders.view', 'cardorders.process', 'transfers.view', 'notifications.view', 'notifications.create', 'orders.view'].join(','), isSystem: true },
 ];
 
 // ================= 用户端 API =================
@@ -515,74 +515,75 @@ app.get('/api/user/transactions/:userId', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ================= 用户端提现 =================
-const MIN_WITHDRAW_AMOUNT = 10000; // 最低提现金额：100元 = 10000分
+// ================= 用户间转让/赠与 =================
 
-// 获取用户的银行卡列表
-app.get('/api/user/bankcards/:userId', async (req, res) => {
+// 获取用户可转让的库存（仅允许转让的卡牌）
+app.get('/api/inventory/transferable/:userId', async (req, res) => {
   try {
-    const cards = await prisma.bankCard.findMany({
-      where: { userId: req.params.userId },
-      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }]
+    const inv = await prisma.inventory.findMany({
+      where: { userId: req.params.userId, card: { allowTransfer: true } },
+      include: { card: true },
+      orderBy: { id: 'desc' }
     });
-    res.json(cards);
+    res.json(inv);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 提交提现申请（冻结余额）
-app.post('/api/withdrawals', async (req, res) => {
-  const { userId, amount, cardNumber, bankName, holderName } = req.body;
+// 提交转让
+app.post('/api/inventory/transfer', async (req, res) => {
+  const { fromUserId, toUsername, cardId, quantity, remark } = req.body;
+  if (!fromUserId) return res.status(400).json({ error: '请先登录' });
+  if (!toUsername || !toUsername.trim()) return res.status(400).json({ error: '请输入接收人用户名' });
+  if (!cardId) return res.status(400).json({ error: '请选择要转让的卡牌' });
 
-  if (!userId) return res.status(400).json({ error: '请先登录' });
-  const amt = parseInt(amount);
-  if (!amt || amt <= 0) return res.status(400).json({ error: '请输入有效的提现金额' });
-  if (amt < MIN_WITHDRAW_AMOUNT) return res.status(400).json({ error: `最低提现金额为 ¥${(MIN_WITHDRAW_AMOUNT / 100).toFixed(2)}` });
-  if (!cardNumber || !cardNumber.trim()) return res.status(400).json({ error: '请填写银行卡号' });
-  if (!holderName || !holderName.trim()) return res.status(400).json({ error: '请填写持卡人姓名' });
+  const qty = parseInt(quantity) || 1;
+  if (qty < 1) return res.status(400).json({ error: '数量至少为 1' });
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id: userId } });
-      if (!user) throw new Error('用户不存在');
-      if (user.coins < amt) throw new Error('余额不足');
+      // 找接收人
+      const toUser = await tx.user.findUnique({ where: { username: toUsername.trim() } });
+      if (!toUser) throw new Error('接收人不存在');
+      if (toUser.id === fromUserId) throw new Error('不能转让给自己');
 
-      // 查找或创建银行卡
-      let card = await tx.bankCard.findFirst({ where: { userId, cardNumber: cardNumber.trim() } });
-      if (!card) {
-        card = await tx.bankCard.create({
-          data: { userId, cardNumber: cardNumber.trim(), bankName: (bankName || '').trim(), holderName: holderName.trim(), isDefault: false }
-        });
+      // 检查卡牌
+      const card = await tx.card.findUnique({ where: { id: cardId } });
+      if (!card) throw new Error('卡牌不存在');
+      if (!card.allowTransfer) throw new Error('该卡牌不允许转让');
+
+      // 检查发送方库存
+      const inv = await tx.inventory.findUnique({ where: { userId_cardId: { userId: fromUserId, cardId } } });
+      if (!inv || inv.quantity < qty) throw new Error('库存不足');
+
+      // 扣减发送方
+      if (inv.quantity === qty) {
+        await tx.inventory.delete({ where: { id: inv.id } });
+      } else {
+        await tx.inventory.update({ where: { id: inv.id }, data: { quantity: { decrement: qty } } });
       }
 
-      // 扣减余额（冻结）
-      await tx.user.update({
-        where: { id: userId },
+      // 增加接收方
+      await tx.inventory.upsert({
+        where: { userId_cardId: { userId: toUser.id, cardId } },
+        update: { quantity: { increment: qty } },
+        create: { userId: toUser.id, cardId, quantity: qty }
+      });
+
+      // 写转让记录
+      const log = await tx.transferLog.create({
+        data: { fromUserId, toUserId: toUser.id, cardId, quantity: qty, remark: remark || '' }
+      });
+
+      // 通知接收方
+      await tx.notification.create({
         data: {
-          coins: { decrement: amt },
-          withdrawalCount: { increment: 1 },
-          withdrawalAmount: { increment: amt }
+          userId: toUser.id,
+          title: `🎁 您收到一份礼物`,
+          content: `用户 ${(await tx.user.findUnique({ where: { id: fromUserId }, select: { username: true } }))?.username || '某用户'} 赠送了您 ${qty} 张「${card.name}」${remark ? `，留言：${remark}` : ''}。`
         }
       });
 
-      // 创建提现申请
-      const withdrawal = await tx.withdrawal.create({
-        data: { userId, amount: amt, bankCardId: card.id, status: 'PENDING' }
-      });
-
-      // 写账变明细
-      await tx.transaction.create({
-        data: {
-          userId,
-          type: 'WITHDRAWAL',
-          amount: -amt,
-          balance: user.coins - amt,
-          refType: 'WITHDRAWAL',
-          refId: withdrawal.id,
-          remark: `申请提现 ¥${(amt / 100).toFixed(2)}`
-        }
-      });
-
-      return { success: true, withdrawal };
+      return { success: true, log };
     });
     res.json(result);
   } catch (e) {
@@ -590,21 +591,23 @@ app.post('/api/withdrawals', async (req, res) => {
   }
 });
 
-// 获取用户的提现记录
-app.get('/api/user/withdrawals/:userId', async (req, res) => {
+// 用户的转让记录（收到的 + 发出的）
+app.get('/api/user/transfers/:userId', async (req, res) => {
+  const { userId } = req.params;
   try {
-    const list = await prisma.withdrawal.findMany({
-      where: { userId: req.params.userId },
+    const sent = await prisma.transferLog.findMany({
+      where: { fromUserId: userId },
+      include: { card: true, toUser: { select: { username: true } } },
       orderBy: { createdAt: 'desc' },
       take: 100
     });
-    const result = [];
-    for (const w of list) {
-      let card = null;
-      if (w.bankCardId) card = await prisma.bankCard.findUnique({ where: { id: w.bankCardId } });
-      result.push({ ...w, bankCard: card });
-    }
-    res.json(result);
+    const received = await prisma.transferLog.findMany({
+      where: { toUserId: userId },
+      include: { card: true, fromUser: { select: { username: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    });
+    res.json({ sent, received });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -670,6 +673,40 @@ app.post('/api/admin/verify-password', async (req, res) => {
   if (!password) return res.status(400).json({ error: '请输入密码' });
   if (req.admin.password !== password) return res.status(401).json({ error: '密码错误' });
   res.json({ success: true });
+});
+
+// ============ 赠送订单管理（后台） ============
+app.get('/api/admin/transfer-logs', requirePermission('transfers.view'), async (req, res) => {
+  const { username, cardName, status } = req.query;
+  const where = {};
+  if (username) {
+    where.OR = [
+      { fromUser: { username: { contains: username } } },
+      { toUser: { username: { contains: username } } }
+    ];
+  }
+  if (cardName) where.card = { name: { contains: cardName } };
+  try {
+    const list = await prisma.transferLog.findMany({
+      where,
+      include: {
+        card: { select: { id: true, name: true, rarity: true, imageUrl: true } },
+        fromUser: { select: { id: true, username: true } },
+        toUser: { select: { id: true, username: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 500
+    });
+    res.json(list);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/transfer-logs/:id', requirePermission('transfers.delete'), async (req, res) => {
+  try {
+    await prisma.transferLog.delete({ where: { id: req.params.id } });
+    await writeAuditLog(req.admin, 'transfer.delete', 'transfer', req.params.id, {});
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
 // ============ 投流广告管理 ============
@@ -1171,13 +1208,32 @@ app.delete('/api/admin/games/:id', requirePermission('games.delete'), async (req
 
 app.get('/api/admin/cards', requirePermission('cards.view'), async (req, res) => { res.json(await prisma.card.findMany({ orderBy: { createdAt: 'desc' } })); });
 app.post('/api/admin/cards', requirePermission('cards.create'), async (req, res) => {
-  const { name, rarity, imageUrl, value } = req.body;
-  try { res.json({ success: true, card: await prisma.card.create({ data: { name, rarity, imageUrl: imageUrl || '', value: parseInt(value || 0) } }) }); }
-  catch (e) { res.status(400).json({ error: e.message }); }
+  const { name, rarity, imageUrl, description, value, allowTransfer } = req.body;
+  if (!name) return res.status(400).json({ error: '请填写卡牌名称' });
+  try {
+    const card = await prisma.card.create({
+      data: {
+        name,
+        rarity: rarity || 'R',
+        imageUrl: imageUrl || '',
+        description: description || '',
+        value: parseInt(value || 0),
+        allowTransfer: !!allowTransfer,
+      }
+    });
+    res.json({ success: true, card });
+  } catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.put('/api/admin/cards/:id', requirePermission('cards.edit'), async (req, res) => {
-  const { name, rarity, imageUrl, value } = req.body;
-  try { res.json({ success: true, card: await prisma.card.update({ where: { id: req.params.id }, data: { name, rarity, imageUrl, value: parseInt(value || 0) } }) }); }
+  const { name, rarity, imageUrl, description, value, allowTransfer } = req.body;
+  const data = {};
+  if (name) data.name = name;
+  if (rarity) data.rarity = rarity;
+  if (imageUrl !== undefined) data.imageUrl = imageUrl;
+  if (description !== undefined) data.description = description;
+  if (value !== undefined) data.value = parseInt(value);
+  if (allowTransfer !== undefined) data.allowTransfer = !!allowTransfer;
+  try { res.json({ success: true, card: await prisma.card.update({ where: { id: req.params.id }, data }) }); }
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.delete('/api/admin/cards/:id', requirePermission('cards.delete'), async (req, res) => {
@@ -1189,19 +1245,34 @@ app.get('/api/admin/boxes', requirePermission('boxes.view'), async (req, res) =>
   res.json(await prisma.box.findMany({ include: { items: { include: { card: true } }, game: { select: { id: true, displayName: true } } }, orderBy: { createdAt: 'desc' } }));
 });
 app.post('/api/admin/boxes', requirePermission('boxes.create'), async (req, res) => {
-  const { name, price, coverUrl, gameId, isFeatured } = req.body;
-  try { res.json({ success: true, box: await prisma.box.create({ data: { name, price: parseInt(price), coverUrl: coverUrl || '', gameId: gameId || null, isFeatured: !!isFeatured } }) }); }
-  catch (e) { res.status(400).json({ error: e.message }); }
+  const { name, price, coverUrl, description, gameId, isFeatured, allowTransfer } = req.body;
+  if (!name || price === undefined) return res.status(400).json({ error: '请填写名称和价格' });
+  try {
+    const box = await prisma.box.create({
+      data: {
+        name,
+        price: parseInt(price),
+        coverUrl: coverUrl || '',
+        description: description || '',
+        gameId: gameId || null,
+        isFeatured: !!isFeatured,
+        allowTransfer: !!allowTransfer,
+      }
+    });
+    res.json({ success: true, box });
+  } catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.put('/api/admin/boxes/:id', requirePermission('boxes.edit'), async (req, res) => {
-  const { name, price, coverUrl, isActive, gameId, isFeatured } = req.body;
+  const { name, price, coverUrl, description, isActive, gameId, isFeatured, allowTransfer } = req.body;
   const data = {};
   if (name) data.name = name;
   if (price !== undefined) data.price = parseInt(price);
   if (coverUrl !== undefined) data.coverUrl = coverUrl;
+  if (description !== undefined) data.description = description;
   if (isActive !== undefined) data.isActive = isActive;
   if (gameId !== undefined) data.gameId = gameId || null;
   if (isFeatured !== undefined) data.isFeatured = !!isFeatured;
+  if (allowTransfer !== undefined) data.allowTransfer = !!allowTransfer;
   try { res.json({ success: true, box: await prisma.box.update({ where: { id: req.params.id }, data }) }); }
   catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -1222,7 +1293,7 @@ app.delete('/api/admin/boxes/:boxId/items/:itemId', requirePermission('boxes.pro
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-// ============ 充值套餐 / 订单 / 支付 / 提现 / 交易 ============
+// ============ 充值套餐 / 订单 / 支付 / 交易 ============
 app.get('/api/admin/recharge-options', requirePermission('recharge.view'), async (req, res) => { res.json(await prisma.rechargeOption.findMany({ orderBy: { sortOrder: 'asc' } })); });
 app.post('/api/admin/recharge-options', requirePermission('recharge.create'), async (req, res) => {
   const { coins, bonus, price, sortOrder } = req.body;
@@ -1272,62 +1343,6 @@ app.put('/api/admin/payment-channels/:id', requirePermission('payments.edit'), a
   if (iconUrl !== undefined) data.iconUrl = iconUrl;
   try { res.json({ success: true, channel: await prisma.paymentChannel.update({ where: { id: req.params.id }, data }) }); }
   catch (e) { res.status(400).json({ error: e.message }); }
-});
-
-app.get('/api/admin/withdrawals', requirePermission('withdrawals.view'), async (req, res) => { res.json(await prisma.withdrawal.findMany({ orderBy: { createdAt: 'desc' }, take: 200 })); });
-
-// 提现审批：通过 = 只改状态；拒绝 = 退还冻结的余额 + 写账变
-app.put('/api/admin/withdrawals/:id/approve', requirePermission('withdrawals.approve'), async (req, res) => {
-  const { approve, remark } = req.body;
-  try {
-    const result = await prisma.$transaction(async (tx) => {
-      const w = await tx.withdrawal.findUnique({ where: { id: req.params.id } });
-      if (!w) throw new Error('提现记录不存在');
-      if (w.status !== 'PENDING') throw new Error('该申请已处理');
-
-      // 拒绝 → 退还余额
-      if (!approve) {
-        const user = await tx.user.findUnique({ where: { id: w.userId } });
-        await tx.user.update({
-          where: { id: w.userId },
-          data: {
-            coins: { increment: w.amount },
-            withdrawalCount: { decrement: 1 },
-            withdrawalAmount: { decrement: w.amount }
-          }
-        });
-        await tx.transaction.create({
-          data: {
-            userId: w.userId,
-            type: 'REWARD',
-            amount: w.amount,
-            balance: (user?.coins || 0) + w.amount,
-            refType: 'WITHDRAWAL_REFUND',
-            refId: w.id,
-            remark: `提现被拒绝，退款 ¥${(w.amount / 100).toFixed(2)}`
-          }
-        });
-        // 发个通知
-        await tx.notification.create({
-          data: {
-            userId: w.userId,
-            title: '提现申请被拒绝',
-            content: `您申请的 ¥${(w.amount / 100).toFixed(2)} 提现被拒绝${remark ? `，原因：${remark}` : ''}。金额已退回余额。`
-          }
-        });
-      }
-
-      return await tx.withdrawal.update({
-        where: { id: req.params.id },
-        data: {
-          status: approve ? 'APPROVED' : 'REJECTED',
-          remark: remark || '',
-          processedAt: new Date()
-        }
-      });
-    });
-    res.json({ success: true, withdrawal: result });
-  } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 app.get('/api/admin/transactions', requirePermission('transactions.view'), async (req, res) => {
@@ -1686,10 +1701,10 @@ async function syncMenus() {
     { id: 'menu-drawlog-group', parentId: 'menu-game-group', title: '抽奖管理', type: 'DIRECTORY', icon: '🎰', path: '', component: '', permission: '', sortOrder: 4 },
     { id: 'menu-drawlogs', parentId: 'menu-drawlog-group', title: '抽奖记录', type: 'MENU', icon: '📝', path: '/drawlogs', component: 'DrawLogList', permission: 'drawlogs.view', sortOrder: 1 },
     { id: 'menu-card-orders', parentId: 'menu-drawlog-group', title: '卡片订单', type: 'MENU', icon: '📦', path: '/card-orders', component: 'CardOrderList', permission: 'cardorders.view', sortOrder: 2 },
+    { id: 'menu-transfer-logs', parentId: 'menu-drawlog-group', title: '赠送订单管理', type: 'MENU', icon: '🎁', path: '/transfer-logs', component: 'TransferLogList', permission: 'transfers.view', sortOrder: 3 },
     { id: 'menu-fund-group', parentId: null, title: '资金管理', type: 'DIRECTORY', icon: '💰', path: '', component: '', permission: '', sortOrder: 4 },
     { id: 'menu-payment-channels', parentId: 'menu-fund-group', title: '支付管理', type: 'MENU', icon: '💳', path: '/payment-channels', component: 'PaymentChannelList', permission: 'payments.view', sortOrder: 1 },
     { id: 'menu-orders', parentId: 'menu-fund-group', title: '充值记录', type: 'MENU', icon: '📥', path: '/orders', component: 'OrderList', permission: 'orders.view', sortOrder: 2 },
-    { id: 'menu-withdrawals', parentId: 'menu-fund-group', title: '提现记录', type: 'MENU', icon: '📤', path: '/withdrawals', component: 'WithdrawalList', permission: 'withdrawals.view', sortOrder: 3 },
     { id: 'menu-transactions', parentId: 'menu-fund-group', title: '交易明细', type: 'MENU', icon: '📊', path: '/transactions', component: 'TransactionList', permission: 'transactions.view', sortOrder: 4 },
     { id: 'menu-recharge', parentId: 'menu-fund-group', title: '充值套餐', type: 'MENU', icon: '💰', path: '/recharge-options', component: 'RechargeList', permission: 'recharge.view', sortOrder: 5 },
     { id: 'menu-report-group', parentId: null, title: '报表管理', type: 'DIRECTORY', icon: '📈', path: '', component: '', permission: '', sortOrder: 5 },
@@ -1734,6 +1749,8 @@ async function syncMenus() {
     });
     if (existing) updated++; else created++;
   }
+  // 清理已废弃的提现菜单
+  try { await prisma.adminMenu.delete({ where: { id: 'menu-withdrawals' } }); } catch (e) {}
   console.log(`✅ 菜单同步完成：新增 ${created} 条，更新 ${updated} 条`);
 }
 
