@@ -37,9 +37,12 @@ function AppInner() {
   const [showRecharge, setShowRecharge] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const { setUser, setBoxes, user } = useStore();
+  const { setUser, setBoxes, user, currency, setCurrency } = useStore();
 
-  useEffect(() => { axios.get(`${API_URL}/api/boxes`).then(res => setBoxes(res.data)).catch(() => {}); }, [setBoxes]);
+  useEffect(() => {
+    axios.get(`${API_URL}/api/boxes`).then(res => setBoxes(res.data)).catch(() => {});
+    axios.get(`${API_URL}/api/currency`).then(res => setCurrency(res.data)).catch(() => {});
+  }, [setBoxes, setCurrency]);
 
   useEffect(() => {
     if (!user) return;
@@ -152,7 +155,9 @@ function AppInner() {
             <button onClick={() => setShowLogin(true)} className="text-[11px] text-gray-400 border border-gray-600 px-2.5 py-1 rounded-full hover:text-white hover:border-white transition whitespace-nowrap">Sign In</button>
           ) : (
             <div className="flex items-center gap-1">
-              <button onClick={() => goPage({ type: 'transactions' })} className="text-[11px] text-yellow-500 font-bold bg-[#2a1414] px-2 py-1 rounded-full border border-yellow-900/50 whitespace-nowrap hover:border-yellow-500 transition">💰 {user.coins.toLocaleString()}</button>
+              <button onClick={() => goPage({ type: 'transactions' })} className="text-[11px] text-yellow-500 font-bold bg-[#2a1414] px-2 py-1 rounded-full border border-yellow-900/50 whitespace-nowrap hover:border-yellow-500 transition">
+                {currency.symbol} {user.coins.toLocaleString()}
+              </button>
               <button onClick={handleRefresh} disabled={refreshing} className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-[11px] w-7 h-7 rounded-full flex items-center justify-center shadow-md transition" title="刷新余额">
                 <span className={refreshing ? 'animate-spin' : ''}>🔄</span>
               </button>
