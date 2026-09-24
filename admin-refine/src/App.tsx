@@ -40,6 +40,7 @@ import ReportDraw from './pages/reports/draw';
 import ReportUserDraw from './pages/reports/user-draw';
 import ReportUserFinance from './pages/reports/user-finance';
 import ReportVipDistribution from './pages/reports/vip-distribution';
+import ReportCardRanking from './pages/reports/card-ranking';
 import LanguageList from './pages/languages';
 import TranslationList from './pages/translations';
 import CardOrderList from './pages/card-orders';
@@ -57,7 +58,7 @@ const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   TicketList, AdminList, RoleList, PermissionList, AuditLogList, SessionList,
   VipLevels, MenuManage, GameList, AdList, PaymentChannelList,
   TransactionList, DrawLogList, ReportSummary, ReportFinance, ReportDraw,
-  ReportUserDraw, ReportUserFinance, ReportVipDistribution,
+  ReportUserDraw, ReportUserFinance, ReportVipDistribution, ReportCardRanking,
   LanguageList, TranslationList, CardOrderList, PopupList, ArticleList,
   AdChannelList, AdCampaignList, KolList, AdReport,
   TransferLogList,
