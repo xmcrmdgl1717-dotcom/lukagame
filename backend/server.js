@@ -2122,6 +2122,7 @@ async function syncMenus() {
     { id: 'menu-ad-campaigns', parentId: 'menu-ad-group', title: '投放活动', type: 'MENU', icon: '📢', path: '/ad-campaigns', component: 'AdCampaignList', permission: 'adcampaigns.view', sortOrder: 2 },
     { id: 'menu-kols', parentId: 'menu-ad-group', title: 'KOL/博主管理', type: 'MENU', icon: '👤', path: '/kols', component: 'KolList', permission: 'kols.view', sortOrder: 3 },
     { id: 'menu-ad-reports', parentId: 'menu-ad-group', title: '广告报表', type: 'MENU', icon: '📊', path: '/ad-reports', component: 'AdReport', permission: 'adreports.view', sortOrder: 4 },
+    { id: 'menu-ad-retention', parentId: 'menu-ad-group', title: '广告留存报表', type: 'MENU', icon: '📈', path: '/ad-retention', component: 'AdRetentionReport', permission: 'adreports.view', sortOrder: 5 },
     { id: 'menu-notification-group', parentId: null, title: '通知管理', type: 'DIRECTORY', icon: '🔔', path: '', component: '', permission: '', sortOrder: 7 },
     { id: 'menu-notifications', parentId: 'menu-notification-group', title: '通知列表', type: 'MENU', icon: '🔔', path: '/notifications', component: 'NotificationList', permission: 'notifications.view', sortOrder: 1 },
     { id: 'menu-banners', parentId: 'menu-notification-group', title: '轮播图', type: 'MENU', icon: '🖼️', path: '/banners', component: 'BannerList', permission: 'banners.view', sortOrder: 2 },
