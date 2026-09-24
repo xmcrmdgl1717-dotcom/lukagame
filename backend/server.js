@@ -1965,6 +1965,127 @@ app.get('/api/admin/reports/retention', requirePermission('reports.view'), async
   }
 });
 
+// ============ 广告留存报表 ============
+// 结合投放渠道看用户质量：注册 → 付费 → 留存 → LTV → ROI
+app.get('/api/admin/reports/ad-retention', requirePermission('adreports.view'), async (req, res) => {
+  const days = parseInt(req.query.days || '30');
+  const since = new Date(); since.setDate(since.getDate() - days);
+  const now = new Date();
+
+  try {
+    const channels = await prisma.adChannel.findMany({ orderBy: { sortOrder: 'asc' } });
+    const result = [];
+
+    for (const c of channels) {
+      // 该渠道带来的用户（时间范围内注册）
+      const users = await prisma.user.findMany({
+        where: { adSource: c.name, createdAt: { gte: since } },
+        select: { id: true, createdAt: true, lastLoginAt: true },
+      });
+      const userIds = users.map(u => u.id);
+      const registerCount = userIds.length;
+
+      // 渠道花费（累计所有活动）
+      const totalCost = await prisma.adCampaign.aggregate({
+        where: { channelId: c.id },
+        _sum: { actualCost: true },
+      });
+      const cost = totalCost._sum.actualCost || 0;
+
+      // 无注册用户 → 全 0
+      if (registerCount === 0) {
+        result.push({
+          channelId: c.id,
+          channelName: c.displayName,
+          channelIcon: c.icon,
+          channelType: c.type,
+          registerCount: 0,
+          paidUserCount: 0,
+          payRate: '0.00',
+          totalRevenue: 0,
+          avgLTV: 0,
+          retentionD1: '0.00',
+          retentionD3: '0.00',
+          retentionD7: '0.00',
+          retentionD14: '0.00',
+          retentionD30: '0.00',
+          cost,
+          roi: '0.00',
+          cac: 0,
+        });
+        continue;
+      }
+
+      // 付费统计
+      const paidOrders = await prisma.order.findMany({
+        where: { userId: { in: userIds }, status: 'PAID' },
+        select: { userId: true, amount: true },
+      });
+      const paidUserIds = [...new Set(paidOrders.map(o => o.userId))];
+      const totalRevenue = paidOrders.reduce((s, o) => s + o.amount, 0);
+      const avgLTV = Math.round(totalRevenue / registerCount);
+      const cac = registerCount > 0 ? Math.round(cost / registerCount) : 0;
+
+      // 留存（按注册日算第 N 天）
+      const calcRetention = (dayN) => {
+        let cohort = 0, retained = 0;
+        for (const u of users) {
+          const obsDate = new Date(u.createdAt);
+          obsDate.setDate(obsDate.getDate() + dayN);
+          if (obsDate > now) continue;
+          cohort += 1;
+          if (u.lastLoginAt && new Date(u.lastLoginAt) >= obsDate) retained += 1;
+        }
+        return cohort > 0 ? ((retained / cohort) * 100).toFixed(2) : '0.00';
+      };
+
+      result.push({
+        channelId: c.id,
+        channelName: c.displayName,
+        channelIcon: c.icon,
+        channelType: c.type,
+        registerCount,
+        paidUserCount: paidUserIds.length,
+        payRate: registerCount > 0 ? ((paidUserIds.length / registerCount) * 100).toFixed(2) : '0.00',
+        totalRevenue,
+        avgLTV,
+        retentionD1: calcRetention(1),
+        retentionD3: calcRetention(3),
+        retentionD7: calcRetention(7),
+        retentionD14: calcRetention(14),
+        retentionD30: calcRetention(30),
+        cost,
+        roi: cost > 0 ? ((totalRevenue / cost) * 100).toFixed(2) : '0.00',
+        cac,
+      });
+    }
+
+    // 按 ROI 从高到低排序，无花费的排最后
+    result.sort((a, b) => {
+      const ra = parseFloat(a.roi) || 0;
+      const rb = parseFloat(b.roi) || 0;
+      return rb - ra;
+    });
+
+    // 汇总
+    const summary = result.reduce((acc, r) => ({
+      totalRegisters: acc.totalRegisters + r.registerCount,
+      totalPaidUsers: acc.totalPaidUsers + r.paidUserCount,
+      totalRevenue: acc.totalRevenue + r.totalRevenue,
+      totalCost: acc.totalCost + r.cost,
+    }), { totalRegisters: 0, totalPaidUsers: 0, totalRevenue: 0, totalCost: 0 });
+    summary.payRate = summary.totalRegisters > 0 ? ((summary.totalPaidUsers / summary.totalRegisters) * 100).toFixed(2) : '0.00';
+    summary.roi = summary.totalCost > 0 ? ((summary.totalRevenue / summary.totalCost) * 100).toFixed(2) : '0.00';
+    summary.avgLTV = summary.totalRegisters > 0 ? Math.round(summary.totalRevenue / summary.totalRegisters) : 0;
+    summary.cac = summary.totalRegisters > 0 ? Math.round(summary.totalCost / summary.totalRegisters) : 0;
+
+    res.json({ list: result, summary, range: { days, since: since.toISOString() } });
+  } catch (e) {
+    console.error('ad-retention report error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ================= 菜单自动同步 =================
 async function syncMenus() {
   const menus = [
