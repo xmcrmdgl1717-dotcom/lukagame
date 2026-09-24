@@ -6,7 +6,7 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function Home({ onShowLogin, onGoGame, onGoLeaderboard, onGoBoxDetail }) {
-  const { user } = useStore();
+  const { user, currency } = useStore();
   const { t } = useI18n();
   const [banners, setBanners] = useState([]);
   const [currentBanner, setCurrentBanner] = useState(0);
@@ -80,7 +80,7 @@ export default function Home({ onShowLogin, onGoGame, onGoLeaderboard, onGoBoxDe
                   <span className="text-white">{row.username}</span>
                   <span className="text-[10px] bg-orange-900/60 text-orange-200 px-1.5 py-0.5 rounded">VIP{row.vipLevel}</span>
                 </div>
-                <span className="text-orange-500 font-bold">{row.totalCost.toLocaleString()} 🪙</span>
+                <span className="text-orange-500 font-bold">{row.totalCost.toLocaleString()}</span>
               </div>
             ))}
           </div>
@@ -144,7 +144,10 @@ export default function Home({ onShowLogin, onGoGame, onGoLeaderboard, onGoBoxDe
                     )}
                   </div>
                   <div className="flex-1 text-right">
-                    <div className="text-white text-sm font-bold mb-2">{box.price.toLocaleString()} 🪙</div>
+                    <div className="text-white text-sm font-bold mb-2 flex items-center justify-end gap-1">
+                      <span className="text-yellow-500">{currency.symbol}</span>
+                      <span>{box.price.toLocaleString()}</span>
+                    </div>
                     <div className="bg-orange-600 text-white text-xs px-5 py-2 rounded-lg font-bold inline-block">
                       立即开盒
                     </div>
