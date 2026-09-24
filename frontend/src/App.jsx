@@ -5,6 +5,7 @@ import { I18nProvider } from './i18n/index.jsx';
 import BottomNav from './components/BottomNav';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import Popup from './components/Popup';
+import ComplianceNotice from './components/ComplianceNotice';
 import Home from './pages/Home';
 import GameDetail from './pages/GameDetail';
 import Activity from './pages/Activity';
@@ -22,6 +23,7 @@ import VipCenter from './pages/VipCenter';
 import Leaderboard from './pages/Leaderboard';
 import Transfers from './pages/Transfers';
 import DrawDetail from './pages/DrawDetail';
+import EmailSettings from './pages/EmailSettings';
 import LoginModal from './components/LoginModal';
 import RechargeModal from './components/RechargeModal';
 
@@ -82,6 +84,7 @@ function AppInner() {
       if (currentPage.type === 'vip') return <VipCenter onBack={backFromPage} />;
       if (currentPage.type === 'leaderboard') return <Leaderboard onBack={backFromPage} />;
       if (currentPage.type === 'transfers') return <Transfers onBack={backFromPage} />;
+      if (currentPage.type === 'email-settings') return <EmailSettings onBack={backFromPage} />;
       if (currentPage.type === 'draw-detail') return (
         <DrawDetail
           boxId={currentPage.boxId}
@@ -120,6 +123,7 @@ function AppInner() {
           onGoStatic={(slug) => goPage({ type: 'static', slug })}
           onGoVip={() => goPage({ type: 'vip' })}
           onGoTransfers={() => goPage({ type: 'transfers' })}
+          onGoEmailSettings={() => goPage({ type: 'email-settings' })}
         />
       );
     }
@@ -165,6 +169,7 @@ function AppInner() {
       <BottomNav currentTab={currentTab} setCurrentTab={(t) => { setCurrentGame(null); setCurrentPage(null); setCurrentTab(t); }} onShowRecharge={() => { if (!user) return setShowLogin(true); setShowRecharge(true); }} />
 
       <Popup currentPath={popupPath} />
+      <ComplianceNotice />
     </div>
   );
 }
