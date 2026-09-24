@@ -32,7 +32,6 @@ import MenuManage from './pages/menus';
 import GameList from './pages/games';
 import AdList from './pages/ads';
 import PaymentChannelList from './pages/payment-channels';
-import WithdrawalList from './pages/withdrawals';
 import TransactionList from './pages/transactions';
 import DrawLogList from './pages/drawlogs';
 import ReportSummary from './pages/reports/summary';
@@ -50,16 +49,18 @@ import AdChannelList from './pages/ad-channels';
 import AdCampaignList from './pages/ad-campaigns';
 import KolList from './pages/kols';
 import AdReport from './pages/ad-reports';
+import TransferLogList from './pages/transfer-logs';
 
 const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   DashboardPage, UserList, UserGroupList, BankCardList, CardList, BoxList,
   RechargeList, OrderList, BannerList, TaskList, RedeemCodeList, NotificationList,
   TicketList, AdminList, RoleList, PermissionList, AuditLogList, SessionList,
-  VipLevels, MenuManage, GameList, AdList, PaymentChannelList, WithdrawalList,
+  VipLevels, MenuManage, GameList, AdList, PaymentChannelList,
   TransactionList, DrawLogList, ReportSummary, ReportFinance, ReportDraw,
   ReportUserDraw, ReportUserFinance, ReportVipDistribution,
   LanguageList, TranslationList, CardOrderList, PopupList, ArticleList,
   AdChannelList, AdCampaignList, KolList, AdReport,
+  TransferLogList,
 };
 
 function buildRoutes(menus: AdminMenu[]): React.ReactElement[] {
@@ -68,7 +69,11 @@ function buildRoutes(menus: AdminMenu[]): React.ReactElement[] {
     list.forEach((m) => {
       if (m.type === 'MENU' && m.path && m.component) {
         const Comp = COMPONENT_REGISTRY[m.component];
-        if (Comp) routes.push(<Route key={m.id} path={m.path} element={<Comp />} />);
+        if (Comp) {
+          routes.push(<Route key={m.id} path={m.path} element={<Comp />} />);
+        } else {
+          console.warn(`[路由] 未找到组件: ${m.component} (菜单 ${m.id})`);
+        }
       }
       if (m.children?.length) walk(m.children);
     });
