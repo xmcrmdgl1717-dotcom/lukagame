@@ -414,6 +414,49 @@ app.get('/api/leaderboard/monthly', async (req, res) => {
   res.json(await buildLeaderboard(since, 10));
 });
 
+// 卡牌持有排行榜：按所有用户库存聚合统计
+async function buildCardRanking(rarity, limit) {
+  const cardWhere = {};
+  if (rarity && rarity !== 'ALL') cardWhere.rarity = rarity;
+  const cards = await prisma.card.findMany({ where: cardWhere, select: { id: true } });
+  const cardIds = cards.map(c => c.id);
+  if (cardIds.length === 0) return [];
+
+  const grouped = await prisma.inventory.groupBy({
+    by: ['cardId'],
+    where: { cardId: { in: cardIds }, quantity: { gt: 0 } },
+    _sum: { quantity: true },
+    _count: { userId: true },
+    orderBy: { _sum: { quantity: 'desc' } },
+    take: limit,
+  });
+
+  const result = [];
+  for (const g of grouped) {
+    const card = await prisma.card.findUnique({ where: { id: g.cardId } });
+    if (card) {
+      result.push({
+        cardId: card.id,
+        name: card.name,
+        rarity: card.rarity,
+        imageUrl: card.imageUrl,
+        description: card.description,
+        totalQuantity: g._sum.quantity || 0,
+        holderCount: g._count.userId || 0,
+      });
+    }
+  }
+  return result;
+}
+
+app.get('/api/leaderboard/cards', async (req, res) => {
+  const rarity = req.query.rarity || 'ALL';
+  const limit = Math.min(parseInt(req.query.limit || '20'), 100);
+  try {
+    res.json(await buildCardRanking(rarity, limit));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/redeem', async (req, res) => {
   const { userId, code } = req.body;
   if (!code) return res.status(400).json({ error: '请输入兑换码' });
@@ -1731,6 +1774,7 @@ async function syncMenus() {
     { id: 'menu-report-user-draw', parentId: 'menu-report-group', title: '用户抽奖报表', type: 'MENU', icon: '👤', path: '/reports/user-draw', component: 'ReportUserDraw', permission: 'reports.view', sortOrder: 4 },
     { id: 'menu-report-user-finance', parentId: 'menu-report-group', title: '用户资金报表', type: 'MENU', icon: '💵', path: '/reports/user-finance', component: 'ReportUserFinance', permission: 'reports.view', sortOrder: 5 },
     { id: 'menu-report-vip', parentId: 'menu-report-group', title: 'VIP分布报表', type: 'MENU', icon: '👑', path: '/reports/vip-distribution', component: 'ReportVipDistribution', permission: 'reports.view', sortOrder: 6 },
+    { id: 'menu-report-card-ranking', parentId: 'menu-report-group', title: '卡牌排行榜', type: 'MENU', icon: '🏆', path: '/reports/card-ranking', component: 'ReportCardRanking', permission: 'reports.view', sortOrder: 7 },
     { id: 'menu-ad-group', parentId: null, title: '广告管理', type: 'DIRECTORY', icon: '📣', path: '', component: '', permission: '', sortOrder: 6 },
     { id: 'menu-ad-channels', parentId: 'menu-ad-group', title: '投放渠道', type: 'MENU', icon: '📡', path: '/ad-channels', component: 'AdChannelList', permission: 'adchannels.view', sortOrder: 1 },
     { id: 'menu-ad-campaigns', parentId: 'menu-ad-group', title: '投放活动', type: 'MENU', icon: '📢', path: '/ad-campaigns', component: 'AdCampaignList', permission: 'adcampaigns.view', sortOrder: 2 },
