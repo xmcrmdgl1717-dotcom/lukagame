@@ -1802,6 +1802,169 @@ app.get('/api/admin/reports/vip-distribution', requirePermission('reports.view')
   res.json({ list: result });
 });
 
+// ============ 付费留存报表 ============
+// 计算两个日期之间相差的天数（忽略时分秒）
+function daysBetween(a, b) {
+  const d1 = new Date(a); d1.setHours(0, 0, 0, 0);
+  const d2 = new Date(b); d2.setHours(0, 0, 0, 0);
+  return Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
+}
+
+app.get('/api/admin/reports/retention', requirePermission('reports.view'), async (req, res) => {
+  const days = parseInt(req.query.days || '30');
+  const since = new Date(); since.setDate(since.getDate() - days);
+  const now = new Date();
+
+  try {
+    // ---- 1. 核心指标 ----
+    const totalUsers = await prisma.user.count();
+    const newUsersInRange = await prisma.user.count({ where: { createdAt: { gte: since } } });
+
+    // 所有付费用户（至少完成 1 笔 PAID 订单）
+    const paidOrders = await prisma.order.findMany({
+      where: { status: 'PAID' },
+      select: { userId: true, amount: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const paidUserIds = [...new Set(paidOrders.map(o => o.userId))];
+    const paidUserCount = paidUserIds.length;
+
+    // 区间内新增付费用户（首次付费在区间内的）
+    const firstPayByUser = {};
+    for (const o of paidOrders) {
+      if (!firstPayByUser[o.userId]) firstPayByUser[o.userId] = o.createdAt;
+    }
+    const newPaidUserIds = Object.entries(firstPayByUser)
+      .filter(([, t]) => new Date(t) >= since)
+      .map(([uid]) => uid);
+    const newPaidUserCount = newPaidUserIds.length;
+
+    const totalRevenue = paidOrders.reduce((s, o) => s + o.amount, 0);
+    const revenueInRange = paidOrders
+      .filter(o => new Date(o.createdAt) >= since)
+      .reduce((s, o) => s + o.amount, 0);
+
+    const arpu = totalUsers > 0 ? Math.round(totalRevenue / totalUsers) : 0;
+    const arppu = paidUserCount > 0 ? Math.round(totalRevenue / paidUserCount) : 0;
+    const payRate = totalUsers > 0 ? ((paidUserCount / totalUsers) * 100).toFixed(2) : '0.00';
+
+    // ---- 2. 充值金额分布 ----
+    const amountDistribution = [
+      { label: '0 元', min: 0, max: 0, count: 0 },
+      { label: '1 - 30 元', min: 1, max: 3000, count: 0 },
+      { label: '30 - 100 元', min: 3001, max: 10000, count: 0 },
+      { label: '100 - 300 元', min: 10001, max: 30000, count: 0 },
+      { label: '300 - 1000 元', min: 30001, max: 100000, count: 0 },
+      { label: '1000 元以上', min: 100001, max: Infinity, count: 0 },
+    ];
+    const allUsers = await prisma.user.findMany({
+      select: { id: true, totalRecharge: true }
+    });
+    for (const u of allUsers) {
+      const dist = amountDistribution.find(d => u.totalRecharge >= d.min && u.totalRecharge <= d.max);
+      if (dist) dist.count += 1;
+    }
+
+    // ---- 3. 复购分析 ----
+    const rechargeCountByUser = {};
+    for (const o of paidOrders) {
+      rechargeCountByUser[o.userId] = (rechargeCountByUser[o.userId] || 0) + 1;
+    }
+    const repeatBuyers = Object.values(rechargeCountByUser).filter(c => c >= 2).length;
+    const repeatRate = paidUserCount > 0 ? ((repeatBuyers / paidUserCount) * 100).toFixed(2) : '0.00';
+    const multiPayBuckets = [
+      { label: '1 次', count: Object.values(rechargeCountByUser).filter(c => c === 1).length },
+      { label: '2 次', count: Object.values(rechargeCountByUser).filter(c => c === 2).length },
+      { label: '3-5 次', count: Object.values(rechargeCountByUser).filter(c => c >= 3 && c <= 5).length },
+      { label: '6-10 次', count: Object.values(rechargeCountByUser).filter(c => c >= 6 && c <= 10).length },
+      { label: '10 次以上', count: Object.values(rechargeCountByUser).filter(c => c > 10).length },
+    ];
+
+    // ---- 4. 首充后留存（1/3/7/14/30 天） ----
+    // 定义：首次付费后第 N 天是否有登录（lastLoginAt >= 首充日 + N 天）
+    const retentionMilestones = [1, 3, 7, 14, 30];
+    const retention = retentionMilestones.map(n => ({ day: n, cohort: 0, retained: 0, rate: '0.00' }));
+
+    // 只统计首充日在 N 天前、有足够时间观察的用户
+    for (const uid of paidUserIds) {
+      const firstPayAt = firstPayByUser[uid];
+      const user = allUsers.find(u => u.id === uid);
+      if (!user) continue;
+      // 取详细用户信息
+      const fullUser = await prisma.user.findUnique({ where: { id: uid }, select: { lastLoginAt: true, createdAt: true } });
+      if (!fullUser) continue;
+
+      for (const r of retention) {
+        const obsDate = new Date(firstPayAt);
+        obsDate.setDate(obsDate.getDate() + r.day);
+        if (obsDate > now) continue; // 还没到观察期
+        r.cohort += 1;
+        if (fullUser.lastLoginAt && new Date(fullUser.lastLoginAt) >= obsDate) {
+          r.retained += 1;
+        }
+      }
+    }
+    for (const r of retention) {
+      r.rate = r.cohort > 0 ? ((r.retained / r.cohort) * 100).toFixed(2) : '0.00';
+    }
+
+    // ---- 5. 每日新增付费用户 & 收入趋势 ----
+    const dailyData = {};
+    for (let i = 0; i < days; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      dailyData[key] = { date: key, newPaidUsers: 0, revenue: 0, orderCount: 0, repeatRevenue: 0 };
+    }
+    for (const o of paidOrders) {
+      const key = new Date(o.createdAt).toISOString().slice(0, 10);
+      if (dailyData[key]) {
+        dailyData[key].revenue += o.amount;
+        dailyData[key].orderCount += 1;
+      }
+    }
+    for (const uid of newPaidUserIds) {
+      const t = firstPayByUser[uid];
+      const key = new Date(t).toISOString().slice(0, 10);
+      if (dailyData[key]) dailyData[key].newPaidUsers += 1;
+    }
+
+    // 复购收入 = 首充之后的订单收入
+    for (const o of paidOrders) {
+      const key = new Date(o.createdAt).toISOString().slice(0, 10);
+      if (!dailyData[key]) continue;
+      if (firstPayByUser[o.userId] !== o.createdAt) {
+        dailyData[key].repeatRevenue += o.amount;
+      }
+    }
+
+    res.json({
+      range: { days, since: since.toISOString(), to: now.toISOString() },
+      core: {
+        totalUsers,
+        newUsersInRange,
+        paidUserCount,
+        newPaidUserCount,
+        payRate,
+        totalRevenue,
+        revenueInRange,
+        arpu,
+        arppu,
+      },
+      amountDistribution,
+      repeat: {
+        repeatBuyers,
+        repeatRate,
+        multiPayBuckets,
+      },
+      retention,
+      daily: Object.values(dailyData).reverse(),
+    });
+  } catch (e) {
+    console.error('retention report error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ================= 菜单自动同步 =================
 async function syncMenus() {
   const menus = [
@@ -1832,6 +1995,7 @@ async function syncMenus() {
     { id: 'menu-report-user-finance', parentId: 'menu-report-group', title: '用户资金报表', type: 'MENU', icon: '💵', path: '/reports/user-finance', component: 'ReportUserFinance', permission: 'reports.view', sortOrder: 5 },
     { id: 'menu-report-vip', parentId: 'menu-report-group', title: 'VIP分布报表', type: 'MENU', icon: '👑', path: '/reports/vip-distribution', component: 'ReportVipDistribution', permission: 'reports.view', sortOrder: 6 },
     { id: 'menu-report-card-ranking', parentId: 'menu-report-group', title: '卡牌排行榜', type: 'MENU', icon: '🏆', path: '/reports/card-ranking', component: 'ReportCardRanking', permission: 'reports.view', sortOrder: 7 },
+    { id: 'menu-report-retention', parentId: 'menu-report-group', title: '付费留存报表', type: 'MENU', icon: '💹', path: '/reports/retention', component: 'ReportRetention', permission: 'reports.view', sortOrder: 8 },
     { id: 'menu-ad-group', parentId: null, title: '广告管理', type: 'DIRECTORY', icon: '📣', path: '', component: '', permission: '', sortOrder: 6 },
     { id: 'menu-ad-channels', parentId: 'menu-ad-group', title: '投放渠道', type: 'MENU', icon: '📡', path: '/ad-channels', component: 'AdChannelList', permission: 'adchannels.view', sortOrder: 1 },
     { id: 'menu-ad-campaigns', parentId: 'menu-ad-group', title: '投放活动', type: 'MENU', icon: '📢', path: '/ad-campaigns', component: 'AdCampaignList', permission: 'adcampaigns.view', sortOrder: 2 },
