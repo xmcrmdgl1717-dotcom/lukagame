@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import SearchBar from '../../components/SearchBar';
 import { useSearch } from '../../hooks/useSearch';
+import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 
 interface R { id: string; name: string; displayName: string; description: string; permissions: string; isSystem: boolean; adminCount?: number; createdAt: string; }
 interface P { key: string; label: string; group: string; }
@@ -20,6 +21,7 @@ export default function RoleList() {
   const [roles, setRoles] = useState<R[]>([]);
   const [perms, setPerms] = useState<P[]>([]);
   const [loading, setLoading] = useState(true);
+  const { confirm } = useSensitiveConfirm();
 
   const { filters, setFilters, filtered, reset } = useSearch(roles, SEARCH_FIELDS);
 
@@ -75,9 +77,17 @@ export default function RoleList() {
 
   const del = async (r: R) => {
     if (r.isSystem) return alert('系统角色不可删除');
-    if (!confirm(`删除角色「${r.displayName}」？`)) return;
-    try { await axios.delete(`${API_URL}/api/admin/roles/${r.id}`, { headers: hdr() }); load(); }
-    catch (e: any) { alert('失败: ' + (e.response?.data?.error || e.message)); }
+    if ((r.adminCount ?? 0) > 0) {
+      return alert(`该角色下还有 ${r.adminCount} 位管理员，无法删除。请先为这些管理员更换角色。`);
+    }
+    const ok = await confirm(
+      `即将删除角色「${r.displayName}」（标识：${r.name}）。\n\n此操作不可恢复，该角色关联的所有权限配置将一并删除。`
+    );
+    if (!ok) return;
+    try {
+      await axios.delete(`${API_URL}/api/admin/roles/${r.id}`, { headers: hdr() });
+      load();
+    } catch (e: any) { alert('失败: ' + (e.response?.data?.error || e.message)); }
   };
 
   return (
@@ -109,7 +119,7 @@ export default function RoleList() {
                     <td className="p-3 text-center">
                       <button onClick={() => { setViewRole(r); setShowView(true); }} className="bg-gray-600 text-white text-xs px-3 py-1 rounded mr-1">查看</button>
                       <button onClick={() => openEdit(r)} disabled={r.name === 'super'} className="bg-blue-600 disabled:opacity-30 text-white text-xs px-3 py-1 rounded mr-1">编辑</button>
-                      <button onClick={() => del(r)} disabled={r.isSystem} className="bg-red-600 disabled:opacity-30 text-white text-xs px-3 py-1 rounded">删除</button>
+                      <button onClick={() => del(r)} disabled={r.isSystem || (r.adminCount ?? 0) > 0} className="bg-red-600 disabled:opacity-30 text-white text-xs px-3 py-1 rounded">删除</button>
                     </td>
                   </tr>
                 );
