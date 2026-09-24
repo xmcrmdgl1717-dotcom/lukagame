@@ -6,7 +6,7 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function GameDetail({ gameId, onBack, onGoBoxDetail }) {
-  const { user } = useStore();
+  const { user, currency } = useStore();
   const { t } = useI18n();
   const [game, setGame] = useState(null);
   const [boxes, setBoxes] = useState([]);
@@ -60,7 +60,11 @@ export default function GameDetail({ gameId, onBack, onGoBoxDetail }) {
         <div className="bg-[#2a1414] border border-orange-700/50 rounded-xl p-3 text-center text-xs">
           <span className="text-gray-400">入场要求：</span>
           {game.minVipLevel > 0 && <span className="text-orange-400 font-bold ml-2">VIP{game.minVipLevel}+</span>}
-          {game.minCoins > 0 && <span className="text-yellow-400 font-bold ml-2">余额 {game.minCoins.toLocaleString()} 🪙+</span>}
+          {game.minCoins > 0 && (
+            <span className="text-yellow-400 font-bold ml-2 flex-inline items-center gap-1">
+              余额 <span className="text-yellow-500">{currency.symbol}</span> {game.minCoins.toLocaleString()}+
+            </span>
+          )}
         </div>
       )}
 
@@ -84,7 +88,10 @@ export default function GameDetail({ gameId, onBack, onGoBoxDetail }) {
                   {box.description && (
                     <div className="text-[10px] text-gray-500 mt-0.5 truncate">{box.description}</div>
                   )}
-                  <div className="text-yellow-500 text-sm mt-1">{box.price.toLocaleString()} 🪙</div>
+                  <div className="text-yellow-500 text-sm mt-1 flex items-center gap-1">
+                    <span>{currency.symbol}</span>
+                    <span>{box.price.toLocaleString()}</span>
+                  </div>
                 </div>
                 <div className="bg-red-600 hover:bg-red-700 text-white text-xs px-5 py-2 rounded-lg font-bold flex-shrink-0">
                   {t('draw.title', '进入')}
