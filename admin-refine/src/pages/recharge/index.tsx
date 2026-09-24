@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTable, useCreate, useUpdate, useDelete } from '@refinedev/core';
 import SearchBar from '../../components/SearchBar';
 import { useSearch } from '../../hooks/useSearch';
+import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 
 interface Opt { id: string; coins: number; bonus: number; price: number; isActive: boolean; sortOrder: number; createdAt: string; }
 
@@ -17,6 +18,7 @@ export default function RechargeList() {
   const { mutate: create_ } = useCreate();
   const { mutate: update_ } = useUpdate();
   const { mutate: delete_ } = useDelete();
+  const { confirm } = useSensitiveConfirm();
 
   const all = tableQueryResult.data?.data || [];
   const { filters, setFilters, filtered, reset } = useSearch(all, SEARCH_FIELDS);
@@ -41,7 +43,14 @@ export default function RechargeList() {
   };
 
   const toggle = (o: Opt) => update_({ resource: 'recharge-options', id: o.id, values: { isActive: !o.isActive } }, { onSuccess: () => tableQueryResult.refetch() });
-  const del = (o: Opt) => { if (confirm(`删除套餐「${o.coins} 金币」？`)) delete_({ resource: 'recharge-options', id: o.id }, { onSuccess: () => tableQueryResult.refetch() }); };
+
+  const del = async (o: Opt) => {
+    const ok = await confirm(
+      `即将删除充值套餐「${o.coins} + ${o.bonus} 金币 / ¥${(o.price/100).toFixed(2)}」。\n\n此操作不可恢复，历史订单不受影响但用户将无法再购买此套餐。`
+    );
+    if (!ok) return;
+    delete_({ resource: 'recharge-options', id: o.id }, { onSuccess: () => tableQueryResult.refetch() });
+  };
 
   return (
     <div>
