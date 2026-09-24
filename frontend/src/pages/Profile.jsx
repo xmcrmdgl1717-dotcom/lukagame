@@ -39,6 +39,8 @@ export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications,
     finally { setSubmitting(false); }
   };
 
+  const groupColor = user?.group?.color || '#6366f1';
+
   return (
     <div className="p-4">
       {/* 用户卡片 - 点击进 VIP 中心 */}
@@ -47,10 +49,21 @@ export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications,
         className="bg-gradient-to-br from-[#1c0e0e] to-[#2a1414] border border-[#3d1a1a] rounded-xl p-5 flex gap-4 items-center mb-6 shadow-lg cursor-pointer hover:border-orange-600/50 transition"
       >
         <div className="w-16 h-16 bg-gradient-to-br from-orange-600 to-red-600 rounded-xl flex items-center justify-center text-3xl shadow-inner">👤</div>
-        <div className="flex-1">
-          <div className="text-xs text-orange-400 font-bold mb-1">LUKA LICENSE</div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="text-xs text-orange-400 font-bold">LUKA LICENSE</span>
+            {/* 分组标签 */}
+            {user?.group && (
+              <span
+                className="text-[9px] text-white px-1.5 py-0.5 rounded font-bold"
+                style={{ backgroundColor: groupColor }}
+              >
+                {user.group.displayName}
+              </span>
+            )}
+          </div>
           <div className="text-xl font-black text-white mb-1">VIP{user?.vipLevel || 0}</div>
-          <div className="text-xs text-gray-500">ID: {user?.id?.slice(0, 8)}</div>
+          <div className="text-xs text-gray-500 truncate">ID: {user?.id?.slice(0, 8)}</div>
         </div>
         <span className="text-gray-600 text-2xl">›</span>
       </div>
@@ -68,7 +81,6 @@ export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications,
         <button onClick={onGoArticles} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:bg-[#2a1414] transition">
           <span className="text-2xl">📰</span><span className="text-sm text-white font-bold">{t('profile.articles', '新闻资讯')}</span>
         </button>
-        {/* 我的赠与入口 */}
         <button onClick={onGoTransfers} className="col-span-2 bg-gradient-to-r from-[#1c0e1c] to-[#2a1424] border border-[#3d1a3d] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:border-purple-500 transition">
           <span className="text-2xl">🎁</span>
           <div className="text-left flex-1">
