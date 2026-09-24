@@ -357,14 +357,15 @@ model Transaction {
 }
 
 model PaymentChannel {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  displayName String
-  iconUrl     String   @default("")
-  config      String   @default("")
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
+  id           String   @id @default(uuid())
+  name         String   @unique
+  displayName  String
+  iconUrl      String   @default("")
+  config       String   @default("")
+  currencyCode String   @default("USD")   // 👈 新增：该通道收款用的法币代码
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
 }
 
 model Banner {
@@ -561,16 +562,30 @@ model AdminMenu {
   children   AdminMenu[]  @relation("MenuChildren")
 }
 
-// ================= 平台币种配置 =================
+// ================= 平台币（单例） =================
 
 model CurrencySetting {
   id        String   @id @default("singleton")
   name      String   @default("钻石")
   symbol    String   @default("💎")
   shortName String   @default("DIAMOND")
-  ratio     Int      @default(100) // 1 元 = N 钻石
   enabled   Boolean  @default(true)
   updatedAt DateTime @updatedAt
+}
+
+// ================= 法币列表（多条） =================
+
+model FiatCurrency {
+  id        String   @id @default(uuid())
+  code      String   @unique      // CNY / USD / EUR / JPY / HKD
+  name      String                 // 人民币 / 美元 / 欧元
+  symbol    String                 // ¥ / $ / €
+  flag      String   @default("")  // 🇨🇳 / 🇺🇸 / 🇪🇺
+  ratio     Int                    // 1 单位该法币 = N 钻石（美元固定 100）
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
 }
 
 // ================= 客户端错误日志 =================
