@@ -21,6 +21,7 @@ import TransactionLog from './pages/TransactionLog';
 import VipCenter from './pages/VipCenter';
 import Leaderboard from './pages/Leaderboard';
 import Transfers from './pages/Transfers';
+import DrawDetail from './pages/DrawDetail';
 import LoginModal from './components/LoginModal';
 import RechargeModal from './components/RechargeModal';
 
@@ -81,9 +82,29 @@ function AppInner() {
       if (currentPage.type === 'vip') return <VipCenter onBack={backFromPage} />;
       if (currentPage.type === 'leaderboard') return <Leaderboard onBack={backFromPage} />;
       if (currentPage.type === 'transfers') return <Transfers onBack={backFromPage} />;
+      if (currentPage.type === 'draw-detail') return (
+        <DrawDetail
+          boxId={currentPage.boxId}
+          onBack={backFromPage}
+          onGoInventory={() => { setCurrentPage(null); setCurrentGame(null); setCurrentTab('inventory'); }}
+        />
+      );
     }
-    if (currentGame) return <GameDetail gameId={currentGame.id} onBack={handleBackFromGame} />;
-    if (currentTab === 'home') return <Home onShowLogin={() => setShowLogin(true)} onGoGame={handleGoGame} onGoLeaderboard={() => goPage({ type: 'leaderboard' })} />;
+    if (currentGame) return (
+      <GameDetail
+        gameId={currentGame.id}
+        onBack={handleBackFromGame}
+        onGoBoxDetail={(boxId) => goPage({ type: 'draw-detail', boxId })}
+      />
+    );
+    if (currentTab === 'home') return (
+      <Home
+        onShowLogin={() => setShowLogin(true)}
+        onGoGame={handleGoGame}
+        onGoLeaderboard={() => goPage({ type: 'leaderboard' })}
+        onGoBoxDetail={(boxId) => goPage({ type: 'draw-detail', boxId })}
+      />
+    );
     if (currentTab === 'activity') return <Activity />;
     if (currentTab === 'inventory') return <Inventory onGoSubmit={() => goPage({ type: 'card-order-submit' })} onGoTransfers={() => goPage({ type: 'transfers' })} />;
     if (currentTab === 'orders') return <Orders />;
