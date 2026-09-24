@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTable, useCreate, useUpdate, useDelete } from '@refinedev/core';
 import SearchBar from '../../components/SearchBar';
 import { useSearch } from '../../hooks/useSearch';
+import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 
 interface GameItem {
   id: string;
@@ -40,6 +41,7 @@ export default function GameList() {
   const { mutate: create_ } = useCreate();
   const { mutate: update_ } = useUpdate();
   const { mutate: delete_ } = useDelete();
+  const { confirm } = useSensitiveConfirm();
 
   const all = tableQueryResult.data?.data || [];
   const { filters, setFilters, filtered, reset } = useSearch(all, SEARCH_FIELDS);
@@ -56,7 +58,6 @@ export default function GameList() {
   });
   const [creating, setCreating] = useState(false);
 
-  // 新建时上传封面
   const onCoverCreate = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -65,7 +66,6 @@ export default function GameList() {
     setN((x) => ({ ...x, coverUrl: img }));
   };
 
-  // 编辑时上传封面
   const onCoverEdit = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -111,8 +111,12 @@ export default function GameList() {
     });
   };
 
-  const handleDelete = (g: GameItem) => {
-    if (!confirm(`确定要删除游戏「${g.displayName}」吗？该游戏下的盲盒将变成无归属。`)) return;
+  const handleDelete = async (g: GameItem) => {
+    const boxWarning = (g.boxCount || 0) > 0
+      ? `\n\n⚠️ 该游戏下还有 ${g.boxCount} 个盲盒，删除后这些盲盒将失去归属（不会自动删除）。`
+      : '';
+    const ok = await confirm(`即将删除游戏「${g.displayName}」。${boxWarning}`);
+    if (!ok) return;
     delete_({ resource: 'games', id: g.id }, {
       onSuccess: () => tableQueryResult.refetch(),
       onError: (e: any) => alert('删除失败: ' + (e?.message || '')),
@@ -134,7 +138,6 @@ export default function GameList() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filtered.map((g) => (
             <div key={g.id} className="bg-[#161616] border border-[#2a2a2a] rounded-xl overflow-hidden">
-              {/* 封面图 */}
               <div className="h-32 bg-[#0d0d0d] flex items-center justify-center relative">
                 {g.coverUrl ? (
                   <img src={g.coverUrl} className="w-full h-full object-cover" alt={g.displayName} />
@@ -186,7 +189,6 @@ export default function GameList() {
         </div>
       )}
 
-      {/* 新建弹窗 */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -211,7 +213,6 @@ export default function GameList() {
                 <input value={n.description} onChange={(e) => setN({ ...n, description: e.target.value })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" />
               </div>
 
-              {/* ====== 封面上传 ====== */}
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">封面图</label>
                 <label className="cursor-pointer inline-block bg-[#2a2a2a] hover:bg-[#3a3a3a] text-xs px-3 py-1.5 rounded text-white">
@@ -260,7 +261,6 @@ export default function GameList() {
         </div>
       )}
 
-      {/* 编辑弹窗 */}
       {showEdit && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -285,7 +285,6 @@ export default function GameList() {
                 <input value={ed.description || ''} onChange={(e) => setEd({ ...ed, description: e.target.value })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" />
               </div>
 
-              {/* ====== 封面上传（编辑） ====== */}
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">封面图</label>
                 <label className="cursor-pointer inline-block bg-[#2a2a2a] hover:bg-[#3a3a3a] text-xs px-3 py-1.5 rounded text-white">
