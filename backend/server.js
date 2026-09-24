@@ -612,6 +612,65 @@ app.delete('/api/admin/client-errors/cleanup', requirePermission('audit.view'), 
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+// ================= 平台币种 =================
+
+// 获取币种（自动初始化单例）
+async function ensureCurrency() {
+  let c = await prisma.currencySetting.findUnique({ where: { id: 'singleton' } });
+  if (!c) {
+    c = await prisma.currencySetting.create({ data: { id: 'singleton' } });
+  }
+  return c;
+}
+
+// 用户端公开接口
+app.get('/api/currency', async (req, res) => {
+  res.set('Cache-Control', 'public, max-age=60');
+  try {
+    const c = await ensureCurrency();
+    res.json({
+      name: c.name,
+      symbol: c.symbol,
+      shortName: c.shortName,
+      ratio: c.ratio,
+      enabled: c.enabled,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 后台读取
+app.get('/api/admin/currency-setting', requirePermission('audit.view'), async (req, res) => {
+  try {
+    const c = await ensureCurrency();
+    res.json(c);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 后台更新
+app.put('/api/admin/currency-setting', requirePermission('audit.view'), async (req, res) => {
+  const { name, symbol, shortName, ratio, enabled } = req.body;
+  const data = {};
+  if (name !== undefined) data.name = String(name).trim() || '钻石';
+  if (symbol !== undefined) data.symbol = String(symbol).trim() || '💎';
+  if (shortName !== undefined) data.shortName = String(shortName).trim().toUpperCase() || 'DIAMOND';
+  if (ratio !== undefined) {
+    const r = parseInt(ratio);
+    if (!r || r <= 0) return res.status(400).json({ error: '比例必须是正整数' });
+    data.ratio = r;
+  }
+  if (enabled !== undefined) data.enabled = !!enabled;
+
+  try {
+    const c = await prisma.currencySetting.upsert({
+      where: { id: 'singleton' },
+      update: data,
+      create: { id: 'singleton', ...data },
+    });
+    await writeAuditLog(req.admin, 'currency.update', 'currency', c.id, data);
+    res.json({ success: true, setting: c });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 // 语言
 app.get('/api/languages', async (req, res) => {
   res.json(await prisma.language.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
@@ -2904,6 +2963,7 @@ async function syncMenus() {
     { id: 'menu-system-group', parentId: null, title: '系统管理', type: 'DIRECTORY', icon: '⚙️', path: '', component: '', permission: '', sortOrder: 99 },
     { id: 'menu-email-setting', parentId: 'menu-system-group', title: '邮件配置', type: 'MENU', icon: '📧', path: '/system/email-setting', component: 'EmailSettingPage', permission: 'audit.view', sortOrder: 7 },
     { id: 'menu-email-logs', parentId: 'menu-system-group', title: '邮件日志', type: 'MENU', icon: '📨', path: '/system/email-logs', component: 'EmailLogList', permission: 'audit.view', sortOrder: 8 },
+    { id: 'menu-currency', parentId: 'menu-system-group', title: '币种管理', type: 'MENU', icon: '💎', path: '/system/currency', component: 'CurrencySettingPage', permission: 'audit.view', sortOrder: 6 },
     { id: 'menu-security', parentId: 'menu-system-group', title: '账号安全', type: 'MENU', icon: '🔐', path: '/system/security', component: 'SecurityPage', permission: '', sortOrder: 9 },
     { id: 'menu-system-monitor', parentId: 'menu-system-group', title: '系统监控', type: 'MENU', icon: '📡', path: '/system/monitor', component: 'SystemMonitorPage', permission: 'audit.view', sortOrder: 10 },
     { id: 'menu-client-errors', parentId: 'menu-system-group', title: '错误日志', type: 'MENU', icon: '🐛', path: '/system/errors', component: 'ClientErrorList', permission: 'audit.view', sortOrder: 11 },
