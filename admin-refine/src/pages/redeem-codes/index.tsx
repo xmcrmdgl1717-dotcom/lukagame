@@ -3,6 +3,7 @@ import { useTable, useCreate, useDelete } from '@refinedev/core';
 import axios from 'axios';
 import SearchBar from '../../components/SearchBar';
 import { useSearch } from '../../hooks/useSearch';
+import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 
 interface C { id: string; code: string; coins: number; maxUses: number; usedCount: number; isActive: boolean; createdAt: string; }
 
@@ -20,6 +21,7 @@ export default function RedeemList() {
   const { tableQueryResult } = useTable<C>({ resource: 'redeem-codes', pagination: { pageSize: 500 } });
   const { mutate: create_ } = useCreate();
   const { mutate: delete_ } = useDelete();
+  const { confirm } = useSensitiveConfirm();
 
   const all = tableQueryResult.data?.data || [];
   const { filters, setFilters, filtered, reset } = useSearch(all, SEARCH_FIELDS);
@@ -37,7 +39,10 @@ export default function RedeemList() {
 
   const batchFn = async () => {
     if (batch.count < 1 || batch.count > 100) return alert('数量 1-100');
-    if (!confirm(`生成 ${batch.count} 个兑换码？每个 ${batch.coins} 金币`)) return;
+    const ok = await confirm(
+      `即将批量生成 ${batch.count} 个兑换码，每个含 ${batch.coins} 金币，最多使用 ${batch.maxUses} 次。\n\n请确认操作。`
+    );
+    if (!ok) return;
     setBatching(true);
     try {
       const a = JSON.parse(localStorage.getItem('adminInfo') || 'null');
@@ -48,7 +53,13 @@ export default function RedeemList() {
     } catch (e: any) { alert('失败: ' + (e.response?.data?.error || e.message)); } finally { setBatching(false); }
   };
 
-  const del = (c: C) => { if (confirm(`删除「${c.code}」？`)) delete_({ resource: 'redeem-codes', id: c.id }, { onSuccess: () => tableQueryResult.refetch() }); };
+  const del = async (c: C) => {
+    const ok = await confirm(
+      `即将删除兑换码「${c.code}」。\n\n已使用 ${c.usedCount} / ${c.maxUses} 次。删除后无法恢复，已兑换的用户不受影响。`
+    );
+    if (!ok) return;
+    delete_({ resource: 'redeem-codes', id: c.id }, { onSuccess: () => tableQueryResult.refetch() });
+  };
 
   return (
     <div>
