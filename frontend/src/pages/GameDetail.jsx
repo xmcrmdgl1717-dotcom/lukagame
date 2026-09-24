@@ -5,17 +5,13 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export default function GameDetail({ gameId, onBack }) {
-  const { user, updateCoins, setUser } = useStore();
+export default function GameDetail({ gameId, onBack, onGoBoxDetail }) {
+  const { user } = useStore();
   const { t } = useI18n();
   const [game, setGame] = useState(null);
   const [boxes, setBoxes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [accessError, setAccessError] = useState('');
-  const [drawing, setDrawing] = useState(false);
-  const [drawnResult, setDrawnResult] = useState([]);
-  const [selectedBox, setSelectedBox] = useState(null);
-  const [drawCount, setDrawCount] = useState(1);
 
   useEffect(() => {
     axios.get(`${API_URL}/api/games/${gameId}`)
@@ -31,20 +27,10 @@ export default function GameDetail({ gameId, onBack }) {
       .catch(() => {});
   }, [user, gameId]);
 
-  const handleDraw = async (box) => {
-    if (!user) return;
+  const handleEnterBox = (box) => {
+    if (!user) return alert('请先登录');
     if (accessError) return alert(accessError);
-    if (user.coins < box.price * drawCount) return alert('金币不足');
-
-    try {
-      const res = await axios.post(`${API_URL}/api/draw`, { userId: user.id, boxId: box.id, count: drawCount });
-      updateCoins(-(box.price * drawCount));
-      const updatedUser = await axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' });
-      setUser(updatedUser.data);
-      setDrawnResult(res.data.drawnCards);
-      setDrawing(true);
-      setSelectedBox(null);
-    } catch (e) { alert(e.response?.data?.error || '抽卡失败'); }
+    onGoBoxDetail(box.id);
   };
 
   if (loading) return <div className="text-center text-gray-500 py-20">加载中...</div>;
@@ -85,73 +71,29 @@ export default function GameDetail({ gameId, onBack }) {
         ) : (
           <div className="space-y-3">
             {boxes.map((box) => (
-              <div key={box.id} className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4 flex items-center gap-3">
-                <div className="w-16 h-20 bg-[#0d0d0d] rounded flex items-center justify-center">
-                  {box.coverUrl ? <img src={box.coverUrl} className="w-full h-full object-cover rounded" /> : <span className="text-3xl">📦</span>}
+              <div
+                key={box.id}
+                onClick={() => handleEnterBox(box)}
+                className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4 flex items-center gap-3 cursor-pointer hover:border-orange-500/60 transition active:scale-[0.98]"
+              >
+                <div className="w-16 h-20 bg-[#0d0d0d] rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {box.coverUrl ? <img src={box.coverUrl} className="w-full h-full object-cover" /> : <span className="text-3xl">📦</span>}
                 </div>
-                <div className="flex-1">
-                  <div className="font-bold text-white">{box.name}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-white truncate">{box.name}</div>
+                  {box.description && (
+                    <div className="text-[10px] text-gray-500 mt-0.5 truncate">{box.description}</div>
+                  )}
                   <div className="text-yellow-500 text-sm mt-1">{box.price.toLocaleString()} 🪙</div>
                 </div>
-                <button
-                  onClick={() => setSelectedBox(box)}
-                  disabled={!!accessError}
-                  className="bg-red-600 hover:bg-red-700 disabled:opacity-30 text-white text-xs px-5 py-2 rounded-lg font-bold"
-                >
-                  {t('draw.title', '抽奖')}
-                </button>
+                <div className="bg-red-600 hover:bg-red-700 text-white text-xs px-5 py-2 rounded-lg font-bold flex-shrink-0">
+                  {t('draw.title', '进入')}
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
-
-      {selectedBox && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-4">
-          <div className="bg-[#161616] rounded-2xl border border-[#2a2a2a] p-6 w-full max-w-sm">
-            <h3 className="text-center font-bold text-lg mb-4 text-orange-400">{selectedBox.name}</h3>
-            <div className="text-center mb-4">
-              <div className="text-sm text-gray-400 mb-1">{t('draw.price', '单价')}</div>
-              <div className="text-2xl font-bold text-yellow-500">{selectedBox.price.toLocaleString()} 🪙</div>
-            </div>
-            <div className="mb-4">
-              <div className="text-sm text-gray-400 mb-2 text-center">{t('draw.count', '抽奖次数')}</div>
-              <div className="flex gap-2 justify-center">
-                {[1, 10, 50].map((n) => (
-                  <button key={n} onClick={() => setDrawCount(n)} className={`px-4 py-2 rounded-lg text-sm font-bold ${drawCount === n ? 'bg-red-600 text-white' : 'bg-[#2a2a2a] text-gray-400'}`}>
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <div className="text-center text-xs text-gray-500 mt-2">
-                {t('draw.total', '总计')}：{(selectedBox.price * drawCount).toLocaleString()} 🪙
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setSelectedBox(null)} className="flex-1 bg-[#2a2a2a] text-white py-3 rounded-lg text-sm font-bold">{t('common.cancel', '取消')}</button>
-              <button onClick={() => handleDraw(selectedBox)} className="flex-1 bg-gradient-to-r from-red-600 to-orange-600 text-white py-3 rounded-lg text-sm font-bold shadow-lg">
-                {t('draw.title', '点击抽奖')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {drawing && drawnResult.length > 0 && (
-        <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-4">
-          <div className="text-2xl font-bold text-red-500 mb-8 animate-pulse">{t('draw.result', '抽卡结果')}</div>
-          <div className="flex flex-wrap justify-center gap-3">
-            {drawnResult.map((card, idx) => (
-              <div key={idx} className="w-20 h-28 bg-[#1c0e0e] rounded-lg border border-red-500 flex flex-col items-center justify-center">
-                <span className="text-3xl mb-1">🃏</span>
-                <span className="text-[10px] text-white">{card.name}</span>
-                <span className="text-[10px] text-yellow-500 font-bold">{card.rarity}</span>
-              </div>
-            ))}
-          </div>
-          <button onClick={() => { setDrawing(false); setDrawnResult([]); }} className="mt-8 bg-red-600 px-8 py-3 rounded-full font-bold text-sm">{t('common.confirm', '确认')}</button>
-        </div>
-      )}
     </div>
   );
 }
