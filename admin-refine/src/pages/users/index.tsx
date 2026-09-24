@@ -1,9 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTable, useUpdate, useDelete } from '@refinedev/core';
 import axios from 'axios';
 import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 import SearchBar from '../../components/SearchBar';
 import { useSearch } from '../../hooks/useSearch';
+
+interface UserGroup {
+  id: string;
+  name: string;
+  displayName: string;
+  color: string;
+  userCount?: number;
+}
 
 interface UserItem {
   id: string;
@@ -15,6 +23,8 @@ interface UserItem {
   tags: string;
   remark: string;
   rechargeCount: number;
+  groupId: string | null;
+  group: { id: string; name: string; displayName: string; color: string } | null;
 }
 
 interface Transaction {
@@ -86,6 +96,10 @@ export default function UserList() {
   const all = tableQueryResult.data?.data || [];
   const { filters, setFilters, filtered, reset } = useSearch(all, SEARCH_FIELDS);
 
+  // 分组数据
+  const [groups, setGroups] = useState<UserGroup[]>([]);
+  const [groupFilter, setGroupFilter] = useState<string>('');
+
   const [showEdit, setShowEdit] = useState(false);
   const [ed, setEd] = useState<any>({});
   const [saving, setSaving] = useState(false);
@@ -104,12 +118,27 @@ export default function UserList() {
   const [invLoading, setInvLoading] = useState(false);
   const [invFilter, setInvFilter] = useState('');
 
-  const openEdit = (u: UserItem) => { setEd({ ...u, password: '' }); setShowEdit(true); };
+  // 首次加载时拉取分组列表
+  useEffect(() => {
+    axios.get(`${API_URL}/api/admin/user-groups`, { headers: hdr() })
+      .then(res => setGroups(res.data))
+      .catch(() => {});
+  }, []);
+
+  const openEdit = (u: UserItem) => {
+    setEd({ ...u, password: '', groupId: u.groupId || '' });
+    setShowEdit(true);
+  };
 
   const handleSave = () => {
     setSaving(true);
     const payload: any = {
-      username: ed.username, coins: ed.coins, tags: ed.tags || '', remark: ed.remark || '', vipLevel: ed.vipLevel,
+      username: ed.username,
+      coins: ed.coins,
+      tags: ed.tags || '',
+      remark: ed.remark || '',
+      vipLevel: ed.vipLevel,
+      groupId: ed.groupId || null,
     };
     if (ed.password) payload.password = ed.password;
     updateUser({ resource: 'users', id: ed.id, values: payload }, {
@@ -119,12 +148,14 @@ export default function UserList() {
   };
 
   const handleDelete = async (u: UserItem) => {
-    const ok = await confirm(`确定删除用户「${u.username}」？`);
+    const groupInfo = u.group ? `（分组：${u.group.displayName}）` : '';
+    const ok = await confirm(
+      `即将删除用户「${u.username}」${groupInfo}。\n\nVIP${u.vipLevel} · 余额 ${u.coins.toLocaleString()} · 充值次数 ${u.rechargeCount}\n\n⚠️ 该用户的所有库存、订单、账变记录将一并删除，不可恢复。`
+    );
     if (!ok) return;
     deleteUser({ resource: 'users', id: u.id }, { onSuccess: () => tableQueryResult.refetch() });
   };
 
-  // 打开账变明细
   const openTransactions = async (u: UserItem) => {
     setTxUser(u);
     setShowTx(true);
@@ -137,7 +168,6 @@ export default function UserList() {
     finally { setTxLoading(false); }
   };
 
-  // 打开库存
   const openInventory = async (u: UserItem) => {
     setInvUser(u);
     setShowInv(true);
@@ -150,20 +180,69 @@ export default function UserList() {
     finally { setInvLoading(false); }
   };
 
+  // 先按分组筛选，再应用 useSearch 的筛选
+  const baseList = groupFilter
+    ? (groupFilter === '__NONE__' ? all.filter(u => !u.groupId) : all.filter(u => u.groupId === groupFilter))
+    : all;
+
+  const finalFiltered = groupFilter
+    ? baseList.filter(u => {
+        // 对分组筛选后的列表再手动跑 useSearch 逻辑较复杂，这里简单处理：用 filtered 的交集
+        return filtered.some(f => f.id === u.id);
+      })
+    : filtered;
+
   const filteredTx = txFilter ? txList.filter(t => t.type === txFilter) : txList;
-  const filteredInv = invFilter
-    ? invList.filter(i => i.card.rarity === invFilter)
-    : invList;
+  const filteredInv = invFilter ? invList.filter(i => i.card.rarity === invFilter) : invList;
 
   const totalInvQty = invList.reduce((s, i) => s + i.quantity, 0);
+
+  const getGroupColor = (color: string) => color || '#6366f1';
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">用户列表</h1>
+        <div className="text-sm text-gray-500">共 {all.length} 位用户</div>
       </div>
 
-      <SearchBar fields={SEARCH_FIELDS} filters={filters} setFilters={setFilters} onReset={reset} total={all.length} filtered={filtered.length} />
+      {/* 分组筛选按钮 */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <button
+          onClick={() => setGroupFilter('')}
+          className={`text-xs px-3 py-1.5 rounded-full font-bold transition ${
+            groupFilter === '' ? 'bg-red-600 text-white' : 'bg-[#2a2a2a] text-gray-400'
+          }`}
+        >
+          全部 ({all.length})
+        </button>
+        {groups.map(g => {
+          const count = all.filter(u => u.groupId === g.id).length;
+          return (
+            <button
+              key={g.id}
+              onClick={() => setGroupFilter(g.id)}
+              className={`text-xs px-3 py-1.5 rounded-full font-bold transition flex items-center gap-1.5 ${
+                groupFilter === g.id ? 'text-white' : 'bg-[#2a2a2a] text-gray-400'
+              }`}
+              style={groupFilter === g.id ? { backgroundColor: getGroupColor(g.color) } : {}}
+            >
+              <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: getGroupColor(g.color) }} />
+              {g.displayName} ({count})
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setGroupFilter('__NONE__')}
+          className={`text-xs px-3 py-1.5 rounded-full font-bold transition ${
+            groupFilter === '__NONE__' ? 'bg-gray-600 text-white' : 'bg-[#2a2a2a] text-gray-400'
+          }`}
+        >
+          未分组 ({all.filter(u => !u.groupId).length})
+        </button>
+      </div>
+
+      <SearchBar fields={SEARCH_FIELDS} filters={filters} setFilters={setFilters} onReset={reset} total={all.length} filtered={finalFiltered.length} />
 
       {tableQueryResult.isLoading ? (
         <div className="text-center text-gray-500 py-20">加载中...</div>
@@ -174,6 +253,7 @@ export default function UserList() {
               <thead className="bg-[#1f1f1f] text-gray-400 text-xs uppercase">
                 <tr>
                   <th className="p-3">用户名</th>
+                  <th className="p-3">分组</th>
                   <th className="p-3">VIP</th>
                   <th className="p-3">注册时间</th>
                   <th className="p-3">最近登录</th>
@@ -184,9 +264,21 @@ export default function UserList() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((u) => (
+                {finalFiltered.map((u) => (
                   <tr key={u.id} className="border-b border-[#2a2a2a] hover:bg-[#1a1a1a]">
                     <td className="p-3 font-bold">{u.username}</td>
+                    <td className="p-3">
+                      {u.group ? (
+                        <span
+                          className="text-[10px] text-white px-2 py-0.5 rounded font-bold"
+                          style={{ backgroundColor: getGroupColor(u.group.color) }}
+                        >
+                          {u.group.displayName}
+                        </span>
+                      ) : (
+                        <span className="text-gray-600 text-xs">未分组</span>
+                      )}
+                    </td>
                     <td className="p-3"><span className="text-xs bg-orange-900/60 text-orange-200 px-2 py-0.5 rounded">VIP{u.vipLevel}</span></td>
                     <td className="p-3 text-gray-400 text-xs">{fmt(u.createdAt)}</td>
                     <td className="p-3 text-gray-400 text-xs">{fmt(u.lastLoginAt)}</td>
@@ -203,7 +295,7 @@ export default function UserList() {
                     </td>
                   </tr>
                 ))}
-                {filtered.length === 0 && <tr><td colSpan={8} className="text-center text-gray-500 py-10">无匹配结果</td></tr>}
+                {finalFiltered.length === 0 && <tr><td colSpan={9} className="text-center text-gray-500 py-10">无匹配结果</td></tr>}
               </tbody>
             </table>
           </div>
@@ -218,6 +310,22 @@ export default function UserList() {
             <div className="space-y-3 text-sm">
               <div><label className="block text-gray-400 mb-1 text-xs">用户名</label><input value={ed.username || ''} onChange={(e) => setEd({ ...ed, username: e.target.value })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" /></div>
               <div><label className="block text-gray-400 mb-1 text-xs">重置密码（留空不改）</label><input type="password" value={ed.password || ''} onChange={(e) => setEd({ ...ed, password: e.target.value })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" /></div>
+
+              {/* 分组选择 */}
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">用户分组</label>
+                <select
+                  value={ed.groupId || ''}
+                  onChange={(e) => setEd({ ...ed, groupId: e.target.value })}
+                  className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white"
+                >
+                  <option value="">-- 未分组 --</option>
+                  {groups.map(g => (
+                    <option key={g.id} value={g.id}>{g.displayName}（{g.name}）</option>
+                  ))}
+                </select>
+              </div>
+
               <div><label className="block text-gray-400 mb-1 text-xs">VIP 等级</label><input type="number" value={ed.vipLevel ?? 0} onChange={(e) => setEd({ ...ed, vipLevel: parseInt(e.target.value) || 0 })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" /></div>
               <div><label className="block text-gray-400 mb-1 text-xs">金币余额</label><input type="number" value={ed.coins ?? 0} onChange={(e) => setEd({ ...ed, coins: parseInt(e.target.value) || 0 })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" /></div>
               <div><label className="block text-gray-400 mb-1 text-xs">标签</label><input value={ed.tags || ''} onChange={(e) => setEd({ ...ed, tags: e.target.value })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" /></div>
