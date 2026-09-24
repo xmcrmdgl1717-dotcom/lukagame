@@ -1107,6 +1107,17 @@ app.delete('/api/admin/users/:id', requirePermission('users.delete'), async (req
   catch (e) { res.status(400).json({ error: '删除失败' }); }
 });
 
+// 查看某用户的库存（后台用）
+app.get('/api/admin/users/:id/inventory', requirePermission('users.view'), async (req, res) => {
+  try {
+    const list = await prisma.inventory.findMany({
+      where: { userId: req.params.id },
+      include: { card: true },
+      orderBy: { id: 'desc' }
+    });
+    res.json(list);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 app.get('/api/admin/vip-levels', requirePermission('users.vip'), async (req, res) => { res.json(await prisma.vipLevel.findMany({ orderBy: { level: 'asc' } })); });
 app.post('/api/admin/vip-levels', requirePermission('users.vip'), async (req, res) => {
   const { level, name, sortOrder, iconUrl, rechargeAmount, consumeAmount, benefits } = req.body;
