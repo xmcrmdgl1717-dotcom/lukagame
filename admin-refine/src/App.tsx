@@ -51,6 +51,7 @@ import AdChannelList from './pages/ad-channels';
 import AdCampaignList from './pages/ad-campaigns';
 import KolList from './pages/kols';
 import AdReport from './pages/ad-reports';
+import AdRetentionReport from './pages/ad-retention';
 import TransferLogList from './pages/transfer-logs';
 
 const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
@@ -61,7 +62,7 @@ const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   TransactionList, DrawLogList, ReportSummary, ReportFinance, ReportDraw,
   ReportUserDraw, ReportUserFinance, ReportVipDistribution, ReportCardRanking, ReportRetention,
   LanguageList, TranslationList, CardOrderList, PopupList, ArticleList,
-  AdChannelList, AdCampaignList, KolList, AdReport,
+  AdChannelList, AdCampaignList, KolList, AdReport, AdRetentionReport,
   TransferLogList,
 };
 
