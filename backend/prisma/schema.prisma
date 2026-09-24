@@ -172,6 +172,13 @@ model User {
   adCampaign       String   @default("")
   adRef            String   @default("")
 
+  email            String   @default("")
+  emailWelcome     Boolean  @default(true)
+  emailRecharge    Boolean  @default(true)
+  emailVip         Boolean  @default(true)
+  emailShip        Boolean  @default(true)
+  emailLogs        EmailLog[]
+
   group            UserGroup?      @relation(fields: [groupId], references: [id])
   inventory        Inventory[]
   orders           Order[]
@@ -546,4 +553,32 @@ model AdminMenu {
   createdAt  DateTime     @default(now())
   parent     AdminMenu?   @relation("MenuChildren", fields: [parentId], references: [id], onDelete: Cascade)
   children   AdminMenu[]  @relation("MenuChildren")
+}
+
+// ================= 邮件 =================
+
+model EmailLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  toEmail   String
+  type      String   // WELCOME / RECHARGE / VIP_UPGRADE / SHIP
+  subject   String
+  status    String   @default("PENDING") // PENDING / SENT / FAILED
+  error     String   @default("")
+  createdAt DateTime @default(now())
+  sentAt    DateTime?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model EmailSetting {
+  id        String   @id @default("singleton")
+  enabled   Boolean  @default(false)
+  host      String   @default("")
+  port      Int      @default(587)
+  secure    Boolean  @default(false)
+  user      String   @default("")
+  pass      String   @default("")
+  fromName  String   @default("LUKA 抽卡平台")
+  fromEmail String   @default("")
+  updatedAt DateTime @updatedAt
 }
