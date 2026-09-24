@@ -8,8 +8,10 @@ interface BoxItem {
   name: string;
   price: number;
   coverUrl: string;
+  description: string;
   isActive: boolean;
   isFeatured: boolean;
+  allowTransfer: boolean;
   gameId: string | null;
   game: { id: string; displayName: string } | null;
   items: Array<{
@@ -40,9 +42,20 @@ const readAsBase64 = (f: File): Promise<string> =>
     r.readAsDataURL(f);
   });
 
+const emptyForm = {
+  name: '',
+  price: 300,
+  coverUrl: '',
+  description: '',
+  gameId: '',
+  isFeatured: false,
+  allowTransfer: false,
+};
+
 export default function BoxList() {
   const { tableQueryResult } = useTable<BoxItem>({ resource: 'boxes', pagination: { pageSize: 100 } });
   const { tableQueryResult: cardsQ } = useTable<CardItem>({ resource: 'cards', pagination: { pageSize: 500 } });
+  const { tableQueryResult: gamesQ } = useTable<{ id: string; displayName: string }>({ resource: 'games', pagination: { pageSize: 100 } });
   const { mutate: createBox } = useCreate();
   const { mutate: updateBox } = useUpdate();
   const { mutate: deleteBox } = useDelete();
@@ -50,69 +63,80 @@ export default function BoxList() {
 
   const all = tableQueryResult.data?.data || [];
   const allCards = cardsQ.data?.data || [];
+  const allGames = gamesQ.data?.data || [];
 
-  const [newBox, setNewBox] = useState({ name: '', price: 300, coverUrl: '', isFeatured: false });
-  const [creating, setCreating] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
-  const [editForm, setEditForm] = useState<any>({});
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [form, setForm] = useState<any>({ ...emptyForm });
   const [saving, setSaving] = useState(false);
+
+  // 概率配置相关
   const [showProb, setShowProb] = useState(false);
   const [curBox, setCurBox] = useState<BoxItem | null>(null);
   const [itemCard, setItemCard] = useState('');
   const [itemWeight, setItemWeight] = useState(10);
 
-  const onCoverNew = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    if (f.size > 2 * 1024 * 1024) return alert('图片不能超过 2MB');
-    const img = await readAsBase64(f);
-    setNewBox((b) => ({ ...b, coverUrl: img }));
+  const openCreate = () => {
+    setModalMode('create');
+    setForm({ ...emptyForm });
+    setShowModal(true);
   };
 
-  const onCoverEdit = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    if (f.size > 2 * 1024 * 1024) return alert('图片不能超过 2MB');
-    const img = await readAsBase64(f);
-    setEditForm((b: any) => ({ ...b, coverUrl: img }));
-  };
-
-  const handleCreate = () => {
-    if (!newBox.name) return alert('请输入名称');
-    setCreating(true);
-    createBox({ resource: 'boxes', values: newBox }, {
-      onSuccess: () => {
-        setNewBox({ name: '', price: 300, coverUrl: '', isFeatured: false });
-        setCreating(false);
-        tableQueryResult.refetch();
-      },
-      onError: (e: any) => {
-        alert('添加失败: ' + (e?.message || '未知错误'));
-        setCreating(false);
-      },
+  const openEdit = (b: BoxItem) => {
+    setModalMode('edit');
+    setForm({
+      id: b.id,
+      name: b.name,
+      price: b.price,
+      coverUrl: b.coverUrl,
+      description: b.description || '',
+      gameId: b.gameId || '',
+      isFeatured: b.isFeatured,
+      allowTransfer: b.allowTransfer,
+      isActive: b.isActive,
     });
+    setShowModal(true);
   };
 
-  const handleSave = () => {
+  const handleCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 2 * 1024 * 1024) return alert('图片不能超过 2MB');
+    const img = await readAsBase64(f);
+    setForm((x: any) => ({ ...x, coverUrl: img }));
+  };
+
+  const handleSubmit = () => {
+    if (!form.name || !form.name.trim()) return alert('请填写盲盒名称');
+    if (!form.price || form.price <= 0) return alert('请填写有效价格');
+
     setSaving(true);
-    updateBox({
-      resource: 'boxes',
-      id: editForm.id,
-      values: {
-        name: editForm.name,
-        price: editForm.price,
-        coverUrl: editForm.coverUrl,
-        isFeatured: !!editForm.isFeatured,
-      },
-    }, {
-      onSuccess: () => {
-        setShowEdit(false);
-        setSaving(false);
-        tableQueryResult.refetch();
-      },
-      onError: (e: any) => {
-        alert('保存失败: ' + (e?.message || '未知错误'));
-        setSaving(false);
-      },
-    });
+    const payload: any = {
+      name: form.name.trim(),
+      price: parseInt(form.price),
+      coverUrl: form.coverUrl || '',
+      description: form.description || '',
+      gameId: form.gameId || null,
+      isFeatured: !!form.isFeatured,
+      allowTransfer: !!form.allowTransfer,
+    };
+    if (modalMode === 'edit') payload.isActive = form.isActive;
+
+    const onSuccess = () => {
+      setShowModal(false);
+      setSaving(false);
+      tableQueryResult.refetch();
+    };
+    const onError = (e: any) => {
+      alert('保存失败: ' + (e?.message || '未知错误'));
+      setSaving(false);
+    };
+
+    if (modalMode === 'create') {
+      createBox({ resource: 'boxes', values: payload }, { onSuccess, onError });
+    } else {
+      updateBox({ resource: 'boxes', id: form.id, values: payload }, { onSuccess, onError });
+    }
   };
 
   const toggle = (b: BoxItem) => {
@@ -125,6 +149,13 @@ export default function BoxList() {
   const toggleFeatured = (b: BoxItem) => {
     updateBox(
       { resource: 'boxes', id: b.id, values: { isFeatured: !b.isFeatured } },
+      { onSuccess: () => tableQueryResult.refetch() }
+    );
+  };
+
+  const toggleTransfer = (b: BoxItem) => {
+    updateBox(
+      { resource: 'boxes', id: b.id, values: { allowTransfer: !b.allowTransfer } },
       { onSuccess: () => tableQueryResult.refetch() }
     );
   };
@@ -161,7 +192,6 @@ export default function BoxList() {
     return p >= 50 ? 'text-green-400' : p >= 10 ? 'text-yellow-400' : 'text-red-400';
   };
 
-  // 改用 axios 直接调用，不再用 useCustom
   const updateWeight = async (it: any) => {
     if (!curBox) return;
     if (it.weight < 1) it.weight = 1;
@@ -202,7 +232,6 @@ export default function BoxList() {
         { cardId: itemCard, weight: itemWeight },
         { headers: hdr() }
       );
-      // 重新拉取盲盒数据
       const res = await axios.get(`${API_URL}/api/admin/boxes`, { headers: hdr() });
       const found = res.data.find((b: any) => b.id === curBox.id);
       if (found) setCurBox(JSON.parse(JSON.stringify(found)));
@@ -218,29 +247,16 @@ export default function BoxList() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">盲盒管理</h1>
-        <div className="text-sm text-gray-500">共 {all.length} 个盲盒</div>
-      </div>
-
-      {/* 新建 */}
-      <div className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4 mb-4">
-        <div className="text-sm font-bold mb-3">新增盲盒</div>
-        <div className="flex flex-wrap gap-2 items-center">
-          <input value={newBox.name} onChange={(e) => setNewBox({ ...newBox, name: e.target.value })} placeholder="名称" className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm w-40 text-white" />
-          <input type="number" value={newBox.price} onChange={(e) => setNewBox({ ...newBox, price: parseInt(e.target.value) || 0 })} placeholder="价格" className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-1.5 text-sm w-24 text-white" />
-          <label className="flex items-center gap-2 text-xs cursor-pointer text-white">
-            <input type="checkbox" checked={newBox.isFeatured} onChange={(e) => setNewBox({ ...newBox, isFeatured: e.target.checked })} />
-            推荐到首页
-          </label>
-          <label className="cursor-pointer bg-[#2a2a2a] text-xs px-3 py-2 rounded text-white">
-            选择封面
-            <input type="file" accept="image/*" onChange={onCoverNew} className="hidden" />
-          </label>
-          {newBox.coverUrl && <img src={newBox.coverUrl} className="w-10 h-14 object-cover rounded" />}
-          <button onClick={handleCreate} disabled={creating} className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm px-4 py-1.5 rounded font-bold">
-            {creating ? '添加中...' : '+ 添加'}
-          </button>
+        <div>
+          <h1 className="text-2xl font-bold">盲盒管理</h1>
+          <div className="text-sm text-gray-500 mt-1">共 {all.length} 个盲盒</div>
         </div>
+        <button
+          onClick={openCreate}
+          className="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded font-bold"
+        >
+          + 新建盲盒
+        </button>
       </div>
 
       {tableQueryResult.isLoading ? (
@@ -255,22 +271,31 @@ export default function BoxList() {
                 <div className="flex items-center gap-3">
                   {b.coverUrl && <img src={b.coverUrl} className="w-12 h-16 object-cover rounded" />}
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold">{b.name}</span>
                       {!b.isActive && <span className="text-xs bg-red-900/60 text-red-200 px-2 py-0.5 rounded">已下架</span>}
                       {b.isFeatured && <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded">⭐推荐</span>}
+                      {b.allowTransfer && <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded">可赠送</span>}
                     </div>
                     <div className="text-yellow-500 text-sm mt-1">价格: {b.price} 🪙</div>
+                    {b.description && (
+                      <div className="text-gray-400 text-xs mt-1 max-w-md truncate" title={b.description}>
+                        {b.description}
+                      </div>
+                    )}
                     <div className="text-gray-500 text-xs mt-1">
                       归属游戏: {b.game?.displayName || '无'} · 包含 {b.items?.length || 0} 种卡牌
                     </div>
                   </div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <button onClick={() => { setEditForm({ ...b }); setShowEdit(true); }} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded">编辑</button>
+                  <button onClick={() => openEdit(b)} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded">编辑</button>
                   <button onClick={() => openProb(b)} className="bg-purple-600 text-white text-xs px-3 py-1.5 rounded font-bold">概率配置</button>
                   <button onClick={() => toggleFeatured(b)} className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs px-3 py-1.5 rounded">
                     {b.isFeatured ? '取消推荐' : '⭐ 推荐'}
+                  </button>
+                  <button onClick={() => toggleTransfer(b)} className="bg-pink-600 hover:bg-pink-700 text-white text-xs px-3 py-1.5 rounded">
+                    {b.allowTransfer ? '禁止转让' : '允许转让'}
                   </button>
                   <button onClick={() => toggle(b)} className="bg-orange-600 text-white text-xs px-3 py-1.5 rounded">{b.isActive ? '下架' : '上架'}</button>
                   <button onClick={() => handleDelete(b)} className="bg-red-600 text-white text-xs px-3 py-1.5 rounded">删除</button>
@@ -282,42 +307,133 @@ export default function BoxList() {
         </div>
       )}
 
-      {/* 编辑弹窗 */}
-      {showEdit && (
+      {/* 新建/编辑弹窗 */}
+      {showModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold mb-4">编辑盲盒</h3>
+          <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold mb-4">
+              {modalMode === 'create' ? '📦 新建盲盒' : `📦 编辑盲盒: ${form.name}`}
+            </h3>
+
             <div className="space-y-3 text-sm">
               <div>
-                <label className="block text-gray-400 mb-1 text-xs">名称</label>
-                <input value={editForm.name || ''} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" />
+                <label className="block text-gray-400 mb-1 text-xs">
+                  盲盒名称 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  value={form.name || ''}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="如：天堂与地狱"
+                  className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white focus:outline-none focus:border-red-500"
+                />
               </div>
-              <div>
-                <label className="block text-gray-400 mb-1 text-xs">价格</label>
-                <input type="number" value={editForm.price ?? 0} onChange={(e) => setEditForm({ ...editForm, price: parseInt(e.target.value) || 0 })} className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white" />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-gray-400 mb-1 text-xs">
+                    价格（金币） <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={form.price ?? 0}
+                    onChange={(e) => setForm({ ...form, price: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-400 mb-1 text-xs">归属游戏（可选）</label>
+                  <select
+                    value={form.gameId || ''}
+                    onChange={(e) => setForm({ ...form, gameId: e.target.value })}
+                    className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white"
+                  >
+                    <option value="">-- 无归属 --</option>
+                    {allGames.map(g => <option key={g.id} value={g.id}>{g.displayName}</option>)}
+                  </select>
+                </div>
               </div>
+
               <div>
                 <label className="block text-gray-400 mb-1 text-xs">封面图</label>
-                <label className="cursor-pointer inline-block bg-[#2a2a2a] text-xs px-3 py-1.5 rounded mb-2 text-white">
-                  选择新封面
-                  <input type="file" accept="image/*" onChange={onCoverEdit} className="hidden" />
+                <label className="cursor-pointer inline-block bg-[#2a2a2a] hover:bg-[#3a3a3a] text-xs px-3 py-1.5 rounded text-white">
+                  选择封面
+                  <input type="file" accept="image/*" onChange={handleCover} className="hidden" />
                 </label>
-                {editForm.coverUrl && <img src={editForm.coverUrl} className="mt-2 h-24 rounded" />}
+                {form.coverUrl && (
+                  <div className="mt-2 relative inline-block">
+                    <img src={form.coverUrl} className="h-32 rounded border border-[#2a2a2a]" />
+                    <button
+                      onClick={() => setForm({ ...form, coverUrl: '' })}
+                      className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-6 h-6 text-xs"
+                    >×</button>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <input type="checkbox" checked={editForm.isFeatured || false} onChange={(e) => setEditForm({ ...editForm, isFeatured: e.target.checked })} />
-                  ⭐ 推荐到首页
+
+              <div>
+                <label className="block text-gray-400 mb-1 text-xs">盲盒说明</label>
+                <textarea
+                  rows={3}
+                  value={form.description || ''}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="比如：经典宝可梦系列，内含 10 种卡牌……（用户在盲盒详情页可看到）"
+                  className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded px-3 py-2 text-white text-xs"
+                  maxLength={500}
+                />
+                <div className="text-[10px] text-gray-600 mt-1 text-right">
+                  {(form.description || '').length} / 500
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="flex items-center gap-2 text-xs cursor-pointer bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                  <input
+                    type="checkbox"
+                    checked={!!form.isFeatured}
+                    onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })}
+                  />
+                  <span>⭐ 推荐到首页</span>
                 </label>
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <input type="checkbox" checked={editForm.isActive || false} onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })} />
-                  上架
+                <label className="flex items-center gap-2 text-xs cursor-pointer bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                  <input
+                    type="checkbox"
+                    checked={!!form.allowTransfer}
+                    onChange={(e) => setForm({ ...form, allowTransfer: e.target.checked })}
+                  />
+                  <span>🎁 允许转让</span>
                 </label>
+              </div>
+
+              {modalMode === 'edit' && (
+                <label className="flex items-center gap-2 text-xs cursor-pointer bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg p-3">
+                  <input
+                    type="checkbox"
+                    checked={!!form.isActive}
+                    onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
+                  />
+                  <span>上架（用户可见）</span>
+                </label>
+              )}
+
+              <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-2.5 text-[10px] text-yellow-200 leading-relaxed">
+                ⚠️ 开启「允许转让」后，用户可以在库存页面将此盲盒抽到的、且卡牌本身也允许转让的卡牌赠送给其他用户。
               </div>
             </div>
-            <div className="flex justify-end gap-3 mt-5">
-              <button onClick={() => setShowEdit(false)} className="px-4 py-2 bg-[#2a2a2a] rounded text-sm">取消</button>
-              <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-blue-600 rounded text-sm font-bold disabled:opacity-50">{saving ? '保存中...' : '保存'}</button>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 bg-[#2a2a2a] rounded text-sm"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={saving}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-bold disabled:opacity-50"
+              >
+                {saving ? '保存中...' : '保存'}
+              </button>
             </div>
           </div>
         </div>
