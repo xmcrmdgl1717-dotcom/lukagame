@@ -6,7 +6,7 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function VipCenter({ onBack }) {
-  const { user } = useStore();
+  const { user, currency } = useStore();
   const { t } = useI18n();
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -30,7 +30,6 @@ export default function VipCenter({ onBack }) {
         <div className="text-lg font-bold text-orange-400">{t('profile.vip', 'VIP 等级')}</div>
       </div>
 
-      {/* 当前等级卡片 */}
       <div className="bg-gradient-to-br from-[#2d1410] via-[#3a1c14] to-[#4a1c12] border border-[#6b2a1e] rounded-2xl p-6 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-orange-600/10 rounded-full blur-3xl"></div>
         <div className="relative z-10 flex items-center justify-between">
@@ -43,7 +42,6 @@ export default function VipCenter({ onBack }) {
         </div>
       </div>
 
-      {/* 升级进度 */}
       {!info.isMaxLevel ? (
         <div className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4">
           <div className="flex justify-between items-center mb-3">
@@ -68,13 +66,20 @@ export default function VipCenter({ onBack }) {
             <div>
               <div className="flex justify-between text-xs text-gray-400 mb-1">
                 <span>{t('vip.consumeRequired', '累计消耗')}</span>
-                <span>{info.totalConsume.toLocaleString()} 🪙</span>
+                <span className="flex items-center gap-1">
+                  <span className="text-yellow-500">{currency.symbol}</span>
+                  <span>{info.totalConsume.toLocaleString()}</span>
+                </span>
               </div>
               <div className="h-2 bg-[#0d0d0d] rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-yellow-500 to-orange-500 transition-all" style={{ width: `${info.consumeProgress}%` }}></div>
               </div>
               {info.needConsume > 0 && (
-                <div className="text-[10px] text-gray-500 mt-1">还需 {info.needConsume.toLocaleString()} 🪙</div>
+                <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
+                  <span>还需</span>
+                  <span className="text-yellow-500">{currency.symbol}</span>
+                  <span>{info.needConsume.toLocaleString()}</span>
+                </div>
               )}
             </div>
           </div>
@@ -85,7 +90,6 @@ export default function VipCenter({ onBack }) {
         </div>
       )}
 
-      {/* 当前特权 */}
       {info.benefits && info.benefits.length > 0 && (
         <div className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4">
           <div className="text-sm font-bold text-orange-400 mb-3">🎁 {t('profile.vipBenefits', 'VIP 特权')}</div>
@@ -100,9 +104,8 @@ export default function VipCenter({ onBack }) {
         </div>
       )}
 
-      {/* 说明 */}
       <div className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-4 text-xs text-gray-400 leading-relaxed">
-        💡 每次充值或抽卡消费都会累计到 VIP 等级，达到条件自动升级并发放奖励（每级赠送金币）。升级后会在「消息中心」收到通知。
+        💡 每次充值或抽卡消费都会累计到 VIP 等级，达到条件自动升级并发放奖励（每级赠送 {currency.name}）。升级后会在「消息中心」收到通知。
       </div>
     </div>
   );
