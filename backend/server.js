@@ -129,7 +129,13 @@ const SYSTEM_ROLES = [
 
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
-  const user = await prisma.user.findUnique({ where: { username }, include: { inventory: { include: { card: true } } } });
+  const user = await prisma.user.findUnique({
+    where: { username },
+    include: {
+      inventory: { include: { card: true } },
+      group: true,
+    }
+  });
   if (!user || user.password !== password) return res.status(401).json({ error: '用户名或密码错误' });
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   res.json(user);
