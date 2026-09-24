@@ -58,6 +58,7 @@ import EmailLogList from './pages/email-logs';
 import SecurityPage from './pages/security';
 import SystemMonitorPage from './pages/system/monitor';
 import ClientErrorList from './pages/system/errors';
+import CurrencySettingPage from './pages/currency-setting';
 
 const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   DashboardPage, UserList, UserGroupList, BankCardList, CardList, BoxList,
@@ -69,7 +70,7 @@ const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
   LanguageList, TranslationList, CardOrderList, PopupList, ArticleList,
   AdChannelList, AdCampaignList, KolList, AdReport, AdRetentionReport,
   TransferLogList, EmailSettingPage, EmailLogList, SecurityPage,
-  SystemMonitorPage, ClientErrorList,
+  SystemMonitorPage, ClientErrorList, CurrencySettingPage,
 };
 
 function buildRoutes(menus: AdminMenu[]): React.ReactElement[] {
