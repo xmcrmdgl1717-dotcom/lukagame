@@ -3,6 +3,7 @@ import { useTable } from '@refinedev/core';
 import axios from 'axios';
 import SearchBar from '../../components/SearchBar';
 import { useSearch } from '../../hooks/useSearch';
+import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 
 interface O { id: string; amount: number; coins: number; status: string; createdAt: string; paidAt: string; user: { username: string }; option: { coins: number; bonus: number }; }
 
@@ -20,12 +21,15 @@ const SEARCH_FIELDS = [
 export default function OrderList() {
   const { tableQueryResult } = useTable<O>({ resource: 'orders', pagination: { pageSize: 500 } });
   const all = tableQueryResult.data?.data || [];
+  const { confirm } = useSensitiveConfirm();
 
-  // user.username 需要特殊处理：把 user.username 当作 user 字段的 username
   const { filters, setFilters, filtered, reset } = useSearch(all, SEARCH_FIELDS);
 
   const markPaid = async (o: O) => {
-    if (!confirm(`标记订单为已支付，并为「${o.user.username}」加 ${o.coins} 金币？`)) return;
+    const ok = await confirm(
+      `即将手动为订单「${o.id.slice(0, 8)}」补单。\n\n用户：${o.user.username}\n金额：¥${(o.amount / 100).toFixed(2)}\n到账金币：${o.coins}\n\n⚠️ 此操作会立即为用户增加 ${o.coins} 金币，并计入累计充值金额，请确认已收到款项。`
+    );
+    if (!ok) return;
     try {
       const a = JSON.parse(localStorage.getItem('adminInfo') || 'null');
       const p = localStorage.getItem('adminPassword') || '';
