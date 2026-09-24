@@ -70,7 +70,6 @@ export default function BoxList() {
   const [form, setForm] = useState<any>({ ...emptyForm });
   const [saving, setSaving] = useState(false);
 
-  // 概率配置相关
   const [showProb, setShowProb] = useState(false);
   const [curBox, setCurBox] = useState<BoxItem | null>(null);
   const [itemCard, setItemCard] = useState('');
@@ -277,7 +276,7 @@ export default function BoxList() {
                       {b.isFeatured && <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded">⭐推荐</span>}
                       {b.allowTransfer && <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded">可赠送</span>}
                     </div>
-                    <div className="text-yellow-500 text-sm mt-1">价格: {b.price} 🪙</div>
+                    <div className="text-yellow-500 text-sm mt-1">价格: {b.price}</div>
                     {b.description && (
                       <div className="text-gray-400 text-xs mt-1 max-w-md truncate" title={b.description}>
                         {b.description}
@@ -307,7 +306,6 @@ export default function BoxList() {
         </div>
       )}
 
-      {/* 新建/编辑弹窗 */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -331,7 +329,7 @@ export default function BoxList() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-gray-400 mb-1 text-xs">
-                    价格（金币） <span className="text-red-500">*</span>
+                    价格 <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -439,7 +437,6 @@ export default function BoxList() {
         </div>
       )}
 
-      {/* 概率配置弹窗 */}
       {showProb && curBox && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-[#161616] rounded-xl border border-[#2a2a2a] p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
