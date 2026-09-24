@@ -9,8 +9,46 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const app = express();
 
+const SERVER_STARTED_AT = new Date();
+
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
+
+// ================= 请求日志 & 慢请求告警 =================
+const SLOW_REQUEST_MS = 800;
+const SLOW_REQUEST_LOG = []; // 内存保留最近 100 条慢请求
+
+app.use((req, res, next) => {
+  const start = Date.now();
+  // 跳过 health check 记录
+  const skipLog = req.path === '/api/health';
+
+  res.on('finish', () => {
+    const dur = Date.now() - start;
+    if (!skipLog && dur > SLOW_REQUEST_MS) {
+      const entry = {
+        path: req.path,
+        method: req.method,
+        duration: dur,
+        status: res.statusCode,
+        at: new Date().toISOString(),
+      };
+      SLOW_REQUEST_LOG.unshift(entry);
+      if (SLOW_REQUEST_LOG.length > 100) SLOW_REQUEST_LOG.pop();
+      console.warn(`[SLOW ${dur}ms] ${req.method} ${req.path} → ${res.statusCode}`);
+    }
+  });
+
+  next();
+});
+
+// ================= 全局错误捕获 =================
+process.on('unhandledRejection', (reason) => {
+  console.error('[UnhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[UncaughtException]', err);
+});
 
 // ================= 辅助函数 =================
 function getClientIp(req) {
@@ -438,6 +476,142 @@ app.get('/api/user/vip-info/:userId', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ================= 健康检查 & 监控 =================
+app.get('/api/health', async (req, res) => {
+  let dbOk = true;
+  let dbError = '';
+  const t0 = Date.now();
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch (e) {
+    dbOk = false;
+    dbError = e.message;
+  }
+  const dbLatency = Date.now() - t0;
+
+  res.json({
+    ok: dbOk,
+    uptime: Math.floor((Date.now() - SERVER_STARTED_AT.getTime()) / 1000),
+    startedAt: SERVER_STARTED_AT.toISOString(),
+    now: new Date().toISOString(),
+    db: { ok: dbOk, latencyMs: dbLatency, error: dbError },
+    memory: process.memoryUsage(),
+    nodeVersion: process.version,
+  });
+});
+
+// 后台系统监控
+app.get('/api/admin/system-stats', requirePermission('audit.view'), async (req, res) => {
+  const uptime = Math.floor((Date.now() - SERVER_STARTED_AT.getTime()) / 1000);
+
+  // 数据库表计数
+  let counts = {};
+  try {
+    const [users, orders, draws, transactions, logs] = await Promise.all([
+      prisma.user.count(),
+      prisma.order.count(),
+      prisma.drawLog.count(),
+      prisma.transaction.count(),
+      prisma.auditLog.count(),
+    ]);
+    counts = { users, orders, draws, transactions, logs };
+  } catch (e) {}
+
+  // 最近 24h 关键指标
+  const since24h = new Date(); since24h.setHours(since24h.getHours() - 24);
+  let recent = {};
+  try {
+    const [newUsers24h, orders24h, draws24h, tickets24h] = await Promise.all([
+      prisma.user.count({ where: { createdAt: { gte: since24h } } }),
+      prisma.order.count({ where: { createdAt: { gte: since24h }, status: 'PAID' } }),
+      prisma.drawLog.count({ where: { createdAt: { gte: since24h } } }),
+      prisma.ticket.count({ where: { createdAt: { gte: since24h } } }),
+    ]);
+    recent = { newUsers24h, orders24h, draws24h, tickets24h };
+  } catch (e) {}
+
+  // 慢请求
+  const slowRequests = SLOW_REQUEST_LOG.slice(0, 20);
+
+  // 客户端错误数
+  let clientErrors24h = 0;
+  try {
+    clientErrors24h = await prisma.clientError.count({ where: { createdAt: { gte: since24h } } });
+  } catch (e) {}
+
+  res.json({
+    uptime,
+    startedAt: SERVER_STARTED_AT.toISOString(),
+    now: new Date().toISOString(),
+    nodeVersion: process.version,
+    memory: process.memoryUsage(),
+    counts,
+    recent,
+    slowRequests,
+    clientErrors24h,
+    slowThresholdMs: SLOW_REQUEST_MS,
+  });
+});
+
+// ================= 前端错误上报 =================
+app.post('/api/client-error', async (req, res) => {
+  try {
+    const { message, stack, url, userAgent, userId, username } = req.body || {};
+    if (!message) return res.json({ ok: true });
+    await prisma.clientError.create({
+      data: {
+        userId: userId || null,
+        username: username || '',
+        message: String(message).slice(0, 2000),
+        stack: String(stack || '').slice(0, 5000),
+        url: String(url || '').slice(0, 500),
+        userAgent: String(userAgent || req.headers['user-agent'] || '').slice(0, 300),
+        ip: getClientIp(req),
+      },
+    });
+  } catch (e) {
+    console.error('client-error save fail:', e.message);
+  }
+  res.json({ ok: true });
+});
+
+// 后台查询错误日志
+app.get('/api/admin/client-errors', requirePermission('audit.view'), async (req, res) => {
+  const { username, search, days } = req.query;
+  const where = {};
+  if (username) where.username = { contains: username };
+  if (search) where.message = { contains: search };
+  if (days) {
+    const since = new Date();
+    since.setDate(since.getDate() - parseInt(days));
+    where.createdAt = { gte: since };
+  }
+  try {
+    const list = await prisma.clientError.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
+    res.json(list);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/client-errors/:id', requirePermission('audit.view'), async (req, res) => {
+  try {
+    await prisma.clientError.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: '删除失败' }); }
+});
+
+app.delete('/api/admin/client-errors/cleanup', requirePermission('audit.view'), async (req, res) => {
+  const before = new Date();
+  before.setDate(before.getDate() - 30);
+  try {
+    const r = await prisma.clientError.deleteMany({ where: { createdAt: { lt: before } } });
+    res.json({ success: true, deleted: r.count });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 // 语言
 app.get('/api/languages', async (req, res) => {
   res.json(await prisma.language.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
@@ -453,6 +627,7 @@ app.get('/api/translations/:lang', async (req, res) => {
 
 // 游戏
 app.get('/api/games', async (req, res) => {
+  res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
   res.json(await prisma.game.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
 });
 
@@ -659,6 +834,7 @@ app.post('/api/tasks/claim', async (req, res) => {
 });
 
 app.get('/api/recharge-options', async (req, res) => {
+  res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
   res.json(await prisma.rechargeOption.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
 });
 
@@ -681,6 +857,8 @@ app.post('/api/recharge', async (req, res) => {
 });
 
 app.get('/api/banners', async (req, res) => {
+  // 静态内容，允许 CDN/浏览器缓存 60 秒
+  res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
   res.json(await prisma.banner.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }));
 });
 
@@ -2727,6 +2905,8 @@ async function syncMenus() {
     { id: 'menu-email-setting', parentId: 'menu-system-group', title: '邮件配置', type: 'MENU', icon: '📧', path: '/system/email-setting', component: 'EmailSettingPage', permission: 'audit.view', sortOrder: 7 },
     { id: 'menu-email-logs', parentId: 'menu-system-group', title: '邮件日志', type: 'MENU', icon: '📨', path: '/system/email-logs', component: 'EmailLogList', permission: 'audit.view', sortOrder: 8 },
     { id: 'menu-security', parentId: 'menu-system-group', title: '账号安全', type: 'MENU', icon: '🔐', path: '/system/security', component: 'SecurityPage', permission: '', sortOrder: 9 },
+    { id: 'menu-system-monitor', parentId: 'menu-system-group', title: '系统监控', type: 'MENU', icon: '📡', path: '/system/monitor', component: 'SystemMonitorPage', permission: 'audit.view', sortOrder: 10 },
+    { id: 'menu-client-errors', parentId: 'menu-system-group', title: '错误日志', type: 'MENU', icon: '🐛', path: '/system/errors', component: 'ClientErrorList', permission: 'audit.view', sortOrder: 11 },
     { id: 'menu-admins', parentId: 'menu-system-group', title: '管理员列表', type: 'MENU', icon: '👤', path: '/admins', component: 'AdminList', permission: 'admins.view', sortOrder: 1 },
     { id: 'menu-roles', parentId: 'menu-system-group', title: '角色管理', type: 'MENU', icon: '🎭', path: '/admins/roles', component: 'RoleList', permission: 'roles.view', sortOrder: 2 },
     { id: 'menu-permissions', parentId: 'menu-system-group', title: '权限说明', type: 'MENU', icon: '📖', path: '/admins/permissions', component: 'PermissionList', permission: '', sortOrder: 3 },
