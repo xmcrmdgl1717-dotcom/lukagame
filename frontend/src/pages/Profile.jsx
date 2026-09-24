@@ -5,7 +5,7 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications, onGoArticles, onGoStatic, onGoVip, onGoTransfers }) {
+export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications, onGoArticles, onGoStatic, onGoVip, onGoTransfers, onGoEmailSettings }) {
   const { user, setUser } = useStore();
   const { t } = useI18n();
   const [redeemCode, setRedeemCode] = useState('');
@@ -43,7 +43,6 @@ export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications,
 
   return (
     <div className="p-4">
-      {/* 用户卡片 - 点击进 VIP 中心 */}
       <div
         onClick={onGoVip}
         className="bg-gradient-to-br from-[#1c0e0e] to-[#2a1414] border border-[#3d1a1a] rounded-xl p-5 flex gap-4 items-center mb-6 shadow-lg cursor-pointer hover:border-orange-600/50 transition"
@@ -52,7 +51,6 @@ export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications,
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-xs text-orange-400 font-bold">LUKA LICENSE</span>
-            {/* 分组标签 */}
             {user?.group && (
               <span
                 className="text-[9px] text-white px-1.5 py-0.5 rounded font-bold"
@@ -81,11 +79,17 @@ export default function Profile({ onGoOrders, onGoCardOrders, onGoNotifications,
         <button onClick={onGoArticles} className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:bg-[#2a1414] transition">
           <span className="text-2xl">📰</span><span className="text-sm text-white font-bold">{t('profile.articles', '新闻资讯')}</span>
         </button>
-        <button onClick={onGoTransfers} className="col-span-2 bg-gradient-to-r from-[#1c0e1c] to-[#2a1424] border border-[#3d1a3d] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:border-purple-500 transition">
+        <button onClick={onGoTransfers} className="bg-gradient-to-r from-[#1c0e1c] to-[#2a1424] border border-[#3d1a3d] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:border-purple-500 transition">
           <span className="text-2xl">🎁</span>
           <div className="text-left flex-1">
             <div className="text-sm text-white font-bold">我的赠与</div>
-            <div className="text-[10px] text-gray-400 mt-0.5">查看收到的礼物 / 已送出的卡牌</div>
+          </div>
+          <span className="text-gray-600 text-2xl">›</span>
+        </button>
+        <button onClick={onGoEmailSettings} className="bg-gradient-to-r from-[#0e1c1c] to-[#142a2a] border border-[#1a3d3d] rounded-xl p-4 flex items-center gap-3 shadow-lg hover:border-cyan-500 transition">
+          <span className="text-2xl">📧</span>
+          <div className="text-left flex-1">
+            <div className="text-sm text-white font-bold">邮件设置</div>
           </div>
           <span className="text-gray-600 text-2xl">›</span>
         </button>
