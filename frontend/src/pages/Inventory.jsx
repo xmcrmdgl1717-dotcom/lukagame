@@ -5,11 +5,26 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+const rarityText = (r) =>
+  r === 'SSR' ? '传说' : r === 'SR' ? '稀有' : '普通';
+
+const rarityColor = (r) =>
+  r === 'SSR' ? 'text-yellow-400' : r === 'SR' ? 'text-purple-400' : 'text-blue-400';
+
+const rarityBg = (r) =>
+  r === 'SSR' ? 'from-yellow-500 to-orange-600'
+  : r === 'SR' ? 'from-purple-500 to-pink-600'
+  : 'from-blue-500 to-cyan-600';
+
 export default function Inventory({ onGoSubmit, onGoTransfers }) {
   const { user, setUser } = useStore();
   const { t } = useI18n();
   const inventory = user?.inventory || [];
 
+  // 卡片详情弹窗
+  const [detailItem, setDetailItem] = useState(null);
+
+  // 赠送弹窗
   const [showTransfer, setShowTransfer] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [toUsername, setToUsername] = useState('');
@@ -17,12 +32,16 @@ export default function Inventory({ onGoSubmit, onGoTransfers }) {
   const [remark, setRemark] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const openDetail = (item) => setDetailItem(item);
+  const closeDetail = () => setDetailItem(null);
+
   const openTransfer = (item) => {
     setSelectedItem(item);
     setToUsername('');
     setQuantity(1);
     setRemark('');
     setShowTransfer(true);
+    setDetailItem(null); // 从详情打开赠送时关闭详情
   };
 
   const closeTransfer = () => {
@@ -49,7 +68,6 @@ export default function Inventory({ onGoSubmit, onGoTransfers }) {
         remark: remark.trim(),
       });
       alert('🎁 赠送成功！');
-      // 刷新用户信息（库存会同步更新）
       const updated = await axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' });
       setUser(updated.data);
       closeTransfer();
@@ -90,7 +108,7 @@ export default function Inventory({ onGoSubmit, onGoTransfers }) {
 
       {transferableCount > 0 && (
         <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-3 mb-3 text-xs text-gray-400">
-          💡 有 <span className="text-orange-400 font-bold">{transferableCount}</span> 种卡牌支持赠送给其他用户，点击卡片上的「🎁 赠送」按钮操作。
+          💡 有 <span className="text-orange-400 font-bold">{transferableCount}</span> 种卡牌支持赠送给其他用户。点击卡片查看详情。
         </div>
       )}
 
@@ -102,7 +120,11 @@ export default function Inventory({ onGoSubmit, onGoTransfers }) {
       ) : (
         <div className="grid grid-cols-3 gap-3">
           {inventory.map((item) => (
-            <div key={item.id} className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-2 relative">
+            <div
+              key={item.id}
+              onClick={() => openDetail(item)}
+              className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-2 relative cursor-pointer hover:border-orange-600/60 transition active:scale-95"
+            >
               {item.card.allowTransfer && (
                 <div className="absolute top-1 right-1 bg-purple-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow z-10">
                   可赠
@@ -121,23 +143,95 @@ export default function Inventory({ onGoSubmit, onGoTransfers }) {
               <div className="text-[10px] text-center text-yellow-500 font-bold mb-1">
                 x{item.quantity}
               </div>
-              <div className={`text-[10px] text-center font-bold mb-2 ${
-                item.card.rarity === 'SSR' ? 'text-yellow-400'
-                : item.card.rarity === 'SR' ? 'text-purple-400'
-                : 'text-blue-400'
-              }`}>
+              <div className={`text-[10px] text-center font-bold ${rarityColor(item.card.rarity)}`}>
                 {item.card.rarity}
               </div>
-              {item.card.allowTransfer && (
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 卡片详情弹窗 */}
+      {detailItem && (
+        <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-[200] p-4 backdrop-blur-sm">
+          <div className="bg-[#1a0f0c] border border-[#3d1a1a] rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-[fadeIn_0.2s_ease]">
+            <div className="flex justify-between items-center p-3 border-b border-[#2a1414]">
+              <div className="text-sm font-bold text-orange-400">🎴 卡牌详情</div>
+              <button onClick={closeDetail} className="text-gray-400 text-2xl leading-none">&times;</button>
+            </div>
+
+            {/* 大图区域 */}
+            <div className={`w-full aspect-[3/4] bg-gradient-to-br ${rarityBg(detailItem.card.rarity)} p-1`}>
+              <div className="w-full h-full bg-[#0d0d0d] rounded-lg overflow-hidden flex items-center justify-center">
+                {detailItem.card.imageUrl ? (
+                  <img src={detailItem.card.imageUrl} className="w-full h-full object-contain" />
+                ) : (
+                  <span className="text-7xl">🃏</span>
+                )}
+              </div>
+            </div>
+
+            {/* 信息区域 */}
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-lg font-bold text-white">{detailItem.card.name}</div>
+                <div className={`text-sm font-black ${rarityColor(detailItem.card.rarity)}`}>
+                  {detailItem.card.rarity}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs">
+                <span className={`px-2 py-0.5 rounded font-bold bg-gradient-to-r ${rarityBg(detailItem.card.rarity)} text-white`}>
+                  {rarityText(detailItem.card.rarity)}
+                </span>
+                <span className="text-gray-500">持有数量：<span className="text-yellow-400 font-bold">{detailItem.quantity}</span></span>
+                {detailItem.card.allowTransfer && (
+                  <span className="bg-purple-600 text-white px-2 py-0.5 rounded font-bold">可赠送</span>
+                )}
+              </div>
+
+              {detailItem.card.description ? (
+                <div className="bg-[#0d0d0d] rounded-lg p-3 text-xs text-gray-300 leading-relaxed whitespace-pre-wrap">
+                  {detailItem.card.description}
+                </div>
+              ) : (
+                <div className="bg-[#0d0d0d] rounded-lg p-3 text-xs text-gray-500 italic">
+                  暂无说明
+                </div>
+              )}
+
+              {detailItem.card.value > 0 && (
+                <div className="text-[10px] text-gray-500 text-center">
+                  参考价值：{detailItem.card.value.toLocaleString()} 🪙
+                </div>
+              )}
+            </div>
+
+            {/* 操作按钮 */}
+            <div className="flex gap-2 p-4 border-t border-[#2a1414]">
+              <button
+                onClick={closeDetail}
+                className="flex-1 bg-[#2a1414] text-white py-2.5 rounded-lg text-sm font-bold"
+              >
+                关闭
+              </button>
+              {detailItem.card.allowTransfer ? (
                 <button
-                  onClick={() => openTransfer(item)}
-                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] py-1 rounded font-bold hover:opacity-90 transition"
+                  onClick={() => openTransfer(detailItem)}
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2.5 rounded-lg text-sm font-bold"
                 >
                   🎁 赠送
                 </button>
+              ) : (
+                <button
+                  disabled
+                  className="flex-1 bg-[#2a1414] text-gray-500 py-2.5 rounded-lg text-sm font-bold cursor-not-allowed"
+                >
+                  不可赠送
+                </button>
               )}
             </div>
-          ))}
+          </div>
         </div>
       )}
 
@@ -151,7 +245,6 @@ export default function Inventory({ onGoSubmit, onGoTransfers }) {
             </div>
 
             <div className="p-4 space-y-4">
-              {/* 卡牌预览 */}
               <div className="flex items-center gap-3 bg-[#0d0d0d] rounded-xl p-3">
                 <div className="w-14 h-18 bg-[#1a0f0c] rounded flex items-center justify-center overflow-hidden">
                   {selectedItem.card.imageUrl ? (
@@ -162,11 +255,7 @@ export default function Inventory({ onGoSubmit, onGoTransfers }) {
                 </div>
                 <div className="flex-1">
                   <div className="text-sm font-bold text-white">{selectedItem.card.name}</div>
-                  <div className={`text-xs font-bold ${
-                    selectedItem.card.rarity === 'SSR' ? 'text-yellow-400'
-                    : selectedItem.card.rarity === 'SR' ? 'text-purple-400'
-                    : 'text-blue-400'
-                  }`}>
+                  <div className={`text-xs font-bold ${rarityColor(selectedItem.card.rarity)}`}>
                     {selectedItem.card.rarity}
                   </div>
                   <div className="text-[10px] text-gray-500 mt-1">
@@ -175,7 +264,6 @@ export default function Inventory({ onGoSubmit, onGoTransfers }) {
                 </div>
               </div>
 
-              {/* 接收人 */}
               <div>
                 <label className="block text-xs text-gray-400 mb-1">接收人用户名</label>
                 <input
@@ -186,7 +274,6 @@ export default function Inventory({ onGoSubmit, onGoTransfers }) {
                 />
               </div>
 
-              {/* 数量 */}
               <div>
                 <label className="block text-xs text-gray-400 mb-1">赠送数量</label>
                 <div className="flex items-center gap-2">
@@ -207,7 +294,6 @@ export default function Inventory({ onGoSubmit, onGoTransfers }) {
                 </div>
               </div>
 
-              {/* 留言 */}
               <div>
                 <label className="block text-xs text-gray-400 mb-1">留言（选填）</label>
                 <input
