@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTable, useCreate, useDelete } from '@refinedev/core';
 import SearchBar from '../../components/SearchBar';
 import { useSearch } from '../../hooks/useSearch';
+import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 
 interface N { id: string; userId: string | null; title: string; content: string; createdAt: string; reads: Array<{ id: string; userId: string }>; }
 
@@ -17,6 +18,7 @@ export default function NotificationList() {
   const { tableQueryResult } = useTable<N>({ resource: 'notifications', pagination: { pageSize: 200 } });
   const { mutate: create_ } = useCreate();
   const { mutate: delete_ } = useDelete();
+  const { confirm } = useSensitiveConfirm();
 
   const all = tableQueryResult.data?.data || [];
   const { filters, setFilters, filtered, reset } = useSearch(all, SEARCH_FIELDS);
@@ -24,15 +26,30 @@ export default function NotificationList() {
   const [n, setN] = useState({ userId: '', title: '', content: '' });
   const [creating, setCreating] = useState(false);
 
-  const createFn = () => {
+  const createFn = async () => {
     if (!n.title || !n.content) return alert('请填写标题和内容');
+    const isBroadcast = !n.userId;
+    const ok = await confirm(
+      isBroadcast
+        ? `即将向「全员」发布通知「${n.title}」。\n\n所有用户都会收到这条消息。`
+        : `即将向指定用户（ID：${n.userId}）发送通知「${n.title}」。`
+    );
+    if (!ok) return;
     setCreating(true);
     create_({ resource: 'notifications', values: { userId: n.userId || null, title: n.title, content: n.content } }, {
-      onSuccess: () => { setN({ userId: '', title: '', content: '' }); setCreating(false); tableQueryResult.refetch(); }, onError: () => setCreating(false),
+      onSuccess: () => { setN({ userId: '', title: '', content: '' }); setCreating(false); tableQueryResult.refetch(); },
+      onError: () => setCreating(false),
     });
   };
 
-  const del = (x: N) => { if (confirm(`删除通知「${x.title}」？`)) delete_({ resource: 'notifications', id: x.id }, { onSuccess: () => tableQueryResult.refetch() }); };
+  const del = async (x: N) => {
+    const readCount = x.reads?.length || 0;
+    const ok = await confirm(
+      `即将删除通知「${x.title}」。\n\n${x.userId ? '指定用户通知' : '全员通知'} · 已读 ${readCount} 人\n\n删除后，用户端「消息中心」将不再显示这条记录。`
+    );
+    if (!ok) return;
+    delete_({ resource: 'notifications', id: x.id }, { onSuccess: () => tableQueryResult.refetch() });
+  };
 
   return (
     <div>
