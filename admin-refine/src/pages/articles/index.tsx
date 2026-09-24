@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useSensitiveConfirm } from '../../components/SensitiveConfirm';
 
 interface Article {
   id: string;
@@ -50,6 +51,7 @@ export default function ArticleList() {
   const [saving, setSaving] = useState(false);
   const [isNew, setIsNew] = useState(false);
   const [filterCat, setFilterCat] = useState('');
+  const { confirm } = useSensitiveConfirm();
 
   const load = async () => {
     setLoading(true);
@@ -82,9 +84,12 @@ export default function ArticleList() {
     finally { setSaving(false); }
   };
 
-  const del = async (id: string) => {
-    if (!confirm('确定删除该文章吗？')) return;
-    try { await axios.delete(`${API_URL}/api/admin/articles/${id}`, { headers: hdr() }); load(); }
+  const del = async (a: Article) => {
+    const ok = await confirm(
+      `即将删除文章「${a.title}」。\n\nSlug：${a.slug} · 分类：${CAT_LABELS[a.category]?.text || a.category} · 阅读量：${a.viewCount}\n\n此操作不可恢复。`
+    );
+    if (!ok) return;
+    try { await axios.delete(`${API_URL}/api/admin/articles/${a.id}`, { headers: hdr() }); load(); }
     catch (e: any) { alert('删除失败'); }
   };
 
@@ -127,7 +132,7 @@ export default function ArticleList() {
                   <td className="p-3 text-center whitespace-nowrap">
                     <button onClick={() => openEdit(a)} className="bg-blue-600 text-white text-xs px-3 py-1 rounded mr-1">编辑</button>
                     <button onClick={() => togglePublished(a)} className="bg-orange-600 text-white text-xs px-3 py-1 rounded mr-1">{a.isPublished ? '下架' : '发布'}</button>
-                    <button onClick={() => del(a.id)} className="bg-red-600 text-white text-xs px-3 py-1 rounded">删除</button>
+                    <button onClick={() => del(a)} className="bg-red-600 text-white text-xs px-3 py-1 rounded">删除</button>
                   </td>
                 </tr>
               ))}
@@ -176,9 +181,7 @@ export default function ArticleList() {
               </div>
 
               <div>
-                <label className="block text-gray-400 mb-1 text-xs">
-                  正文（支持 HTML 标签：&lt;p&gt; &lt;h2&gt; &lt;img&gt; &lt;strong&gt; 等）
-                </label>
+                <label className="block text-gray-400 mb-1 text-xs">正文（支持 HTML 标签：&lt;p&gt; &lt;h2&gt; &lt;img&gt; &lt;strong&gt; 等）</label>
                 <textarea
                   rows={12}
                   value={ed.content || ''}
