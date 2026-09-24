@@ -183,6 +183,71 @@ function userWantsEmail(user, type) {
   return true;
 }
 
+// ================= 2FA 模块 =================
+
+// 内存缓存：临时登录 token -> { adminId, expiresAt }
+// 5 分钟过期，进程重启后失效（生产可换 Redis）
+const pending2FA = new Map();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, info] of pending2FA.entries()) {
+    if (info.expiresAt < now) pending2FA.delete(token);
+  }
+}, 60 * 1000).unref();
+
+function newTempToken(adminId) {
+  const token = crypto.randomBytes(24).toString('hex');
+  pending2FA.set(token, { adminId, expiresAt: Date.now() + 5 * 60 * 1000 });
+  return token;
+}
+
+function consumeTempToken(token) {
+  const info = pending2FA.get(token);
+  if (!info) return null;
+  if (info.expiresAt < Date.now()) {
+    pending2FA.delete(token);
+    return null;
+  }
+  pending2FA.delete(token);
+  return info;
+}
+
+// 生成 8 个一次性备份码（每个 10 位，格式 XXXX-XXXX）
+function generateBackupCodes() {
+  const codes = [];
+  for (let i = 0; i < 8; i++) {
+    const part1 = crypto.randomBytes(2).toString('hex').toUpperCase();
+    const part2 = crypto.randomBytes(2).toString('hex').toUpperCase();
+    codes.push(`${part1}-${part2}`);
+  }
+  return codes;
+}
+
+// 备份码 hash（用 sha256，不存明文）
+function hashBackupCode(code) {
+  return crypto.createHash('sha256').update(code.toUpperCase().replace(/\s/g, '')).digest('hex');
+}
+
+// 消费备份码（验证成功后从列表中移除）
+function tryConsumeBackupCode(storedCodesJson, inputCode) {
+  try {
+    const codes = JSON.parse(storedCodesJson || '[]');
+    const hashed = hashBackupCode(inputCode);
+    const idx = codes.indexOf(hashed);
+    if (idx === -1) return null;
+    codes.splice(idx, 1); // 一次性
+    return JSON.stringify(codes);
+  } catch (e) {
+    return null;
+  }
+}
+
+// 判断管理员是否需要 2FA
+function adminNeeds2FA(admin) {
+  return admin && admin.totpEnabled && admin.totpSecret;
+}
+
 // ================= 权限定义 =================
 const ALL_PERMISSIONS = [
   { key: 'users.view', label: '查看用户', group: '用户管理' },
@@ -1071,14 +1136,66 @@ async function migrateRoles() {
   } catch (e) { console.error('角色迁移失败:', e); }
 }
 
+// 统一构造登录成功后的 admin 对象
+function buildAdminPayload(admin, permissions) {
+  return {
+    id: admin.id,
+    username: admin.username,
+    roleId: admin.roleId,
+    role: admin.roleRef?.name || 'admin',
+    roleDisplayName: admin.roleRef?.displayName || '管理员',
+    permissions,
+    totpEnabled: admin.totpEnabled,
+  };
+}
+
 app.post('/api/admin/login', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, totpCode } = req.body;
   const admin = await prisma.admin.findUnique({ where: { username }, include: { roleRef: true } });
-  if (!admin || admin.password !== password || !admin.isActive) return res.status(401).json({ error: '账号或密码错误' });
+  if (!admin || admin.password !== password || !admin.isActive) {
+    return res.status(401).json({ error: '账号或密码错误' });
+  }
+
+  // 已启用 2FA：密码校验通过后，如果没带 totpCode → 返回 need2FA
+  if (adminNeeds2FA(admin)) {
+    if (!totpCode) {
+      const tempToken = newTempToken(admin.id);
+      return res.json({
+        success: false,
+        need2FA: true,
+        tempToken,
+        message: '需要输入 2FA 验证码',
+      });
+    }
+
+    // 校验 TOTP 或备份码
+    const codeClean = String(totpCode).trim();
+    let verified = false;
+    let usedBackup = false;
+
+    if (/^\d{6}$/.test(codeClean)) {
+      verified = authenticator.verify({ token: codeClean, secret: admin.totpSecret });
+    } else {
+      // 尝试作为备份码
+      const newCodesJson = tryConsumeBackupCode(admin.totpBackupCodes, codeClean);
+      if (newCodesJson !== null) {
+        verified = true;
+        usedBackup = true;
+        await prisma.admin.update({ where: { id: admin.id }, data: { totpBackupCodes: newCodesJson } });
+      }
+    }
+
+    if (!verified) {
+      return res.status(401).json({ error: usedBackup ? '备份码无效' : '验证码错误或已过期' });
+    }
+
+    await prisma.admin.update({ where: { id: admin.id }, data: { totpVerifiedAt: new Date() } });
+  }
+
   await prisma.admin.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } });
   try { await prisma.adminSession.create({ data: { adminId: admin.id, adminName: admin.username, ip: getClientIp(req), userAgent: getClientUA(req) } }); } catch (e) {}
   const permissions = admin.roleRef?.name === 'super' ? ALL_PERMISSION_KEYS : (admin.roleRef?.permissions || '').split(',').filter(Boolean);
-  res.json({ success: true, admin: { id: admin.id, username: admin.username, roleId: admin.roleId, role: admin.roleRef?.name || 'admin', roleDisplayName: admin.roleRef?.displayName || '管理员', permissions } });
+  res.json({ success: true, admin: buildAdminPayload(admin, permissions) });
 });
 
 app.use('/api/admin', async (req, res, next) => {
@@ -1115,6 +1232,127 @@ app.post('/api/admin/verify-password', async (req, res) => {
   if (!password) return res.status(400).json({ error: '请输入密码' });
   if (req.admin.password !== password) return res.status(401).json({ error: '密码错误' });
   res.json({ success: true });
+});
+
+// ============ 2FA 管理 ============
+
+// 查询当前 2FA 状态
+app.get('/api/admin/2fa/status', async (req, res) => {
+  try {
+    const admin = await prisma.admin.findUnique({ where: { id: req.admin.id } });
+    if (!admin) return res.status(404).json({ error: '管理员不存在' });
+    let backupCodesLeft = 0;
+    try { backupCodesLeft = JSON.parse(admin.totpBackupCodes || '[]').length; } catch (e) {}
+    res.json({
+      enabled: admin.totpEnabled,
+      verifiedAt: admin.totpVerifiedAt,
+      backupCodesLeft,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 步骤 1：生成新 secret + 二维码（不保存，用户扫码验证后再启用）
+app.post('/api/admin/2fa/setup', async (req, res) => {
+  try {
+    const admin = await prisma.admin.findUnique({ where: { id: req.admin.id } });
+    if (!admin) return res.status(404).json({ error: '管理员不存在' });
+    if (admin.totpEnabled) return res.status(400).json({ error: '2FA 已启用，请先停用' });
+
+    const secret = authenticator.generateSecret(20); // base32
+    const otpauth = authenticator.keyuri(admin.username, 'LUKA Admin', secret);
+    const qrDataUrl = await QRCode.toDataURL(otpauth, {
+      width: 240,
+      margin: 1,
+      color: { dark: '#ffffff', light: '#0d0d0d' },
+    });
+
+    // 生成备份码（明文返回给用户，DB 存 hash）
+    const plainBackupCodes = generateBackupCodes();
+
+    res.json({
+      secret,
+      otpauth,
+      qrDataUrl,
+      plainBackupCodes, // 只在这里返回一次，之后无法查看明文
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 步骤 2：用 secret + 用户输入的 6 位码验证，成功后正式启用
+app.post('/api/admin/2fa/enable', async (req, res) => {
+  const { secret, code, plainBackupCodes } = req.body;
+  if (!secret || !code) return res.status(400).json({ error: '缺少参数' });
+  if (!/^\d{6}$/.test(String(code).trim())) return res.status(400).json({ error: '请输入 6 位数字验证码' });
+
+  try {
+    const isValid = authenticator.verify({ token: String(code).trim(), secret });
+    if (!isValid) return res.status(400).json({ error: '验证码不正确，请检查手机时间是否准确' });
+
+    // 把明文备份码 hash 后存库
+    const hashedCodes = (plainBackupCodes || []).map(hashBackupCode);
+
+    await prisma.admin.update({
+      where: { id: req.admin.id },
+      data: {
+        totpSecret: secret,
+        totpEnabled: true,
+        totpBackupCodes: JSON.stringify(hashedCodes),
+        totpVerifiedAt: new Date(),
+      },
+    });
+
+    await writeAuditLog(req.admin, 'admin.2fa.enable', 'admin', req.admin.id, {});
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// 停用 2FA（需要输入密码 + 6 位验证码）
+app.post('/api/admin/2fa/disable', async (req, res) => {
+  const { password, code } = req.body;
+  if (!password || !code) return res.status(400).json({ error: '请输入密码和验证码' });
+
+  try {
+    const admin = await prisma.admin.findUnique({ where: { id: req.admin.id } });
+    if (!admin) return res.status(404).json({ error: '管理员不存在' });
+    if (!admin.totpEnabled) return res.status(400).json({ error: '2FA 未启用' });
+    if (admin.password !== password) return res.status(401).json({ error: '密码错误' });
+
+    const isValid = authenticator.verify({ token: String(code).trim(), secret: admin.totpSecret });
+    if (!isValid) return res.status(400).json({ error: '验证码错误' });
+
+    await prisma.admin.update({
+      where: { id: admin.id },
+      data: { totpEnabled: false, totpSecret: '', totpBackupCodes: '', totpVerifiedAt: null },
+    });
+
+    await writeAuditLog(req.admin, 'admin.2fa.disable', 'admin', admin.id, {});
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// 重新生成备份码（需要密码 + 当前验证码）
+app.post('/api/admin/2fa/regenerate-backup', async (req, res) => {
+  const { password, code } = req.body;
+  if (!password || !code) return res.status(400).json({ error: '请输入密码和验证码' });
+
+  try {
+    const admin = await prisma.admin.findUnique({ where: { id: req.admin.id } });
+    if (!admin) return res.status(404).json({ error: '管理员不存在' });
+    if (!admin.totpEnabled) return res.status(400).json({ error: '2FA 未启用' });
+    if (admin.password !== password) return res.status(401).json({ error: '密码错误' });
+
+    const isValid = authenticator.verify({ token: String(code).trim(), secret: admin.totpSecret });
+    if (!isValid) return res.status(400).json({ error: '验证码错误' });
+
+    const plainCodes = generateBackupCodes();
+    await prisma.admin.update({
+      where: { id: admin.id },
+      data: { totpBackupCodes: JSON.stringify(plainCodes.map(hashBackupCode)) },
+    });
+
+    await writeAuditLog(req.admin, 'admin.2fa.regenerate_backup', 'admin', admin.id, {});
+    res.json({ success: true, plainBackupCodes: plainCodes });
+  } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 // ============ 赠送订单管理（后台） ============
@@ -2488,6 +2726,7 @@ async function syncMenus() {
     { id: 'menu-system-group', parentId: null, title: '系统管理', type: 'DIRECTORY', icon: '⚙️', path: '', component: '', permission: '', sortOrder: 99 },
     { id: 'menu-email-setting', parentId: 'menu-system-group', title: '邮件配置', type: 'MENU', icon: '📧', path: '/system/email-setting', component: 'EmailSettingPage', permission: 'audit.view', sortOrder: 7 },
     { id: 'menu-email-logs', parentId: 'menu-system-group', title: '邮件日志', type: 'MENU', icon: '📨', path: '/system/email-logs', component: 'EmailLogList', permission: 'audit.view', sortOrder: 8 },
+    { id: 'menu-security', parentId: 'menu-system-group', title: '账号安全', type: 'MENU', icon: '🔐', path: '/system/security', component: 'SecurityPage', permission: '', sortOrder: 9 },
     { id: 'menu-admins', parentId: 'menu-system-group', title: '管理员列表', type: 'MENU', icon: '👤', path: '/admins', component: 'AdminList', permission: 'admins.view', sortOrder: 1 },
     { id: 'menu-roles', parentId: 'menu-system-group', title: '角色管理', type: 'MENU', icon: '🎭', path: '/admins/roles', component: 'RoleList', permission: 'roles.view', sortOrder: 2 },
     { id: 'menu-permissions', parentId: 'menu-system-group', title: '权限说明', type: 'MENU', icon: '📖', path: '/admins/permissions', component: 'PermissionList', permission: '', sortOrder: 3 },
