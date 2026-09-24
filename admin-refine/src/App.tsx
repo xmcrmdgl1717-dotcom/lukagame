@@ -1,124 +1,177 @@
-import React from 'react';
-import { Refine, useIsAuthenticated } from '@refinedev/core';
-import routerProvider from '@refinedev/react-router-v6';
-import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
-import { dataProvider } from './providers/dataProvider';
-import { authProvider } from './providers/authProvider';
-import { SensitiveConfirmProvider } from './components/SensitiveConfirm';
-import AppLayout from './components/AppLayout';
-import { useMenuTree, AdminMenu } from './hooks/useMenuTree';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useStore } from './store';
+import { I18nProvider } from './i18n/index.jsx';
+import BottomNav from './components/BottomNav';
+import LanguageSwitcher from './components/LanguageSwitcher';
+import Popup from './components/Popup';
+import Home from './pages/Home';
+import GameDetail from './pages/GameDetail';
+import Activity from './pages/Activity';
+import Inventory from './pages/Inventory';
+import Profile from './pages/Profile';
+import Orders from './pages/Orders';
+import Notifications from './pages/Notifications';
+import CardOrders from './pages/CardOrders';
+import CardOrderSubmit from './pages/CardOrderSubmit';
+import Articles from './pages/Articles';
+import ArticleDetail from './pages/ArticleDetail';
+import StaticPage from './pages/StaticPage';
+import TransactionLog from './pages/TransactionLog';
+import VipCenter from './pages/VipCenter';
+import Leaderboard from './pages/Leaderboard';
+import Transfers from './pages/Transfers';
+import DrawDetail from './pages/DrawDetail';
+import EmailSettings from './pages/EmailSettings';
+import LoginModal from './components/LoginModal';
+import RechargeModal from './components/RechargeModal';
 
-import { LoginPage } from './pages/login';
-import { DashboardPage } from './pages/dashboard';
-import UserList from './pages/users';
-import UserGroupList from './pages/user-groups';
-import BankCardList from './pages/bankcards';
-import CardList from './pages/cards';
-import BoxList from './pages/boxes';
-import RechargeList from './pages/recharge';
-import OrderList from './pages/orders';
-import BannerList from './pages/banners';
-import TaskList from './pages/tasks';
-import RedeemCodeList from './pages/redeem-codes';
-import NotificationList from './pages/notifications';
-import TicketList from './pages/tickets';
-import AdminList from './pages/admins';
-import RoleList from './pages/roles';
-import PermissionList from './pages/permissions';
-import AuditLogList from './pages/audit-logs';
-import SessionList from './pages/sessions';
-import VipLevels from './pages/vip-levels';
-import MenuManage from './pages/menus';
-import GameList from './pages/games';
-import AdList from './pages/ads';
-import PaymentChannelList from './pages/payment-channels';
-import TransactionList from './pages/transactions';
-import DrawLogList from './pages/drawlogs';
-import ReportSummary from './pages/reports/summary';
-import ReportFinance from './pages/reports/finance';
-import ReportDraw from './pages/reports/draw';
-import ReportUserDraw from './pages/reports/user-draw';
-import ReportUserFinance from './pages/reports/user-finance';
-import ReportVipDistribution from './pages/reports/vip-distribution';
-import ReportCardRanking from './pages/reports/card-ranking';
-import ReportRetention from './pages/reports/retention';
-import LanguageList from './pages/languages';
-import TranslationList from './pages/translations';
-import CardOrderList from './pages/card-orders';
-import PopupList from './pages/popups';
-import ArticleList from './pages/articles';
-import AdChannelList from './pages/ad-channels';
-import AdCampaignList from './pages/ad-campaigns';
-import KolList from './pages/kols';
-import AdReport from './pages/ad-reports';
-import AdRetentionReport from './pages/ad-retention';
-import TransferLogList from './pages/transfer-logs';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-const COMPONENT_REGISTRY: Record<string, React.ComponentType<any>> = {
-  DashboardPage, UserList, UserGroupList, BankCardList, CardList, BoxList,
-  RechargeList, OrderList, BannerList, TaskList, RedeemCodeList, NotificationList,
-  TicketList, AdminList, RoleList, PermissionList, AuditLogList, SessionList,
-  VipLevels, MenuManage, GameList, AdList, PaymentChannelList,
-  TransactionList, DrawLogList, ReportSummary, ReportFinance, ReportDraw,
-  ReportUserDraw, ReportUserFinance, ReportVipDistribution, ReportCardRanking, ReportRetention,
-  LanguageList, TranslationList, CardOrderList, PopupList, ArticleList,
-  AdChannelList, AdCampaignList, KolList, AdReport, AdRetentionReport,
-  TransferLogList,
-};
+function AppInner() {
+  const [currentTab, setCurrentTab] = useState('home');
+  const [currentGame, setCurrentGame] = useState(null);
+  const [currentPage, setCurrentPage] = useState(null);
+  const [showLogin, setShowLogin] = useState(false);
+  const [showRecharge, setShowRecharge] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const { setUser, setBoxes, user } = useStore();
 
-function buildRoutes(menus: AdminMenu[]): React.ReactElement[] {
-  const routes: React.ReactElement[] = [];
-  const walk = (list: AdminMenu[]) => {
-    list.forEach((m) => {
-      if (m.type === 'MENU' && m.path && m.component) {
-        const Comp = COMPONENT_REGISTRY[m.component];
-        if (Comp) {
-          routes.push(<Route key={m.id} path={m.path} element={<Comp />} />);
-        } else {
-          console.warn(`[路由] 未找到组件: ${m.component} (菜单 ${m.id})`);
-        }
-      }
-      if (m.children?.length) walk(m.children);
-    });
+  useEffect(() => { axios.get(`${API_URL}/api/boxes`).then(res => setBoxes(res.data)).catch(() => {}); }, [setBoxes]);
+
+  useEffect(() => {
+    if (!user) return;
+    axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' })
+      .then((res) => { if (res.data && res.data.id) setUser(res.data); }).catch(() => {});
+    // eslint-disable-next-line
+  }, []);
+
+  useEffect(() => {
+    if (!user) { setUnreadCount(0); return; }
+    const fetchUnread = async () => {
+      try { const res = await axios.get(`${API_URL}/api/notifications/${user.id}/unread-count`); setUnreadCount(res.data.unread); } catch (e) {}
+    };
+    fetchUnread();
+    const timer = setInterval(fetchUnread, 30000);
+    return () => clearInterval(timer);
+  }, [user]);
+
+  const handleLoginSuccess = (userData) => { setUser(userData); setShowLogin(false); };
+  const handleGoGame = (game) => setCurrentGame(game);
+  const handleBackFromGame = () => setCurrentGame(null);
+  const goPage = (page) => { setCurrentPage(page); setCurrentGame(null); };
+  const backFromPage = () => setCurrentPage(null);
+
+  const handleRefresh = async () => {
+    if (!user) return;
+    setRefreshing(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' });
+      if (res.data && res.data.id) setUser(res.data);
+    } catch (e) {}
+    finally { setTimeout(() => setRefreshing(false), 300); }
   };
-  walk(menus);
-  return routes;
-}
 
-const ProtectedLayout = ({ menus }: { menus: AdminMenu[] }) => (
-  <AppLayout menus={menus}><Outlet /></AppLayout>
-);
+  const renderContent = () => {
+    if (currentPage) {
+      if (currentPage.type === 'article') return <ArticleDetail slug={currentPage.slug} onBack={backFromPage} />;
+      if (currentPage.type === 'static') return <StaticPage slug={currentPage.slug} onBack={backFromPage} />;
+      if (currentPage.type === 'articles-list') return <Articles onOpenArticle={(slug) => goPage({ type: 'article', slug })} onBack={backFromPage} />;
+      if (currentPage.type === 'card-order-submit') return <CardOrderSubmit onBack={backFromPage} />;
+      if (currentPage.type === 'transactions') return <TransactionLog onBack={backFromPage} />;
+      if (currentPage.type === 'vip') return <VipCenter onBack={backFromPage} />;
+      if (currentPage.type === 'leaderboard') return <Leaderboard onBack={backFromPage} />;
+      if (currentPage.type === 'transfers') return <Transfers onBack={backFromPage} />;
+      if (currentPage.type === 'email-settings') return <EmailSettings onBack={backFromPage} />;
+      if (currentPage.type === 'draw-detail') return (
+        <DrawDetail
+          boxId={currentPage.boxId}
+          onBack={backFromPage}
+          onGoInventory={() => { setCurrentPage(null); setCurrentGame(null); setCurrentTab('inventory'); }}
+        />
+      );
+    }
+    if (currentGame) return (
+      <GameDetail
+        gameId={currentGame.id}
+        onBack={handleBackFromGame}
+        onGoBoxDetail={(boxId) => goPage({ type: 'draw-detail', boxId })}
+      />
+    );
+    if (currentTab === 'home') return (
+      <Home
+        onShowLogin={() => setShowLogin(true)}
+        onGoGame={handleGoGame}
+        onGoLeaderboard={() => goPage({ type: 'leaderboard' })}
+        onGoBoxDetail={(boxId) => goPage({ type: 'draw-detail', boxId })}
+      />
+    );
+    if (currentTab === 'activity') return <Activity />;
+    if (currentTab === 'inventory') return <Inventory onGoSubmit={() => goPage({ type: 'card-order-submit' })} onGoTransfers={() => goPage({ type: 'transfers' })} />;
+    if (currentTab === 'orders') return <Orders />;
+    if (currentTab === 'card-orders') return <CardOrders onGoSubmit={() => goPage({ type: 'card-order-submit' })} />;
+    if (currentTab === 'notifications') return <Notifications onRead={() => setUnreadCount(0)} />;
+    if (currentTab === 'profile') {
+      return (
+        <Profile
+          onGoOrders={() => setCurrentTab('orders')}
+          onGoCardOrders={() => setCurrentTab('card-orders')}
+          onGoNotifications={() => setCurrentTab('notifications')}
+          onGoArticles={() => goPage({ type: 'articles-list' })}
+          onGoStatic={(slug) => goPage({ type: 'static', slug })}
+          onGoVip={() => goPage({ type: 'vip' })}
+          onGoTransfers={() => goPage({ type: 'transfers' })}
+          onGoEmailSettings={() => goPage({ type: 'email-settings' })}
+        />
+      );
+    }
+    return null;
+  };
 
-function AppContent() {
-  const { data: auth, isLoading: authLoading } = useIsAuthenticated();
-  const { menus, loading: menuLoading } = useMenuTree();
-
-  if (authLoading) return <div className="flex items-center justify-center h-screen bg-[#0d0d0d] text-gray-400">验证登录状态...</div>;
-  if (!auth?.authenticated) return (<Routes><Route path="/login" element={<LoginPage />} /><Route path="*" element={<Navigate to="/login" replace />} /></Routes>);
-  if (menuLoading || !menus) return <div className="flex items-center justify-center h-screen bg-[#0d0d0d] text-gray-400">加载菜单中...</div>;
-
-  const dynamicRoutes = buildRoutes(menus);
+  const popupPath = currentPage ? `/page/${currentPage.type}` : currentGame ? `/game/${currentGame.id}` : `/${currentTab}`;
 
   return (
-    <Routes>
-      <Route path="/login" element={<Navigate to="/" replace />} />
-      <Route element={<ProtectedLayout menus={menus} />}>
-        {dynamicRoutes}
-        <Route index element={<DashboardPage />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <div className="max-w-md mx-auto min-h-screen bg-[#0a0a0a] text-white pb-20 relative shadow-2xl overflow-hidden">
+      <div className="flex justify-between items-center px-3 py-3 bg-[#140a0a] border-b border-[#332222] gap-2">
+        <div className="text-xl font-black italic text-red-500 tracking-wider flex-shrink-0">LUKA!</div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <LanguageSwitcher />
+          {user && (
+            <button onClick={() => setCurrentTab('notifications')} className="relative flex-shrink-0">
+              <span className="text-lg">🔔</span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[14px] h-3.5 flex items-center justify-center px-1">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+          )}
+          {!user ? (
+            <button onClick={() => setShowLogin(true)} className="text-[11px] text-gray-400 border border-gray-600 px-2.5 py-1 rounded-full hover:text-white hover:border-white transition whitespace-nowrap">Sign In</button>
+          ) : (
+            <div className="flex items-center gap-1">
+              <button onClick={() => goPage({ type: 'transactions' })} className="text-[11px] text-yellow-500 font-bold bg-[#2a1414] px-2 py-1 rounded-full border border-yellow-900/50 whitespace-nowrap hover:border-yellow-500 transition">💰 {user.coins.toLocaleString()}</button>
+              <button onClick={handleRefresh} disabled={refreshing} className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-[11px] w-7 h-7 rounded-full flex items-center justify-center shadow-md transition" title="刷新余额">
+                <span className={refreshing ? 'animate-spin' : ''}>🔄</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="p-4">{renderContent()}</div>
+
+      {showLogin && <LoginModal onClose={() => setShowLogin(false)} onLoginSuccess={handleLoginSuccess} />}
+      {showRecharge && <RechargeModal onClose={() => setShowRecharge(false)} />}
+
+      <BottomNav currentTab={currentTab} setCurrentTab={(t) => { setCurrentGame(null); setCurrentPage(null); setCurrentTab(t); }} onShowRecharge={() => { if (!user) return setShowLogin(true); setShowRecharge(true); }} />
+
+      <Popup currentPath={popupPath} />
+    </div>
   );
 }
 
 export default function App() {
-  return (
-    <SensitiveConfirmProvider>
-      <BrowserRouter>
-        <Refine dataProvider={dataProvider} authProvider={authProvider} routerProvider={routerProvider} options={{ disableTelemetry: true }}>
-          <AppContent />
-        </Refine>
-      </BrowserRouter>
-    </SensitiveConfirmProvider>
-  );
+  return (<I18nProvider><AppInner /></I18nProvider>);
 }
