@@ -6,8 +6,10 @@ export const useStore = create(
     (set) => ({
       user: null,
       boxes: [],
+      currency: { name: '钻石', symbol: '💎', shortName: 'DIAMOND', ratio: 100, enabled: true },
       setUser: (user) => set({ user }),
       setBoxes: (boxes) => set({ boxes }),
+      setCurrency: (currency) => set({ currency }),
       updateCoins: (amount) => set((state) => ({
         user: state.user ? { ...state.user, coins: state.user.coins + amount } : null
       })),
@@ -15,7 +17,7 @@ export const useStore = create(
     }),
     {
       name: 'luka-user', // localStorage key
-      partialize: (state) => ({ user: state.user }), // 只持久化 user，不持久化 boxes
+      partialize: (state) => ({ user: state.user }), // 只持久化 user
     }
   )
 );
