@@ -28,21 +28,19 @@ const fmtTime = (d) => {
 };
 
 export default function DrawDetail({ boxId, onBack, onGoInventory }) {
-  const { user, setUser } = useStore();
+  const { user, setUser, currency } = useStore();
   const [box, setBox] = useState(null);
   const [loading, setLoading] = useState(true);
   const [recentDraws, setRecentDraws] = useState([]);
   const [showPool, setShowPool] = useState(false);
 
-  // 抽奖流程状态
-  const [phase, setPhase] = useState('idle'); // idle | countdown | revealing | done
+  const [phase, setPhase] = useState('idle');
   const [countdown, setCountdown] = useState(3);
   const [drawnCards, setDrawnCards] = useState([]);
   const [revealIdx, setRevealIdx] = useState(0);
   const [pendingCount, setPendingCount] = useState(1);
   const timerRef = useRef(null);
 
-  // 加载盲盒详情
   useEffect(() => {
     setLoading(true);
     axios.get(`${API_URL}/api/boxes/${boxId}`)
@@ -51,7 +49,6 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
       .finally(() => setLoading(false));
   }, [boxId]);
 
-  // 加载动态
   useEffect(() => {
     const loadRecent = () => {
       axios.get(`${API_URL}/api/boxes/${boxId}/recent-draws`)
@@ -63,7 +60,6 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
     return () => clearInterval(timer);
   }, [boxId]);
 
-  // 清理计时器
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -74,18 +70,16 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
     if (!user) return alert('请先登录');
     if (!box) return;
     const totalCost = box.price * count;
-    if (user.coins < totalCost) return alert(`金币不足！需要 ${totalCost.toLocaleString()} 🪙`);
+    if (user.coins < totalCost) return alert(`${currency.name}不足！需要 ${totalCost.toLocaleString()} ${currency.symbol}`);
 
     setPendingCount(count);
 
-    // 1. 请求后端抽奖
     try {
       const res = await axios.post(`${API_URL}/api/draw`, { userId: user.id, boxId: box.id, count });
       const cards = res.data.drawnCards || [];
       setDrawnCards(cards);
       setRevealIdx(0);
 
-      // 2. 进入倒计时动画
       setPhase('countdown');
       setCountdown(3);
 
@@ -96,9 +90,8 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
           setCountdown(cd);
           timerRef.current = setTimeout(tick, 700);
         } else {
-          setCountdown(0); // GO!
+          setCountdown(0);
           timerRef.current = setTimeout(() => {
-            // 3. 进入揭晓
             setPhase('revealing');
             revealNext(cards, 0);
           }, 500);
@@ -106,7 +99,6 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
       };
       timerRef.current = setTimeout(tick, 700);
 
-      // 4. 立刻刷新用户（余额已扣）
       const updated = await axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' });
       setUser(updated.data);
     } catch (e) {
@@ -117,12 +109,10 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
 
   const revealNext = (cards, idx) => {
     if (idx >= cards.length) {
-      // 全部揭晓完
       timerRef.current = setTimeout(() => setPhase('done'), 400);
       return;
     }
     setRevealIdx(idx + 1);
-    // 每张间隔 250ms，SSR 慢一点给足特效时间
     const card = cards[idx];
     const delay = card.rarity === 'SSR' ? 900 : card.rarity === 'SR' ? 500 : 250;
     timerRef.current = setTimeout(() => revealNext(cards, idx + 1), delay);
@@ -132,7 +122,6 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
     setPhase('idle');
     setDrawnCards([]);
     setRevealIdx(0);
-    // 刷新动态
     axios.get(`${API_URL}/api/boxes/${boxId}/recent-draws`).then(res => setRecentDraws(res.data || [])).catch(() => {});
   };
 
@@ -144,7 +133,6 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
 
   return (
     <div className="space-y-4 pb-32 relative">
-      {/* 返回 */}
       <div className="flex items-center gap-2">
         <button onClick={onBack} className="text-gray-400 text-sm hover:text-white">← 返回</button>
         {box.game && (
@@ -154,7 +142,6 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
         )}
       </div>
 
-      {/* 大封面 */}
       <div className="relative rounded-2xl overflow-hidden border border-[#3d1a1a] shadow-2xl">
         <div className="w-full aspect-video bg-gradient-to-br from-[#2d1410] via-[#3a1c14] to-[#4a1c12] flex items-center justify-center relative">
           {box.coverUrl ? (
@@ -177,7 +164,6 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
         </div>
       </div>
 
-      {/* 全服抽奖动态 */}
       <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl p-3">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs font-bold text-orange-400">🔥 全服动态</span>
@@ -200,7 +186,6 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
         )}
       </div>
 
-      {/* 概率公示 */}
       <div className="bg-[#1c0e0e] border border-[#3d1a1a] rounded-xl overflow-hidden">
         <button
           onClick={() => setShowPool(!showPool)}
@@ -233,12 +218,14 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
         )}
       </div>
 
-      {/* 底部固定：抽奖按钮 */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-[#140a0a]/95 border-t border-[#332222] p-3 backdrop-blur-md z-40" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
         <div className="flex gap-2 items-center">
           <div className="flex-shrink-0 text-center pr-2 border-r border-[#332222]">
             <div className="text-[10px] text-gray-500">单价</div>
-            <div className="text-sm font-black text-yellow-500 whitespace-nowrap">{box.price.toLocaleString()} 🪙</div>
+            <div className="text-sm font-black text-yellow-500 whitespace-nowrap flex items-center gap-0.5">
+              <span>{currency.symbol}</span>
+              <span>{box.price.toLocaleString()}</span>
+            </div>
           </div>
           <button
             onClick={() => startDraw(1)}
@@ -246,7 +233,7 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
             className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 text-white font-bold py-3 rounded-xl shadow-lg disabled:opacity-50 transition active:scale-95"
           >
             <div className="text-sm">单抽</div>
-            <div className="text-[10px] opacity-80">{box.price.toLocaleString()} 🪙</div>
+            <div className="text-[10px] opacity-80">{currency.symbol} {box.price.toLocaleString()}</div>
           </button>
           <button
             onClick={() => startDraw(10)}
@@ -254,13 +241,12 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
             className="flex-1 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold py-3 rounded-xl shadow-lg disabled:opacity-50 transition active:scale-95 relative overflow-hidden"
           >
             <div className="text-sm">十连抽</div>
-            <div className="text-[10px] opacity-80">{(box.price * 10).toLocaleString()} 🪙</div>
+            <div className="text-[10px] opacity-80">{currency.symbol} {(box.price * 10).toLocaleString()}</div>
             <div className="absolute top-0 right-0 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded-bl-lg">HOT</div>
           </button>
         </div>
       </div>
 
-      {/* 倒计时全屏覆盖 */}
       {phase === 'countdown' && (
         <div className="fixed inset-0 bg-black/95 z-[300] flex flex-col items-center justify-center">
           <div className="text-orange-400 text-sm mb-8 animate-pulse">准备开奖...</div>
@@ -279,7 +265,6 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
         </div>
       )}
 
-      {/* 揭晓动画 */}
       {phase === 'revealing' && (
         <div className="fixed inset-0 bg-black/95 z-[300] flex flex-col items-center justify-center p-4">
           <div className="text-orange-400 text-xs mb-6">
@@ -318,7 +303,6 @@ export default function DrawDetail({ boxId, onBack, onGoInventory }) {
         </div>
       )}
 
-      {/* 结果页 */}
       {phase === 'done' && (
         <div className="fixed inset-0 bg-black/95 z-[300] flex flex-col items-center justify-center p-4 overflow-y-auto">
           {hasSSR && (
