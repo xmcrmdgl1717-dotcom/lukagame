@@ -6,7 +6,7 @@ import { useI18n } from '../i18n/index.jsx';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function RechargeModal({ onClose }) {
-  const { user, setUser } = useStore();
+  const { user, setUser, currency } = useStore();
   const { t } = useI18n();
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,13 +18,16 @@ export default function RechargeModal({ onClose }) {
 
   const handleRecharge = async (option) => {
     if (!user) return alert('请先登录');
-    if (!confirm(`确认支付 ¥${(option.price / 100).toFixed(2)}，获得 ${option.coins + option.bonus} 金币吗？`)) return;
+    // 当前默认用 USD 结算（后续接入支付通道后再按通道币种结算）
+    const price = option.prices?.USD ?? (option.price / 100);
+    if (!confirm(`确认支付 $${price.toFixed(2)}，获得 ${option.totalCoins} ${currency.name}吗？`)) return;
+
     setProcessing(true);
     try {
-      const res = await axios.post(`${API_URL}/api/recharge`, { userId: user.id, optionId: option.id });
+      const res = await axios.post(`${API_URL}/api/recharge`, { userId: user.id, optionId: option.id, currencyCode: 'USD' });
       const updatedUser = await axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' });
       setUser(updatedUser.data);
-      alert(`充值成功！获得 ${res.data.coinsAdded} 金币`);
+      alert(`充值成功！获得 ${res.data.coinsAdded} ${currency.name}`);
       onClose();
     } catch (e) { alert('充值失败: ' + (e.response?.data?.error || e.message)); }
     finally { setProcessing(false); }
@@ -42,14 +45,29 @@ export default function RechargeModal({ onClose }) {
           <div className="text-center text-gray-500 py-8">暂无可用的充值套餐</div>
         ) : (
           <div className="grid grid-cols-3 gap-3">
-            {options.map(opt => (
-              <div key={opt.id} onClick={() => handleRecharge(opt)} className="bg-[#2a1414] border border-[#4a1c12] rounded-lg p-3 text-center cursor-pointer hover:border-orange-500 transition">
-                <div className="text-lg font-black text-yellow-500">{opt.coins}</div>
-                <div className="text-[10px] text-gray-400 mb-1">金币</div>
-                {opt.bonus > 0 && <div className="text-[10px] text-green-400 mb-1">+{opt.bonus}</div>}
-                <div className="text-xs font-bold text-white mt-2">¥{(opt.price / 100).toFixed(2)}</div>
-              </div>
-            ))}
+            {options.map(opt => {
+              const usdPrice = opt.prices?.USD ?? (opt.price / 100);
+              const totalCoins = opt.totalCoins ?? (opt.coins + (opt.bonus || 0));
+              return (
+                <div
+                  key={opt.id}
+                  onClick={() => handleRecharge(opt)}
+                  className="bg-[#2a1414] border border-[#4a1c12] rounded-lg p-3 text-center cursor-pointer hover:border-orange-500 transition"
+                >
+                  <div className="text-lg font-black text-yellow-500 flex items-center justify-center gap-0.5">
+                    <span className="text-base">{currency.symbol}</span>
+                    <span>{opt.coins}</span>
+                  </div>
+                  <div className="text-[10px] text-gray-400 mb-1">{currency.name}</div>
+                  {opt.bonus > 0 && (
+                    <div className="text-[10px] text-green-400 mb-1 flex items-center justify-center gap-0.5">
+                      <span>+{opt.bonus}</span>
+                    </div>
+                  )}
+                  <div className="text-xs font-bold text-white mt-2">${usdPrice.toFixed(2)}</div>
+                </div>
+              );
+            })}
           </div>
         )}
 
