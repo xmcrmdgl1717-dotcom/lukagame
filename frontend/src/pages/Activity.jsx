@@ -6,7 +6,7 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export default function Activity() {
-  const { user, setUser } = useStore();
+  const { user, setUser, currency } = useStore();
   const { t } = useI18n();
   const [tab, setTab] = useState('tasks');
   const [tasks, setTasks] = useState([]);
@@ -39,7 +39,7 @@ export default function Activity() {
   const handleClaim = async (taskId) => {
     try {
       const res = await axios.post(`${API_URL}/api/tasks/claim`, { userId: user.id, taskId });
-      alert(`领取成功！获得 ${res.data.reward} 金币`);
+      alert(`领取成功！获得 ${res.data.reward} ${currency.name}`);
       const updated = await axios.post(`${API_URL}/api/login`, { username: user.username, password: user.password || '123' });
       setUser(updated.data);
       fetchTasks();
@@ -74,7 +74,9 @@ export default function Activity() {
                         <div className="text-sm font-bold text-white">{t_item.title}</div>
                         <div className="text-[10px] text-gray-500 mt-1">{t_item.description}</div>
                       </div>
-                      <div className="text-xs text-yellow-500 font-bold whitespace-nowrap ml-2">+{t_item.rewardCoins} 🪙</div>
+                      <div className="text-xs text-yellow-500 font-bold whitespace-nowrap ml-2 flex items-center gap-0.5">
+                        <span>+{t_item.rewardCoins}</span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-3 mt-3">
                       <div className="flex-1 bg-gray-800 rounded-full h-2 overflow-hidden">
@@ -110,7 +112,7 @@ export default function Activity() {
                   </span>
                   <span className="text-white font-bold">{row.username}</span>
                 </div>
-                <span className="text-orange-400 font-bold text-sm">{row.totalCost.toLocaleString()} 🪙</span>
+                <span className="text-orange-400 font-bold text-sm">{row.totalCost.toLocaleString()}</span>
               </div>
             ))
           )}
