@@ -561,6 +561,18 @@ model AdminMenu {
   children   AdminMenu[]  @relation("MenuChildren")
 }
 
+// ================= 平台币种配置 =================
+
+model CurrencySetting {
+  id        String   @id @default("singleton")
+  name      String   @default("钻石")
+  symbol    String   @default("💎")
+  shortName String   @default("DIAMOND")
+  ratio     Int      @default(100) // 1 元 = N 钻石
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
 // ================= 客户端错误日志 =================
 
 model ClientError {
