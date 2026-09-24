@@ -15,7 +15,8 @@
   "dependencies": {
     "@prisma/client": "^5.14.0",
     "cors": "^2.8.5",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "nodemailer": "^6.9.13"
   },
   "devDependencies": {
     "prisma": "^5.14.0"
