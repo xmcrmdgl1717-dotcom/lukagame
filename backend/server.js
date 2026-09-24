@@ -242,6 +242,63 @@ app.get('/api/boxes', async (req, res) => {
   res.json(await prisma.box.findMany({ where, include: { game: true } }));
 });
 
+// 单个盲盒详情（含卡池概率 + 抽奖动态）
+app.get('/api/boxes/:id', async (req, res) => {
+  try {
+    const box = await prisma.box.findUnique({
+      where: { id: req.params.id },
+      include: {
+        game: { select: { id: true, displayName: true, icon: true } },
+        items: { include: { card: true } },
+      },
+    });
+    if (!box || !box.isActive) return res.status(404).json({ error: '盲盒不存在或已下架' });
+
+    const totalWeight = box.items.reduce((s, i) => s + (i.weight || 0), 0);
+    const pool = box.items.map(i => ({
+      cardId: i.card.id,
+      name: i.card.name,
+      rarity: i.card.rarity,
+      imageUrl: i.card.imageUrl,
+      description: i.card.description,
+      weight: i.weight,
+      probability: totalWeight > 0 ? ((i.weight / totalWeight) * 100).toFixed(2) : '0.00',
+    })).sort((a, b) => b.weight - a.weight);
+
+    res.json({
+      id: box.id,
+      name: box.name,
+      price: box.price,
+      coverUrl: box.coverUrl,
+      description: box.description,
+      allowTransfer: box.allowTransfer,
+      game: box.game,
+      totalWeight,
+      pool,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 盲盒最近抽奖动态（全服）
+app.get('/api/boxes/:id/recent-draws', async (req, res) => {
+  try {
+    const logs = await prisma.drawLog.findMany({
+      where: { boxId: req.params.id },
+      include: { user: { select: { username: true, vipLevel: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+    res.json(logs.map(l => ({
+      id: l.id,
+      username: l.user?.username || '神秘用户',
+      vipLevel: l.user?.vipLevel || 0,
+      count: l.count,
+      cost: l.cost,
+      createdAt: l.createdAt,
+    })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // 抽卡
 app.post('/api/draw', async (req, res) => {
   const { userId, boxId, count } = req.body;
