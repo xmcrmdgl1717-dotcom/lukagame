@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const { authenticator } = require('otplib');
+const QRCode = require('qrcode');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
